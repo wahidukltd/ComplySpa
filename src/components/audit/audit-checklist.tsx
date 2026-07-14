@@ -1,0 +1,1 @@
+// AuditChecklist — 7-item inspection-readiness checklist with auto-fill from F1/F2 (Phase 4).

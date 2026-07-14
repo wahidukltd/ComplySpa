@@ -1,0 +1,1 @@
+// ReadinessScore — circular/linear score gauge 0-100 derived from audit findings (Phase 4).

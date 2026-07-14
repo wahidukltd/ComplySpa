@@ -1,0 +1,1 @@
+// Single staff profile — all credentials for one staff member (Phase 2).

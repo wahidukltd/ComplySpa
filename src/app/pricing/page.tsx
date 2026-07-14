@@ -1,0 +1,1 @@
+// Public pricing page — three plan cards, free trial CTA, feature comparison table (Phase 8).

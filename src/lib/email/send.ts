@@ -1,0 +1,1 @@
+// Resend API wrapper — sends transactional emails, logs delivery, errors to Sentry (Phase 5).

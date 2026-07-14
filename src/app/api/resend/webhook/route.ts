@@ -1,0 +1,1 @@
+// Resend email delivery webhook — validates signature, logs delivery status (Phase 5).

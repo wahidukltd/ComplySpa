@@ -1,0 +1,1 @@
+// ReadinessReport — generate and download the inspection-readiness report (Phase 4).

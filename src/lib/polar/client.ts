@@ -1,0 +1,1 @@
+// Polar SDK client wrapper — initializes with POLAR_ACCESS_TOKEN (Phase 7).

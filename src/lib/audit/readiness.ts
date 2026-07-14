@@ -1,0 +1,1 @@
+// Readiness score calculation + auto-fill logic from credential data F1/F2 (Phase 4).

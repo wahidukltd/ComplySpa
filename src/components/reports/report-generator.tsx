@@ -1,0 +1,1 @@
+// ReportGenerator — compose, render, and download the audit report PDF (Phase 3).

@@ -1,0 +1,1 @@
+// DeliveryStatusBadge — sent/failed/pending badge for alert delivery channels (Phase 5).

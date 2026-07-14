@@ -1,0 +1,1 @@
+// Clerk auth middleware helpers — protect /dashboard/*, gate by plan status (Phase 0).

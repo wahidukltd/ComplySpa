@@ -1,0 +1,1 @@
+// PageHeader — title, description, and primary action slot for dashboard pages (Phase 0).

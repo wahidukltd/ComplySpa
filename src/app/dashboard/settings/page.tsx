@@ -1,0 +1,1 @@
+// Clinic settings — profile, alert recipients, custom credential types, audit reminders (Phase 6).

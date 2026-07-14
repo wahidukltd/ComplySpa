@@ -1,0 +1,1 @@
+// StaffTable — staff list table with status badges and row actions (Phase 2).

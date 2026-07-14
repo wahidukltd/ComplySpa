@@ -1,0 +1,1 @@
+// GapTracker — remediation tracker for failed/stale audit findings (Phase 4).

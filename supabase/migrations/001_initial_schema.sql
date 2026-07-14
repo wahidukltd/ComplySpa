@@ -1,0 +1,1 @@
+-- Initial schema: all tables + seed data (Phase 1)

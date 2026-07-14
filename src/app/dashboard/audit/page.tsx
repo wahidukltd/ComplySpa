@@ -1,0 +1,1 @@
+// Inspection-readiness & mock-audit engine — checklist, score, gap tracker, report, history (Phase 4).
