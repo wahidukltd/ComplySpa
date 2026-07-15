@@ -126,7 +126,8 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
       002_rls_policies.sql
       003_pg_cron_jobs.sql
       004_credential_audit.sql
-      005_audit_tables.sql
+      006_security_fixes.sql
+      007_post_review_fixes.sql
     /functions/
       send-credential-alert/
         index.ts
