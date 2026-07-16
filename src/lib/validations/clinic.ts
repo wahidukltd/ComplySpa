@@ -8,13 +8,16 @@ export const createClinicSchema = z.object({
   address: z
     .string()
     .max(500, "Address must be 500 characters or fewer")
+    .transform(val => val.replace(/<[^>]*>/g, ""))
     .optional()
     .or(z.literal("")),
   state: z
     .string()
-    .max(2, "Use the 2-letter state abbreviation")
+    .length(2, "Use the 2-letter state abbreviation")
+    .regex(/^[A-Z]{2}$/, "Must be a valid 2-letter state code")
     .optional()
-    .or(z.literal("")),
+    .or(z.literal(""))
+    .transform(val => val === "" ? undefined : val),
 });
 
 export type CreateClinicInput = z.infer<typeof createClinicSchema>;

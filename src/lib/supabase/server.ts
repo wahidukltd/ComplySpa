@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { auth } from "@clerk/nextjs/server";
+import * as Sentry from "@sentry/nextjs";
 import type { Database } from "@/types/database";
 
 export async function createClient() {
@@ -15,14 +16,18 @@ export async function createClient() {
 
   const { getToken } = await auth();
   const supabaseToken = await getToken({ template: "supabase" });
+  if (!supabaseToken) {
+    Sentry.captureMessage("Server client: Clerk JWT template 'supabase' returned null", "warning");
+  }
 
   return createServerClient<Database>(url, anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
       },
-      // ponytail: setAll not needed — auth is via Bearer JWT, not Supabase cookies
-      setAll() {},
+      setAll() {
+        Sentry.captureMessage("Server client: setAll called but not implemented", "info");
+      },
     },
     ...(supabaseToken
       ? { global: { headers: { Authorization: `Bearer ${supabaseToken}` } } }

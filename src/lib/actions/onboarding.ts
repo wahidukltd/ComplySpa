@@ -2,9 +2,10 @@
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { createClinicSchema, type CreateClinicInput } from "@/lib/validations/clinic";
 import { revalidatePath } from "next/cache";
+import * as Sentry from "@sentry/nextjs";
 
 export async function createClinic(input: CreateClinicInput) {
   const { userId } = await auth();
@@ -25,6 +26,12 @@ export async function createClinic(input: CreateClinicInput) {
   try {
     const clerkUser = await clerk.users.getUser(userId);
     userEmail = clerkUser.emailAddresses[0]?.emailAddress;
+    const primaryEmail = clerkUser.emailAddresses.find(
+      e => e.id === clerkUser.primaryEmailAddressId,
+    );
+    if (!primaryEmail?.verification?.status || primaryEmail.verification.status !== "verified") {
+      return { error: "Please verify your email address before setting up your clinic." };
+    }
   } catch {
     return {
       error:
@@ -36,11 +43,10 @@ export async function createClinic(input: CreateClinicInput) {
     return { error: "Your account must have a verified email address to continue." };
   }
 
-  const supabase = createAdminClient();
+  const supabase = await createClient();
 
   const { data: clinicId, error: rpcError } = await supabase.rpc(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    "create_clinic_for_user" as any,
+    "create_clinic_for_user",
     {
       p_clerk_sub: userId,
       p_email: userEmail,
@@ -51,6 +57,11 @@ export async function createClinic(input: CreateClinicInput) {
   );
 
   if (rpcError) {
+    Sentry.captureMessage("Onboarding RPC failed", { extra: { userId, error: rpcError } });
+    return { error: "Unable to create clinic. Please try again." };
+  }
+
+  if (!clinicId) {
     return { error: "Unable to create clinic. Please try again." };
   }
 
@@ -58,8 +69,8 @@ export async function createClinic(input: CreateClinicInput) {
     await clerk.users.updateUser(userId, {
       publicMetadata: { clinic_id: clinicId },
     });
-  } catch {
-    // ponytail: non-critical — dashboard layout queries users table directly
+  } catch (err) {
+    Sentry.captureException(err);
   }
 
   revalidatePath("/dashboard");

@@ -278,6 +278,52 @@ describe("Credentials isolation", () => {
   });
 });
 
+describe("credential_types isolation (M-5 coverage)", () => {
+  it("each clinic can see global credential types", async () => {
+    const [resA, resB] = await Promise.all([
+      fetchAsUser(clerkUserA, "credential_types?is_custom=eq.false"),
+      fetchAsUser(clerkUserB, "credential_types?is_custom=eq.false"),
+    ]);
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+    const dataA = await resA.json();
+    const dataB = await resB.json();
+    expect(dataA.length).toBeGreaterThanOrEqual(12);
+    expect(dataB.length).toBe(dataA.length);
+  });
+
+  it("owner can INSERT a custom credential type", async () => {
+    const res = await fetchAsUser(clerkUserA, "credential_types", {
+      method: "POST",
+      body: { clinic_id: clinicAId, name: "Custom RLS Test Type", is_custom: true, category: "license" },
+    });
+    expect(res.status).toBe(201);
+    await serviceClient.from("credential_types").delete().eq("name", "Custom RLS Test Type");
+  });
+
+  it("viewer cannot INSERT a custom credential type", async () => {
+    const res = await fetchAsUser(clerkViewerA, "credential_types", {
+      method: "POST",
+      body: { clinic_id: clinicAId, name: "Viewer Custom Type", is_custom: true, category: "license" },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("Clinic A cannot see Clinic B's custom credential types", async () => {
+    const { error } = await serviceClient.from("credential_types").insert({
+      clinic_id: clinicBId, name: "Clinic B Secret Type", is_custom: true, category: "license",
+    });
+    if (error) throw new Error(`Failed to insert: ${error.message}`);
+
+    const res = await fetchAsUser(clerkUserA, "credential_types?is_custom=eq.true");
+    const data = await res.json();
+    const clinicBNames = data.filter((c: { name: string }) => c.name === "Clinic B Secret Type");
+    expect(clinicBNames).toHaveLength(0);
+
+    await serviceClient.from("credential_types").delete().eq("name", "Clinic B Secret Type");
+  });
+});
+
 describe("Owner can manage users", () => {
   it("owner can INSERT a new user", async () => {
     const res = await fetchAsUser(clerkUserA, "users", {

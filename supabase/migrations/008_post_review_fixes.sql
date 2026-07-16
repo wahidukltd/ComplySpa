@@ -1,4 +1,4 @@
-﻿-- Fixes identified by Phase 2 security + database review
+-- Fixes identified by Phase 2 security + database review
 
 -- 1. Partial indexes on unindexed FK columns (review finding #9)
 CREATE INDEX IF NOT EXISTS idx_credentials_verified_by_user_id

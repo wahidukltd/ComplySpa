@@ -47,11 +47,13 @@ try {
 }
 
 /** Run SQL directly via psql (for pg_catalog / cron.job queries not exposed via PostgREST) */
-export function execSql(sql: string): string {
-  return execSync(`docker exec -i ${DB_CONTAINER} psql -U postgres -d postgres -t -A`, {
-    input: sql,
-    encoding: "utf8",
-  }).trim();
+export function execSql(sql: string, params?: string[]): string {
+  let cmd = `docker exec -i ${DB_CONTAINER} psql -U postgres -d postgres -t -A`;
+  if (params && params.length > 0) {
+    const args = params.map((p, i) => `-v p${i + 1}='${p.replace(/'/g, "'\\''")}'`).join(" ");
+    cmd += ` ${args}`;
+  }
+  return execSync(cmd, { input: sql, encoding: "utf8" }).trim();
 }
 
 /** Craft a JWT signed with the local Supabase JWT secret */

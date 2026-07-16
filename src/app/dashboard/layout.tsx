@@ -1,8 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({
   children,
@@ -24,7 +27,7 @@ export default async function DashboardLayout({
 
   if (userErr) {
     Sentry.captureException(userErr);
-    throw userErr;
+    throw new Error("Failed to load user data");
   }
 
   if (!userRecord) {
@@ -39,7 +42,7 @@ export default async function DashboardLayout({
 
   if (clinicErr) {
     Sentry.captureException(clinicErr);
-    throw clinicErr;
+    throw new Error("Failed to load clinic data");
   }
 
   if (!clinic) {
@@ -52,6 +55,15 @@ export default async function DashboardLayout({
 
   if (clinic.plan === "inactive") {
     redirect("/pricing?reason=account_inactive");
+  }
+
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") ?? "";
+  if (clinic.plan === "solo") {
+    const soloRestricted = pathname.startsWith("/dashboard/audit") || pathname.startsWith("/dashboard/settings/users");
+    if (soloRestricted) {
+      redirect("/pricing?reason=plan_upgrade_required");
+    }
   }
 
   return <DashboardShell>{children}</DashboardShell>;

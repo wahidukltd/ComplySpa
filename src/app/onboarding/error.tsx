@@ -2,7 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 
-export default function DashboardError({
+export default function OnboardingError({
   error,
   reset,
 }: {
@@ -14,7 +14,7 @@ export default function DashboardError({
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6">
       <h1 className="text-xl font-semibold">Something went wrong</h1>
       <p className="max-w-md text-sm text-muted-foreground">
-        An unexpected error occurred while loading the dashboard. Please try again.
+        We couldn&apos;t load the onboarding page. Please try again.
       </p>
       <button
         onClick={reset}

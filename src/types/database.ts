@@ -404,6 +404,16 @@ export type Database = {
       auth_user_role: { Args: never; Returns: string }
       check_trial_expiry: { Args: never; Returns: undefined }
       cleanup_inactive_clinics: { Args: never; Returns: undefined }
+      create_clinic_for_user: {
+        Args: {
+          p_clerk_sub: string
+          p_email: string
+          p_name: string
+          p_address?: string | null
+          p_state?: string | null
+        }
+        Returns: string
+      }
       scan_expiring_credentials: { Args: never; Returns: undefined }
       update_credential_statuses: { Args: never; Returns: undefined }
     }

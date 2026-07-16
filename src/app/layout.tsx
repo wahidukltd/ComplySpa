@@ -9,6 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   title: "Med Spa Compliance Tracker",
   description:
     "Track staff credentials, get automated alerts, and generate audit-ready compliance reports.",

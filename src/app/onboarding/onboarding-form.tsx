@@ -39,18 +39,23 @@ export function OnboardingForm() {
       return;
     }
 
-    const result = await createClinic(input);
-    if (result?.error) {
-      setServerError(result.error);
-      if (result.fieldErrors) {
-        const flat: Record<string, string> = {};
-        for (const [key, msgs] of Object.entries(result.fieldErrors)) {
-          if (msgs && msgs.length > 0) flat[key] = msgs[0] ?? "";
+    try {
+      const result = await createClinic(input);
+      if (result?.error) {
+        setServerError(result.error);
+        if (result.fieldErrors) {
+          const flat: Record<string, string> = {};
+          for (const [key, msgs] of Object.entries(result.fieldErrors)) {
+            if (msgs && msgs.length > 0) flat[key] = msgs[0] ?? "";
+          }
+          setErrors(flat);
         }
-        setErrors(flat);
       }
+    } catch {
+      setServerError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   }
 
   return (
