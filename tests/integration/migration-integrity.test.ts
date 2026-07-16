@@ -140,4 +140,25 @@ describe("Migration integrity", () => {
     );
     expect(parseInt(result, 10)).toBe(3);
   });
+
+  it("users.email has a UNIQUE constraint (008 regression guard)", () => {
+    const result = execSql(
+      "SELECT count(*) FROM pg_constraint c JOIN pg_class t ON c.conrelid = t.oid WHERE t.relname = 'users' AND c.contype = 'u' AND c.conname = 'users_email_unique'",
+    );
+    expect(parseInt(result, 10)).toBe(1);
+  });
+
+  it("set_audit_report_author trigger exists (008 regression guard)", () => {
+    const result = execSql(
+      "SELECT count(*) FROM pg_trigger WHERE tgname = 'trigger_set_audit_report_author'",
+    );
+    expect(parseInt(result, 10)).toBe(1);
+  });
+
+  it("create_clinic_for_user RPC function exists (009 regression guard)", () => {
+    const result = execSql(
+      "SELECT count(*) FROM pg_proc WHERE proname = 'create_clinic_for_user'",
+    );
+    expect(parseInt(result, 10)).toBe(1);
+  });
 });

@@ -1,5 +1,8 @@
-import { createServerClient as createServerSupabaseClient } from "@supabase/ssr";
+import "server-only";
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
+import type { Database } from "@/types/database";
 
 export async function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -7,21 +10,22 @@ export async function createClient() {
   if (!url || !anonKey) {
     throw new Error("Missing Supabase environment variables");
   }
+
   const cookieStore = await cookies();
-  return createServerSupabaseClient(url, anonKey, {
+
+  const { getToken } = await auth();
+  const supabaseToken = await getToken({ template: "supabase" });
+
+  return createServerClient<Database>(url, anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          try {
-            cookieStore.set(name, value, options);
-          } catch {
-            // Server Components can't set cookies — session refresh handled by middleware
-          }
-        });
-      },
+      // ponytail: setAll not needed — auth is via Bearer JWT, not Supabase cookies
+      setAll() {},
     },
+    ...(supabaseToken
+      ? { global: { headers: { Authorization: `Bearer ${supabaseToken}` } } }
+      : {}),
   });
 }

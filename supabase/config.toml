@@ -358,9 +358,8 @@ enabled = false
 
 # Use Clerk as a third-party provider alongside Supabase Auth.
 [auth.third_party.clerk]
-enabled = false
-# Obtain from https://clerk.com/setup/supabase
-# domain = "example.clerk.accounts.dev"
+enabled = true
+domain = "moving-sheepdog-44.clerk.accounts.dev"
 
 # OAuth server configuration
 [auth.oauth_server]

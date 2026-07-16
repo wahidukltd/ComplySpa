@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Opencode.
 
 ## Tooling that governs work in this repo
 
@@ -18,7 +18,7 @@ The following are configured at Claude Code **user scope** and shape how code ge
 
 ComplySpa is a vertical SaaS product for medical spas globally, launching in the US market. It tracks staff credentials, sends automated expiration alerts, generates audit-ready compliance reports, and runs an inspection-readiness & mock-audit engine.
 
-**Stack:** Next.js 14+ (App Router) · TypeScript · Tailwind CSS · shadcn/ui (component library) · Supabase (PostgreSQL, Edge Functions, Storage, pg_cron) · Clerk (Auth) · Vercel (Hosting) · Resend (Email) · Twilio (SMS) · Polar.sh (Payments) · Sentry (Errors)
+**Stack:** Next.js 14+ (App Router) · TypeScript · Tailwind CSS · shadcn/ui (component library) · Framer Motion (micro-interactions + page transitions) · React Three Fiber + Three.js (landing page hero 3D only) · Supabase (PostgreSQL, Edge Functions, Storage, pg_cron) · Clerk (Auth) · Vercel (Hosting) · Resend (Email) · Twilio (SMS) · Polar.sh (Payments) · Sentry (Errors)
 
 **Architecture:** Two services only — Vercel (frontend) + Supabase (database, auth fallback, storage, crons, edge functions). No separate backend server. No Railway. No microservices. No message queues.
 
@@ -371,6 +371,29 @@ Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfac
 - All UI must look enterprise-grade: clean typography, consistent spacing, professional color palette, no generic or amateur styling
 - Use `lucide-react` for all icons (included with shadcn/ui)
 
+### Animation & 3D Graphics
+
+#### Framer Motion — used EVERYWHERE in the product
+- Install: `npm install framer-motion`
+- Use for: page transitions, list item enter/exit animations, card hover effects, loading skeletons, toast notifications, sidebar slide-in on mobile, dialog open/close, tab transitions, badge state changes (green→yellow→red), readiness score animation
+- Keep animations subtle and fast: 200-400ms duration, ease-out easing
+- Never block user interaction — animations are decorative, not functional
+- Use `AnimatePresence` for route transitions in the dashboard layout
+- Use `motion.div` for staggered list item entrance (staff table, credential list, audit checklist)
+- Respect `prefers-reduced-motion`: wrap motion components in a check and disable animation for users who request it
+- Every animation must have a purpose: feedback (button click), orientation (page transition), or visual hierarchy (staggered list). No decorative-only animation in the dashboard.
+
+#### React Three Fiber + Three.js — LANDING PAGE ONLY
+- Install: `npm install three @react-three/fiber @react-three/drei`
+- Use for: landing page (`/`) hero section 3D background ONLY. Animated gradient mesh, particle field, or subtle 3D geometry that signals premium quality.
+- DO NOT use Three.js or React Three Fiber in the dashboard, settings, reports, or audit pages. The dashboard is a productivity tool — 3D effects slow down page load and distract from data.
+- Auth pages (`/sign-in`, `/sign-up`): subtle Framer Motion entrance animations only. No Three.js. Auth pages must load in under 1 second.
+- The 3D hero must lazy-load: use `next/dynamic` with `ssr: false` to prevent server-side rendering of Three.js. Show a static fallback (gradient background) while loading.
+- Keep the 3D scene lightweight: maximum 50MB bundle for Three.js + Drei. Use simple geometry, not complex models.
+- The 3D scene must respect `prefers-reduced-motion`: render a static gradient instead of animated 3D.
+- Performance budget: landing page must score >90 on Lighthouse despite the 3D hero. If it does not, simplify the scene.
+- Color palette for 3D: use the brand tokens from the Styling section (--color-ink #0F2A43 for background, --color-action #0F766E for accent). Never use generic Three.js colors.
+
 ### Accessibility
 - All interactive elements are keyboard-accessible
 - All form inputs have associated `<label>` elements
@@ -696,6 +719,7 @@ Provisioning items only — code-quality pre-checks (tests, tsc, lint, types, se
 - [ ] Resend sending domain verified (DKIM, SPF, DMARC)
 - [ ] Twilio webhook URL points to production domain
 - [ ] Clerk production URLs configured
+- [ ] Clerk third-party auth configured in Supabase Dashboard: Authentication → Third-Party Auth → Clerk → paste domain (`moving-sheepdog-44.clerk.accounts.dev`)
 - [ ] DNS configured (A record + CNAME to Vercel)
 
 ## Architecture Decision Records

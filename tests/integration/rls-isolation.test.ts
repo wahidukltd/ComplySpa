@@ -205,3 +205,91 @@ describe("Billing bypass prevention (C2 fix)", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("Soft-delete hiding (N3 fix)", () => {
+  it("staff_members with deleted_at set are hidden from SELECT", async () => {
+    const { data: staff } = await serviceClient
+      .from("staff_members")
+      .select("id")
+      .eq("clinic_id", clinicAId)
+      .limit(1);
+    if (!staff || staff.length === 0) throw new Error("No staff found");
+
+    await serviceClient
+      .from("staff_members")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", staff[0].id);
+
+    const res = await fetchAsUser(clerkUserA, "staff_members");
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    // Only non-deleted staff are visible
+    expect(data.every((s: { deleted_at: string | null }) => s.deleted_at === null)).toBe(true);
+
+    // Restore for other tests
+    await serviceClient
+      .from("staff_members")
+      .update({ deleted_at: null })
+      .eq("id", staff[0].id);
+  });
+});
+
+describe("Credentials isolation", () => {
+  it("each clinic sees only its own credentials", async () => {
+    const { data: ct } = await serviceClient
+      .from("credential_types")
+      .select("id")
+      .eq("name", "Registered Nurse License")
+      .limit(1);
+    if (!ct || ct.length === 0) throw new Error("No credential type found");
+
+    const { data: staffA } = await serviceClient
+      .from("staff_members")
+      .select("id")
+      .eq("clinic_id", clinicAId)
+      .limit(1);
+    const { data: staffB } = await serviceClient
+      .from("staff_members")
+      .select("id")
+      .eq("clinic_id", clinicBId)
+      .limit(1);
+    if (!staffA || !staffB) throw new Error("No staff found");
+
+    await serviceClient.from("credentials").upsert([
+      { staff_member_id: staffA[0].id, credential_type_id: ct[0].id, clinic_id: clinicAId, license_number: "RLS-CRED-A" },
+      { staff_member_id: staffB[0].id, credential_type_id: ct[0].id, clinic_id: clinicBId, license_number: "RLS-CRED-B" },
+    ]);
+
+    const [resA, resB] = await Promise.all([
+      fetchAsUser(clerkUserA, "credentials"),
+      fetchAsUser(clerkUserB, "credentials"),
+    ]);
+    const dataA = await resA.json();
+    const dataB = await resB.json();
+
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+    expect(dataA.every((c: { clinic_id: string }) => c.clinic_id === clinicAId)).toBe(true);
+    expect(dataB.every((c: { clinic_id: string }) => c.clinic_id === clinicBId)).toBe(true);
+    expect(dataA.some((c: { license_number: string }) => c.license_number === "RLS-CRED-A")).toBe(true);
+    expect(dataA.some((c: { license_number: string }) => c.license_number === "RLS-CRED-B")).toBe(false);
+
+    await serviceClient.from("credentials").delete().in("license_number", ["RLS-CRED-A", "RLS-CRED-B"]);
+  });
+});
+
+describe("Owner can manage users", () => {
+  it("owner can INSERT a new user", async () => {
+    const res = await fetchAsUser(clerkUserA, "users", {
+      method: "POST",
+      body: {
+        clinic_id: clinicAId,
+        email: "newowner@rls-test.com",
+        clerk_user_id: "clerk_new_owner_test",
+        role: "viewer",
+      },
+    });
+    expect(res.status).toBe(201);
+    await serviceClient.from("users").delete().eq("clerk_user_id", "clerk_new_owner_test");
+  });
+});

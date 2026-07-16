@@ -51,6 +51,19 @@ test-results/
 # Claude Code
 .claude/
 
+# Agent skills workspace
+.agents/
+
+# Opencode
+.opencode/
+
+# Dev server output
+.server-output.txt
+
+# Python cache
+__pycache__/
+*.pyc
+
 # OS
 Thumbs.db
 desktop.ini

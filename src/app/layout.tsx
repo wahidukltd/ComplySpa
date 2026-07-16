@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <ClerkProvider
       signInFallbackRedirectUrl="/dashboard"
-      signUpFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/onboarding"
       afterSignOutUrl="/sign-in"
     >
       <html lang="en" className={`${inter.variable} h-full antialiased`}>
