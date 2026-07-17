@@ -13,8 +13,7 @@ export const createClinicSchema = z.object({
     .or(z.literal("")),
   state: z
     .string()
-    .length(2, "Use the 2-letter state abbreviation")
-    .regex(/^[A-Z]{2}$/, "Must be a valid 2-letter state code")
+    .max(100, "Must be 100 characters or fewer")
     .optional()
     .or(z.literal(""))
     .transform(val => val === "" ? undefined : val),

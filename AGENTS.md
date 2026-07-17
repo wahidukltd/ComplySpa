@@ -8,11 +8,12 @@ The following are configured at Claude Code **user scope** and shape how code ge
 
 - **Ponytail** (`ponytail@ponytail` plugin) — enforces a "laziest solution that works" ladder (YAGNI → reuse → stdlib → native → installed dep → one line → minimum). Active at `full` by default. Reach for `/ponytail ultra` only to cut bloat; `stop ponytail` to disable. Never strips validation, error handling, security, or accessibility — this aligns with the "Simplicity Over Cleverness" principle below.
 - **Impeccable** (`impeccable@impeccable` plugin) — frontend design skill + a `PostToolUse` detector hook that runs 45 deterministic anti-slop rules on UI file edits (HTML/CSS/JSX/TSX/Vue/Svelte), no LLM. Run `/impeccable init` once the frontend exists to write `PRODUCT.md`/`DESIGN.md`; use `/impeccable critique`, `/impeccable audit`, `/impeccable polish` for design work. Pairs with the Frontend Conventions and Accessibility sections below.
+- **Psychological Copywriting** (`.agents/skills/psychological-copywriting/SKILL.md`) — governs ALL public-facing copy: landing page headlines, pricing page text, email templates, blog posts, and marketing CTAs. Mandatory audit before any public page ships. Enforces anti-AI-pattern checks (no "Unlock," "Leverage," "seamless," "revolutionize," "game-changer," "In today's fast-paced world"), audience diagnosis, persuasion framework selection, and conversion psychology. All public copy must sound like a med spa consultant who has seen 50 board inspections — direct, expert, unpretentious. No generic SaaS voice.
 - **Exa** (`mcp__exa__web_search_exa`, `mcp__exa__web_fetch_exa`) — web search / URL content extraction. Use for general web lookups (competitor research, market context).
 - **Context7** (`context7` MCP, auto-triggers on library/framework questions) — fetches current, version-specific library docs (Next.js, Supabase, Clerk, Tailwind, Prisma, etc.) instead of relying on training data. **Prefer Context7 over Exa for library API / framework questions.**
 - **skill-creator** skill (project-scoped, `.agents/skills/skill-creator`) — use when creating, editing, or benchmarking custom skills.
 
-**Tool selection rule:** Context7 for library/framework docs, Exa for general web search, Ponytail to keep code minimal, Impeccable for UI design/quality. No overlap — pick the one matching the task.
+**Tool selection rule:** Context7 for library/framework docs, Exa for general web search, Ponytail to keep code minimal, Impeccable for UI design/quality, Psychological Copywriting for public-facing copy. No overlap — pick the one matching the task.
 
 ## Project Overview
 
@@ -401,6 +402,134 @@ Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfac
 - Color is never the sole indicator of status — always include text (e.g., "Expired" not just red)
 - Use semantic HTML: `<table>`, `<thead>`, `<tbody>`, `<th scope="col">`
 - Test with keyboard-only navigation before releasing any feature
+
+## Public Pages & Marketing Conventions
+
+The landing page (`/`) and pricing page (`/pricing`) are the conversion surface.
+They must communicate trust, authority, and premium quality without feeling
+like a generic SaaS template. See the Engineering Blueprint, Phase 7.2-7.5
+for the complete specification. This section documents the code-level conventions.
+
+### Landing Page (`src/app/page.tsx`)
+
+- Server Component. Pre-rendered HTML for SEO.
+- Three.js 3D hero background ONLY — simple geometric composition (interlocking
+  tetrahedra, compliance grid, or medical-precision lattice) in brand colors
+  (#0F2A43 navy depth, #0F766E teal accents). Subtle rotation (0.002 rad/frame
+  max). Not particles. Not orbiting spheres. Not glowing orbs.
+- Three.js lazy-loaded via `next/dynamic` with `ssr: false`. Static gradient
+  fallback (#0F2A43 → #FAF8F5) while loading.
+- Three.js canvas has `aria-hidden="true"` and `role="presentation"` — purely
+  decorative. Screen readers read the hero text, not the 3D.
+- On mobile (< 768px): replace Three.js with a static gradient. No 3D on
+  devices where GPU/bandwidth are constrained.
+- Hero headline: 12 words max. Renders instantly — no fade-in, no typing
+  animation. CSS opacity transition on CTAs only (200ms).
+- Sections below the hero: Framer Motion scroll-triggered reveals only
+  (fade + subtle translateY, 300ms, ease-out). No animation on trust signals
+  or testimonial text — motion on social proof reduces credibility.
+- Performance budget: Lighthouse > 90 desktop, > 85 mobile. Total page
+  weight < 300KB. Three.js chunk < 50KB gzipped.
+- Every headline and CTA must pass the psychological-copywriting skill audit.
+  Zero AI slop phrases. Every claim is evidence-backed (Reddit link, industry
+  stat, or board citation).
+
+### Pricing Page (`src/app/pricing/page.tsx`)
+
+- Server Component. Pre-rendered HTML for SEO.
+- Three plan cards: Solo ($29/mo), Practice ($79/mo), Multi-Location ($149/mo).
+- "Practice" card has subtle teal border highlight + "Most popular" badge.
+- Annual/monthly toggle: Framer Motion on price numbers only (transform +
+  opacity, 200ms). No layout shift — card dimensions fixed.
+- Card entrance: Framer Motion stagger on page load (100ms per card, 300ms
+  fade + 8px translateY). One-time — no re-trigger on scroll.
+- Feature comparison table: shadcn/ui Table. ✓ for included, — for excluded.
+  Sticky header row. No animation on the table itself.
+- FAQ: shadcn/ui Accordion. One open at a time. Framer Motion
+  AnimatePresence on content height.
+- NO Polar checkout links during Phase 7. Trial CTA goes to `/sign-up`.
+  Polar checkout is wired in Phase 9.
+- No dark patterns: no countdown timers, no fake scarcity, no hidden fees.
+  All prices are final (Polar handles tax).
+- Price anchoring note: "Most med spa compliance tools cost $3,000/year.
+  Same coverage, 88% less." in small muted text below cards.
+
+### Three.js on Public Pages — Rules
+
+- Landing page hero ONLY. Never on pricing, auth, dashboard, or blog pages.
+- Simple geometry only — no GLTF models, no textures, no external assets.
+- Max 50KB gzipped for the Three.js payload.
+- Respects `prefers-reduced-motion`: renders static gradient instead.
+- Canvas is a background layer (z-index behind hero text).
+- Colors: `#0F2A43` (navy depth), `#0F766E` (teal accent), `#FAF8F5` (bone
+  — no 3D element in this color, it's the page background that the 3D fades to).
+
+### Framer Motion on Public Pages — Rules
+
+- Scroll-triggered reveals only: `whileInView` with `viewport={{ once: true }}`.
+  Nothing re-triggers on subsequent scrolls.
+- Landing page: stagger on pain-point cards (100ms per card) and feature cards
+  (50ms per card). No stagger on "How It Works" (all three appear together).
+- Pricing page: card entrance stagger on page load only. Price toggle animation
+  only on the numbers.
+- No animation on: trust signals, testimonial text, comparison table, FAQ
+  question text, footer, or any copy that is actively being read.
+- Duration: 200-400ms max. Easing: ease-out. Nothing decorative or attention-
+  seeking. Animation must serve orientation (where am I on the page?) or
+  feedback (did the toggle switch?), never decoration.
+- `prefers-reduced-motion`: all Framer Motion disabled. Accordion opens
+  instantly. No scroll reveals.
+
+### SEO & GEO Standards
+
+The complete SEO and Generative Engine Optimization (GEO) specification lives
+in the Engineering Blueprint, Section 9.15. This section documents the
+code-level requirements enforced at implementation time.
+
+Non-negotiable for every public page:
+- Export `metadata` or `generateMetadata` with: title, description, keywords,
+  robots (index/follow), openGraph (title, description, image 1200×630),
+  twitter card, canonical URL.
+- JSON-LD structured data on homepage (Organization + SoftwareApplication),
+  pricing page (OfferCatalog), and blog posts (Article + BreadcrumbList).
+  Validated against https://validator.schema.org/ before commit.
+- `src/app/sitemap.ts` — dynamic sitemap with all public routes.
+- `src/app/robots.ts` — allows `/`, `/pricing`, `/blog/*`; disallows
+  `/dashboard/*`, `/api/*`, `/onboarding/`.
+- All public pages are Server Components (pre-rendered HTML). No client-side
+  rendered content that search engines cannot read.
+- Images: Next.js `<Image>` component with explicit width/height, lazy
+  loading, WebP/AVIF formats.
+- Fonts: Inter via `next/font/google` with `display: 'swap'`.
+- Core Web Vitals: Lighthouse > 90 on every public page.
+- Internal links use `<a>` tags or `next/link` — search engines must be
+  able to crawl the entire public site.
+- Blog (Phase 7+): MDX files in `/content/blog/`, rendered via Server
+  Components. Each post: Article JSON-LD, BreadcrumbList JSON-LD, author
+  bio with Person schema, internal links to 2+ related posts.
+
+### Psychological Copywriting — Rules
+
+The psychological-copywriting skill (`.agents/skills/psychological-
+copywriting/SKILL.md`) governs all public-facing copy. Before any public page
+ships:
+- Run the skill's self-audit on all headlines, subheadlines, CTAs, and body
+  copy above the fold.
+- Verify zero AI-slop phrases: no "In today's fast-paced world," no "In the
+  ever-evolving landscape of," no "Unlock," no "Leverage," no "seamless,"
+  no "revolutionize," no "cutting-edge," no "game-changer," no "next-gen."
+- Tone: direct, expert, unpretentious. Like a med spa consultant who has
+  seen 50 board inspections and doesn't sugarcoat.
+- Audience state: med spa owners feeling ANXIETY, not curiosity. Copy must
+  acknowledge the specific risk (license lapsing, board investigation, staff
+  operating outside scope) and offer the concrete solution.
+- Every claim is evidence-backed: link to a Reddit thread, industry stat,
+  or board citation. No assertion without attribution.
+- Pricing page copy: no dark patterns. No countdown timers. No fake urgency.
+  The trial is real — honor it.
+- Email templates (Resend): same rules apply. Alert emails, trial reminders,
+  and quarterly audit nudges must match the product's voice — direct, helpful,
+  never salesy.
 
 ## Backend Conventions
 
