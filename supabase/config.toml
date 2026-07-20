@@ -381,8 +381,14 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+[edge_runtime.secrets]
+SUPABASE_SERVICE_ROLE_KEY = "env(SUPABASE_SERVICE_ROLE_KEY)"
+RESEND_API_KEY = "env(RESEND_API_KEY)"
+TWILIO_ACCOUNT_SID = "env(TWILIO_ACCOUNT_SID)"
+TWILIO_AUTH_TOKEN = "env(TWILIO_AUTH_TOKEN)"
+TWILIO_PHONE_NUMBER = "env(TWILIO_PHONE_NUMBER)"
+SENTRY_DSN = "env(SENTRY_DSN)"
+CRON_SECRET = "env(CRON_SECRET)"
 
 [analytics]
 enabled = true
