@@ -311,53 +311,53 @@ pg_cron job `daily-audit-overdue-check`:
 ### Styling
 - Tailwind CSS only. No CSS modules, no styled-components, no inline styles
 - Use the `cn()` utility (`clsx` + `tailwind-merge`) for conditional classes
-- Color tokens are defined in `tailwind.config.ts` and are non-negotiable. The palette is the output of an evidence-backed color audit (`complyspa-color-palette-report.md` on the Desktop, 14 sources). Do not introduce new tokens, revert to cold Tailwind defaults, or pick ad-hoc brand colors — each such change breaks trust signaling, WCAG accessibility, and brand identity simultaneously. Full source rationale: med-spa luxury convention + healthcare color psych + premium-SaaS craft + WCAG research.
+- Color tokens are defined in `tailwind.config.ts` and are non-negotiable. The palette is the product of a founder-directed warm-spa aesthetic: soft skin tones, warm browns, muted terracotta. Do not introduce new tokens, revert to cold Tailwind defaults, or pick ad-hoc brand colors — each such change breaks the spa-luxury trust signaling, WCAG accessibility, and brand identity simultaneously. Every hex below is the final, approved value.
 
-#### Foundation — two brand colors only
-- `--color-ink` = `#0F2A43` — Deep Spruce Navy. Hero backgrounds, primary text on light surfaces, dark pill buttons, footer, structural chrome. The single brand spine; never pair it with a second dark hue.
-- `--color-action` = `#0F766E` — Authority Teal (`teal-700`). The ONLY filled-button / link / focus-ring / active-nav color. Not indigo, not violet, not Vercel-cobalt — teal was chosen to differentiate from the Stripe / Linear / Vercel / Jasper / Fellow indigo monoculture and to signal healthcare vertical without reverting to the med-spa pink cliché.
+#### Foundation — warm spa palette (five colors only)
+- `--color-canvas` = `#FFF8F2` — Warm peach-cream. Page backgrounds, empty states, hero surface. The dominant color across the entire product.
+- `--color-surface` = `#FFFFFF` — Clean white. Elevated cards, dashboard panels, input backgrounds. Contrast layer on the warm canvas.
+- `--color-surface-alt` = `#F6E3D6` — Soft blush. Alternating section bands, hover backgrounds, secondary surfaces. Never used as a primary background — it supports, never dominates.
+- `--color-action` = `#9C6B5D` — Terracotta brown. The ONLY filled-button / link / focus-ring / active-nav color. Warm, grounded, confident. No indigo, no teal, no violet — this is a med spa, not a dev-tool dashboard.
+- `--color-ink` = `#3D2A25` — Deep espresso. Primary text, structural chrome, footer, dark pill backgrounds, headings. Never pure `#000`.
 
-#### Warm-tinted neutrals (NOT cold slate / zinc)
-- `--color-canvas` = `#FAF8F5` (warm bone) — page background
-- `--color-surface` = `#FFFFFF` — elevated cards, dashboard panels, product screenshot frames
-- `--color-hairline` = `#E5E1D8` — borders, dividers, input outlines. NEVER cold `#E5E7EB` (the Vercel / Lynchpin hairline); that reads as developer dashboard, not med-spa premium.
-- `--color-text` = `#1A2421` — warm charcoal primary text. Never pure `#000`.
-- `--color-text-muted` = `#5B6F6A` — sage-slate secondary text / metadata / helper copy
-- `--color-input-border` = `#3D4A47` — focused input border
-- `--color-cream-alt` = `#F2EDE4` — alternating section banding surface
+#### Derived tokens (built from the five foundation colors)
+- `--color-hairline` = `#D9B7A7` — Warm rosewood. Borders, dividers, input outlines. NEVER cold gray (`#E5E7EB`, `#D1D5DB`) — those read as developer dashboard, not med-spa premium.
+- `--color-text` = `#3D2A25` — Deep espresso. Same as `--color-ink`. Primary body and heading text.
+- `--color-text-muted` = `#8B7D78` — Warm gray-brown. Secondary text, metadata, helper copy, captions.
+- `--color-input-border` = `#9C6B5D` — Terracotta. Focused input border. Matches the action color for a unified interactive vocabulary.
 
 #### Semantic status tier — WCAG AA, ALWAYS paired with icon + visible text label
-Status colors are RESERVED for compliance state — the brand teal never borrows them. Pure yellow (`#FACC15` / `#F0E442`) is FORBIDDEN as a status background (fails WCAG at ~1.3:1 on white — "essentially invisible"). Amber-600 is mandatory for warning. Every status pill ships as `tint background + dark foreground text + icon + visible label` so the ~8% of male users with red-green color-vision deficiency can still read state (WCAG 1.4.1: Use of Color). Never color alone — the accessibility section already requires this for text; here it is anchored to specific tokens.
+Status colors are RESERVED for compliance state. The action terracotta never borrows them. Pure yellow (`#FACC15`) is FORBIDDEN as a status background (fails WCAG at ~1.3:1 on white — "essentially invisible"). Every status pill ships as `tint background + dark foreground text + icon + visible label` so the ~8% of male users with red-green color-vision deficiency can still read state (WCAG 1.4.1: Use of Color). All status colors are warm-harmonized — no cold greens, no clinical blues.
 
 | Status | Strong | Tint Bg | Text on tint | Icon | Label |
 |---|---|---|---|---|---|
-| Valid / Active | `#16A34A` (`green-600`) | `#DCFCE7` (`green-100`) | `#15803D` (`green-700`) | ✓ check | "Valid" |
-| Expiring / Warning | `#D97706` (`amber-600`) | `#FEF3C7` (`amber-100`) | `#92400E` (`amber-800`) | ▲ triangle | "Expiring" |
-| Expired / Critical | `#DC2626` (`red-600`) | `#FEE2E2` (`red-100`) | `#991B1B` (`red-800`) | ✕ X | "Expired" |
-| Unknown / Not tracked | `#6B7280` (`gray-500`) | `#F3F4F6` (`gray-100`) | `#374151` (`gray-700`) | — dash | "Unknown" |
+| Valid / Active | `#4A8C5C` (sage green) | `#E8F2EB` | `#2D5C3A` | ✓ check | "Valid" |
+| Expiring / Warning | `#C2853A` (warm amber) | `#FBF0E0` | `#7A4E1F` | ▲ triangle | "Expiring" |
+| Expired / Critical | `#B8443A` (terracotta red) | `#FCE8E5` | `#7A2A26` | ✕ X | "Expired" |
+| Unknown / Not tracked | `#8B7D78` (warm gray) | `#F2EFED` | `#5A504C` | dash | "Unknown" |
 
-The Tailwind defaults `green-500` / `yellow-500` / `red-500` are NOT used for status — they file contrast and perceptual-weight requirements.
+No Tailwind default status colors (`green-500`/`yellow-500`/`red-500`) are used — they clash with the warm palette and fail perceptual-weight requirements. The sage green replaces clinical `#16A34A`; warm amber replaces harsh `#D97706`; terracotta red replaces aggressive `#DC2626`.
 
 #### Data visualization (audit-report charts, dashboard KPIs)
-Brand-teal anchors the first series so charts read as ComplySpa, not a generic charting library. Never use red + green as the first two slots — that pairing is the most-cited color-blindness failure (WCAG 1.4.1, Okabe-Ito research). Prefer direct data labels over a legend; apply tabular figures (`font-feature-settings: "tnum"`) to every numeric cell.
+Terracotta anchors the first series so charts read as ComplySpa, not a generic charting library. All colors are warm-harmonized. Never use red + green as the first two slots — that pairing is the most-cited color-blindness failure (WCAG 1.4.1, Okabe-Ito research). Prefer direct data labels over a legend; apply tabular figures (`font-feature-settings: "tnum"`) to every numeric cell.
 
 | Slot | Hex | Use |
 |---|---|---|
-| 1 | `#0F766E` (brand teal) | Default series |
-| 2 | `#EA580C` (`orange-600`) | High contrast with teal; CVD-safe pair |
-| 3 | `#7C3AED` (`violet-600`) | Distinguishable from blue and red under deuteranopia |
-| 4 | `#DB2777` (`pink-600`) | Distinct under all CVD conditions |
-| 5 | `#2563EB` (`blue-600`) | "In progress / processing" convention |
-| 6 | `#6B7280` (`gray-500`) | "Other" / low-priority bucket |
+| 1 | `#9C6B5D` (terracotta) | Default series — the brand anchor |
+| 2 | `#C2853A` (warm amber) | CVD-safe contrast with terracotta |
+| 3 | `#7B8C5C` (sage) | Distinguishable from amber and terracotta under deuteranopia |
+| 4 | `#6A5B7B` (muted violet) | Distinct under all CVD conditions |
+| 5 | `#5B7B8C` (muted teal) | "In progress / processing" convention |
+| 6 | `#8B7D78` (warm gray) | "Other" / low-priority bucket |
 
 #### Dark theme — tokens DEFINED, UI toggle is POST-MVP
-Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfaces. The tokens below ARE defined in `tailwind.config.ts` as a deferred design system, ready to ship when dark mode is prioritized. This preserves WCAG perceptual weight on near-black backgrounds (status mid-tones shift lighter and more saturated than their light-theme counterparts).
+Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfaces. The tokens below ARE defined in `tailwind.config.ts` as a deferred design system, ready to ship when dark mode is prioritized. This preserves WCAG perceptual weight on warm-dark backgrounds (status mid-tones shift lighter and more saturated than their light-theme counterparts).
 
-- Dark surface: `#0A1A24` (deeper navy ink)
-- Text on dark: `#E6E9E5` (green-tinted off-white)
-- Action on dark: `#14B8A6` (`teal-500` — brighter than `teal-700` for perceptual weight)
-- Status-on-dark shifts to the `-400` variants:
-  - Active `#4ADE80` · Warning `#FBBF24` · Critical `#F87171` · Unknown `#9CA3AF`
+- Dark surface: `#2A1F1C` (deep warm espresso)
+- Text on dark: `#F5EDE8` (warm off-white)
+- Action on dark: `#C4A091` (lighter terracotta — brighter than `#9C6B5D` for perceptual weight on dark)
+- Status-on-dark shifts to lighter variants:
+  - Active `#6DB580` · Warning `#DA9E4A` · Critical `#D06960` · Unknown `#A89890`
 - Hairline on dark: `rgba(255,255,255,0.08)`
 
 #### Responsive
@@ -367,7 +367,7 @@ Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfac
 - Use shadcn/ui for all UI components (Button, Table, Badge, Dialog, Input, Select, Toast, Dropdown, Tabs, Card, Skeleton)
 - Install: `npx shadcn@latest init`
 - shadcn/ui components are copied into the project (not imported from a package) — they live in `src/components/ui/`
-- Customize shadcn/ui components to match the product's design language (green/amber/red status system — see the Styling section for exact tokens, Inter font, generous whitespace, subtle shadows). Do not configure shadcn to use `yellow` for warning — amber is mandatory (pure yellow fails WCAG contrast on white)
+- Customize shadcn/ui components to match the product's design language (sage/amber/terracotta status system — see the Styling section for exact tokens, Inter font, generous whitespace). Do not configure shadcn to use `yellow` for warning — warm amber is mandatory (pure yellow fails WCAG contrast on white)
 - Do not install shadcn/ui components that are not needed — install only what each feature requires
 - All UI must look enterprise-grade: clean typography, consistent spacing, professional color palette, no generic or amateur styling
 - Use `lucide-react` for all icons (included with shadcn/ui)
@@ -375,8 +375,8 @@ Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfac
 ### Animation & 3D Graphics
 
 #### Framer Motion — used EVERYWHERE in the product
-- Install: `npm install framer-motion`
-- Use for: page transitions, list item enter/exit animations, card hover effects, loading skeletons, toast notifications, sidebar slide-in on mobile, dialog open/close, tab transitions, badge state changes (green→yellow→red), readiness score animation
+- Install: `npm install motion`
+- Use for: page transitions, list item enter/exit animations, card hover effects, loading skeletons, toast notifications, sidebar slide-in on mobile, dialog open/close, tab transitions, badge state changes (sage→amber→terracotta), readiness score animation
 - Keep animations subtle and fast: 200-400ms duration, ease-out easing
 - Never block user interaction — animations are decorative, not functional
 - Use `AnimatePresence` for route transitions in the dashboard layout
@@ -393,7 +393,7 @@ Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfac
 - Keep the 3D scene lightweight: maximum 50MB bundle for Three.js + Drei. Use simple geometry, not complex models.
 - The 3D scene must respect `prefers-reduced-motion`: render a static gradient instead of animated 3D.
 - Performance budget: landing page must score >90 on Lighthouse despite the 3D hero. If it does not, simplify the scene.
-- Color palette for 3D: use the brand tokens from the Styling section (--color-ink #0F2A43 for background, --color-action #0F766E for accent). Never use generic Three.js colors.
+- Color palette for 3D: soft organic forms in `#F6E3D6` (blush) and `#D9B7A7` (rosewood) against a `#FFF8F2` (peach-cream) canvas. Warm ambient lighting only. No dark backgrounds. No hard-edge geometry. No generic Three.js colors. Med-spa is warm and soft — the 3D scene must match.
 
 ### Accessibility
 - All interactive elements are keyboard-accessible
@@ -413,12 +413,13 @@ for the complete specification. This section documents the code-level convention
 ### Landing Page (`src/app/page.tsx`)
 
 - Server Component. Pre-rendered HTML for SEO.
-- Three.js 3D hero background ONLY — simple geometric composition (interlocking
-  tetrahedra, compliance grid, or medical-precision lattice) in brand colors
-  (#0F2A43 navy depth, #0F766E teal accents). Subtle rotation (0.002 rad/frame
-  max). Not particles. Not orbiting spheres. Not glowing orbs.
+- Three.js 3D hero background ONLY — soft organic forms (smooth, flowing,
+  rounded metaball-like shapes) in brand surface colors (`#F6E3D6` blush,
+  `#D9B7A7` rosewood) against a `#FFF8F2` (peach-cream) canvas. Not geometric.
+  Not hard-edge. Not dark. Subtle slow morphing (0.001 rad/frame max). Warm
+  ambient lighting creating soft shadows.
 - Three.js lazy-loaded via `next/dynamic` with `ssr: false`. Static gradient
-  fallback (#0F2A43 → #FAF8F5) while loading.
+  fallback (`#FFF8F2 → #D9B7A7`) while loading.
 - Three.js canvas has `aria-hidden="true"` and `role="presentation"` — purely
   decorative. Screen readers read the hero text, not the 3D.
 - On mobile (< 768px): replace Three.js with a static gradient. No 3D on
@@ -438,7 +439,7 @@ for the complete specification. This section documents the code-level convention
 
 - Server Component. Pre-rendered HTML for SEO.
 - Three plan cards: Solo ($29/mo), Practice ($79/mo), Multi-Location ($149/mo).
-- "Practice" card has subtle teal border highlight + "Most popular" badge.
+- "Practice" card has subtle terracotta border highlight + "Most popular" badge.
 - Annual/monthly toggle: Framer Motion on price numbers only (transform +
   opacity, 200ms). No layout shift — card dimensions fixed.
 - Card entrance: Framer Motion stagger on page load (100ms per card, 300ms
@@ -461,8 +462,8 @@ for the complete specification. This section documents the code-level convention
 - Max 50KB gzipped for the Three.js payload.
 - Respects `prefers-reduced-motion`: renders static gradient instead.
 - Canvas is a background layer (z-index behind hero text).
-- Colors: `#0F2A43` (navy depth), `#0F766E` (teal accent), `#FAF8F5` (bone
-  — no 3D element in this color, it's the page background that the 3D fades to).
+- Colors: `#F6E3D6` (blush), `#D9B7A7` (rosewood), `#FFF8F2` (peach-cream
+  — the page background that the 3D fades to). Warm tones only. No dark hues.
 
 ### Framer Motion on Public Pages — Rules
 

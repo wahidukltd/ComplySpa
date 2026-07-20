@@ -104,10 +104,10 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
-            <Clock className="size-4 text-amber-600" />
+            <Clock className="size-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{expiringCount ?? 0}</div>
+            <div className="text-2xl font-bold text-warning">{expiringCount ?? 0}</div>
             <p className="text-xs text-muted-foreground">Within 90 days</p>
           </CardContent>
         </Card>
@@ -115,20 +115,20 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Expired</CardTitle>
-            <AlertTriangle className="size-4 text-red-600" />
+            <AlertTriangle className="size-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{expiredCount ?? 0}</div>
+            <div className="text-2xl font-bold text-destructive">{expiredCount ?? 0}</div>
             <p className="text-xs text-muted-foreground">Requires immediate action</p>
           </CardContent>
         </Card>
       </div>
 
       {s > 0 && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-warning bg-warning-tint">
           <CardContent className="flex items-center gap-3 py-4">
-            <AlertTriangle className="size-5 shrink-0 text-amber-600" />
-            <p className="text-sm text-amber-800">
+            <AlertTriangle className="size-5 shrink-0 text-warning" />
+            <p className="text-sm text-warning-foreground">
               Have you verified that each provider&apos;s procedures match their license scope for your state?
               Staff performing services outside their license is the #1 cause of board investigations.
             </p>
