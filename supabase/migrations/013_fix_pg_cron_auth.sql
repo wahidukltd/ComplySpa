@@ -2,6 +2,10 @@
 -- Fixes pre-existing bug: original migration 003 omitted the apikey header
 -- required by the API gateway for Edge Function calls.
 -- Uses COALESCE fallbacks so local dev works without superuser GUC config.
+--
+-- PRODUCTION SETUP (Supabase Dashboard → Database → Configuration → Custom GUCs):
+--   app.edge_function_url = https://<project-ref>.supabase.co/functions/v1
+--   app.cron_secret = <generate-a-strong-random-secret>
 
 CREATE OR REPLACE FUNCTION scan_expiring_credentials()
 RETURNS void AS $$

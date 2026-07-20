@@ -1,6 +1,10 @@
 -- Migration 012: Escalation alerts for credentials expired 7+ days
 -- Adds a new pg_cron job that scans for expired, un-alerted credentials
 -- and triggers the send-credential-alert Edge Function with days_before = -7
+--
+-- PRODUCTION SETUP (Supabase Dashboard → Database → Configuration → Custom GUCs):
+--   app.edge_function_url = https://<project-ref>.supabase.co/functions/v1
+--   app.cron_secret = <generate-a-strong-random-secret>
 
 CREATE OR REPLACE FUNCTION scan_escalation_alerts()
 RETURNS void AS $$
