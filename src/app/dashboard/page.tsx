@@ -59,6 +59,14 @@ export default async function DashboardPage() {
   const s = staffCount ?? 0;
   const c = totalCredentials ?? 0;
 
+  const { data: recentFailedAlerts } = await supabase
+    .from("alert_logs")
+    .select("id, credential_id, alert_type, sent_at, delivery_status")
+    .eq("clinic_id", clinicId)
+    .eq("delivery_status", "failed")
+    .order("sent_at", { ascending: false })
+    .limit(5);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -123,6 +131,25 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {recentFailedAlerts && recentFailedAlerts.length > 0 && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-center gap-3 py-4">
+            <AlertTriangle className="size-5 shrink-0 text-red-600" />
+            <div>
+              <p className="text-sm font-medium text-red-800">
+                {recentFailedAlerts.length} alert{recentFailedAlerts.length > 1 ? "s" : ""} failed to deliver
+              </p>
+              <Link
+                href="/dashboard/alerts"
+                className="text-sm text-red-600 underline hover:text-red-800"
+              >
+                View alert history →
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {s > 0 && (
         <Card className="border-warning bg-warning-tint">
