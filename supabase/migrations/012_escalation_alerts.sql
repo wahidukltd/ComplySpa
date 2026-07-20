@@ -50,7 +50,7 @@ BEGIN
     );
   END LOOP;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 DO $$
 BEGIN
