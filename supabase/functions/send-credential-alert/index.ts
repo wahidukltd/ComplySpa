@@ -18,13 +18,16 @@ interface AlertResponse {
   error?: string;
 }
 
-const SUPABASE_URL = Deno.env.get("NEXT_PUBLIC_SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are auto-injected by the
+// Supabase Edge Runtime (both local and hosted). NEXT_PUBLIC_* vars are
+// read from env exports (not available in hosted, but set via config.toml).
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("NEXT_PUBLIC_SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID")!;
 const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN")!;
 const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER")!;
-const APP_URL = Deno.env.get("NEXT_PUBLIC_APP_URL") || "http://localhost:3000";
+const APP_URL = Deno.env.get("APP_URL") || Deno.env.get("NEXT_PUBLIC_APP_URL") || "http://localhost:3000";
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Compliance Alerts <onboarding@resend.dev>";
 
 const SENTRY_DSN = Deno.env.get("SENTRY_DSN");
