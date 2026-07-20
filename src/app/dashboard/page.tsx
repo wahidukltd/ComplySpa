@@ -133,16 +133,16 @@ export default async function DashboardPage() {
       </div>
 
       {recentFailedAlerts && recentFailedAlerts.length > 0 && (
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-destructive/40 bg-destructive/10">
           <CardContent className="flex items-center gap-3 py-4">
-            <AlertTriangle className="size-5 shrink-0 text-red-600" />
+            <AlertTriangle className="size-5 shrink-0 text-destructive" />
             <div>
-              <p className="text-sm font-medium text-red-800">
+              <p className="text-sm font-medium text-destructive">
                 {recentFailedAlerts.length} alert{recentFailedAlerts.length > 1 ? "s" : ""} failed to deliver
               </p>
               <Link
                 href="/dashboard/alerts"
-                className="text-sm text-red-600 underline hover:text-red-800"
+                className="text-sm text-destructive underline hover:text-destructive/80"
               >
                 View alert history →
               </Link>

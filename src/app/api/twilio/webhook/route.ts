@@ -1,24 +1,47 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import twilio from "twilio";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { twilioWebhookSchema } from "@/lib/validations/webhook";
 import * as Sentry from "@sentry/nextjs";
 
 export async function POST(req: NextRequest) {
   try {
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!authToken) {
+      Sentry.captureMessage("Twilio webhook: TWILIO_AUTH_TOKEN not configured", { level: "error" });
+      return new Response("<Response></Response>", {
+        headers: { "Content-Type": "text/xml" },
+        status: 500,
+      });
+    }
+
     const formData = await req.formData();
     const raw: Record<string, string> = {};
-    formData.forEach((value, key) => {
-      raw[key] = value.toString();
-    });
+    formData.forEach((value, key) => { raw[key] = value.toString(); });
+
+    const url = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/twilio/webhook`;
+    const twilioSignature = req.headers.get("x-twilio-signature") || "";
+    const isValid = twilio.validateRequest(authToken, twilioSignature, url, raw);
+
+    if (!isValid) {
+      Sentry.captureMessage("Twilio webhook: invalid signature", { level: "warning" });
+      return new Response("<Response></Response>", {
+        headers: { "Content-Type": "text/xml" },
+        status: 401,
+      });
+    }
 
     const parsed = twilioWebhookSchema.safeParse(raw);
 
     if (!parsed.success) {
       Sentry.captureMessage("Twilio webhook: invalid payload", {
         level: "warning",
-        extra: { errors: parsed.error.flatten(), raw },
+        extra: { errors: parsed.error.flatten() },
       });
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      return new Response("<Response></Response>", {
+        headers: { "Content-Type": "text/xml" },
+        status: 400,
+      });
     }
 
     const { MessageSid, SmsStatus } = parsed.data;
@@ -41,6 +64,10 @@ export async function POST(req: NextRequest) {
     if (error) {
       Sentry.captureException(error, {
         extra: { message_sid: MessageSid, sms_status: SmsStatus },
+      });
+      return new Response("<Response></Response>", {
+        headers: { "Content-Type": "text/xml" },
+        status: 500,
       });
     }
 

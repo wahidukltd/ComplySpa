@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Clock } from "lucide-react";
 
+type DeliveryStatus = "delivered" | "failed" | "pending";
+
 interface DeliveryStatusBadgeProps {
-  status: string;
+  status: DeliveryStatus;
 }
 
 export function DeliveryStatusBadge({ status }: DeliveryStatusBadgeProps) {

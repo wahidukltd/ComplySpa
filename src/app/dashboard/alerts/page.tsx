@@ -21,7 +21,7 @@ export default async function AlertsPage() {
 
   const { data: alerts } = await supabase
     .from("alert_logs")
-    .select("*")
+    .select("id, clinic_id, credential_id, alert_type, recipient, sent_at, delivery_status, days_before_expiration, created_at, resend_webhook_id, twilio_message_id")
     .eq("clinic_id", userRecord.clinic_id)
     .order("sent_at", { ascending: false })
     .limit(100);

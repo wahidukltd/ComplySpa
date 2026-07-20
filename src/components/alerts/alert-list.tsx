@@ -69,7 +69,7 @@ export function AlertList({ alerts }: AlertListProps) {
               </Badge>
             </TableCell>
             <TableCell>
-              <DeliveryStatusBadge status={alert.delivery_status} />
+              <DeliveryStatusBadge status={alert.delivery_status as "delivered" | "failed" | "pending"} />
             </TableCell>
           </TableRow>
         ))}

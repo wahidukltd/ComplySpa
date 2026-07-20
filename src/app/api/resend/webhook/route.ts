@@ -1,34 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Webhook } from "svix";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resendWebhookSchema } from "@/lib/validations/webhook";
 import * as Sentry from "@sentry/nextjs";
 
 export async function POST(req: NextRequest) {
   try {
-    const svixId = req.headers.get("svix-id");
-    const svixTimestamp = req.headers.get("svix-timestamp");
-    const svixSignature = req.headers.get("svix-signature");
-
-    if (!svixId || !svixTimestamp || !svixSignature) {
-      Sentry.captureMessage("Resend webhook: missing Svix headers", {
-        level: "warning",
-      });
-      return NextResponse.json({ error: "Missing signature headers" }, { status: 401 });
+    const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      Sentry.captureMessage("Resend webhook: RESEND_WEBHOOK_SECRET not configured", { level: "error" });
+      return NextResponse.json({ error: "Server not configured" }, { status: 500 });
     }
 
-    const ts = parseInt(svixTimestamp, 10);
-    if (isNaN(ts) || Date.now() - ts * 1000 > 5 * 60 * 1000) {
-      Sentry.captureMessage("Resend webhook: stale timestamp", { level: "warning" });
-      return NextResponse.json({ error: "Stale timestamp" }, { status: 401 });
+    const payload = await req.text();
+
+    const wh = new Webhook(webhookSecret);
+    let verified: Record<string, unknown>;
+    try {
+      verified = wh.verify(payload, {
+        "svix-id": req.headers.get("svix-id") ?? "",
+        "svix-timestamp": req.headers.get("svix-timestamp") ?? "",
+        "svix-signature": req.headers.get("svix-signature") ?? "",
+      }) as Record<string, unknown>;
+    } catch {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const parsed = resendWebhookSchema.safeParse(body);
+    const parsed = resendWebhookSchema.safeParse(verified);
 
     if (!parsed.success) {
       Sentry.captureMessage("Resend webhook: invalid payload", {
         level: "warning",
-        extra: { errors: parsed.error.flatten(), body },
+        extra: { errors: parsed.error.flatten() },
       });
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
