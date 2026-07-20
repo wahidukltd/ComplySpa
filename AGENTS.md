@@ -614,7 +614,7 @@ Plan values: `trial`, `expired_trial`, `inactive`, `solo`, `practice`, `multi_lo
 - `practice`: email + SMS, 15 staff, 300 credentials, 3 users, audit-ready report, MD tracking, inspection-readiness & mock-audit engine
 - `multi_location`: all features, 50 staff, 1000 credentials, 5 locations, 10 users, API, white-label, audit engine per location
 
-**Enforcement at THREE layers:**
+**Enforcement at THREE layers (all implemented Phase 4):**
 
 Layer 1 — MIDDLEWARE (route-level):
 - `plan='expired_trial'` → redirect to `/pricing`
@@ -631,6 +631,7 @@ Layer 3 — DATABASE (data-level):
 - Before inserting staff: count existing. If `>=` plan limit, reject with `PlanLimitError`
 - Before inserting credentials: count existing. If `>=` plan limit, reject with `PlanLimitError`
 - RLS does NOT enforce plan limits (RLS is for clinic isolation only)
+- Implementation: `src/lib/utils/plan.ts` (limits), `src/lib/utils/errors.ts` (PlanLimitError), `src/lib/actions/staff.ts` and `credentials.ts` (count checks)
 
 ## Email Responsibilities
 
