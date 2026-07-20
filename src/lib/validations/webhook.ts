@@ -34,3 +34,50 @@ export const polarWebhookSchema = z.discriminatedUnion("type", [
 ]);
 
 export type PolarWebhookPayload = z.infer<typeof polarWebhookSchema>;
+
+// ============================================================================
+// Resend Webhook Schema
+// ============================================================================
+
+export const resendWebhookSchema = z.object({
+  type: z.enum([
+    "email.sent",
+    "email.delivered",
+    "email.delivery_delayed",
+    "email.complained",
+    "email.bounced",
+    "email.opened",
+    "email.clicked",
+  ]),
+  data: z.object({
+    email_id: z.string(),
+    created_at: z.string(),
+    from: z.string(),
+    to: z.array(z.string()),
+    subject: z.string(),
+  }),
+});
+
+export type ResendWebhookPayload = z.infer<typeof resendWebhookSchema>;
+
+// ============================================================================
+// Twilio Webhook Schema
+// ============================================================================
+
+export const twilioWebhookSchema = z.object({
+  MessageSid: z.string(),
+  SmsStatus: z.enum([
+    "sent",
+    "delivered",
+    "failed",
+    "undelivered",
+    "queued",
+  ]),
+  MessageStatus: z.string(),
+  To: z.string(),
+  From: z.string(),
+  Body: z.string().optional(),
+  AccountSid: z.string(),
+});
+
+export type TwilioWebhookPayload = z.infer<typeof twilioWebhookSchema>;
