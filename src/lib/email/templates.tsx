@@ -1,5 +1,5 @@
 /**
- * Email and SMS templates for credential expiration alerts.
+ * Email templates for credential expiration alerts.
  *
  * These templates are plain strings (not React elements) because:
  * 1. The Edge Function runs on Deno, not Node.js — no React rendering available
@@ -146,14 +146,4 @@ export function buildAlertSubject(
   return `${staffName}'s ${credentialType} expires in ${daysBeforeExpiration} days`;
 }
 
-export function buildSmsBody(
-  staffName: string,
-  credentialType: string,
-  expirationDate: string,
-  daysBeforeExpiration: number,
-): string {
-  if (daysBeforeExpiration < 0) {
-    return `COMPLIANCE ALERT: ${staffName}'s ${credentialType} EXPIRED on ${expirationDate}. Renew immediately.`;
-  }
-  return `Compliance alert: ${staffName}'s ${credentialType} expires ${expirationDate} (${daysBeforeExpiration} days). Renew at your state board website.`;
-}
+

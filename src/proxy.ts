@@ -9,7 +9,6 @@ const isPublicRoute = createRouteMatcher([
   "/pricing",
   "/api/polar/webhook",
   "/api/resend/webhook",
-  "/api/twilio/webhook",
 ]);
 
 const isProtectedRoute = createRouteMatcher([

@@ -51,8 +51,8 @@ export async function createClinic(input: CreateClinicInput) {
       p_clerk_sub: userId,
       p_email: userEmail,
       p_name: name,
-      p_address: address || null,
-      p_state: state || null,
+      p_address: address || undefined,
+      p_state: state || undefined,
     }
   );
 

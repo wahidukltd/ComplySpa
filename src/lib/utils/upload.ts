@@ -22,9 +22,9 @@ export function validateFile(file: File): string | null {
 export async function uploadDocument(
   file: File,
   clinicId: string,
-): Promise<{ url: string | null; error: string | null }> {
+): Promise<{ url: string | null; filePath: string | null; error: string | null }> {
   const validationError = validateFile(file);
-  if (validationError) return { url: null, error: validationError };
+  if (validationError) return { url: null, filePath: null, error: validationError };
 
   const supabase = createClient();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -35,12 +35,12 @@ export async function uploadDocument(
     .upload(filePath, file, { upsert: false });
 
   if (error) {
-    return { url: null, error: error.message };
+    return { url: null, filePath: null, error: error.message };
   }
 
   const { data: signedData } = await supabase.storage
     .from("documents")
     .createSignedUrl(filePath, SIGNED_URL_EXPIRY_SECONDS);
 
-  return { url: signedData?.signedUrl ?? null, error: null };
+  return { url: signedData?.signedUrl ?? null, filePath, error: null };
 }

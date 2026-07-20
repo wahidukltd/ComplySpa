@@ -82,6 +82,81 @@ export async function sendEmail(
   };
 }
 
+interface SendEmailWithAttachmentParams {
+  to: string;
+  subject: string;
+  html: string;
+  attachment: {
+    content: string;
+    filename: string;
+  };
+}
+
+export async function sendEmailWithAttachment(
+  params: SendEmailWithAttachmentParams,
+): Promise<SendEmailResult> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { data, error } = await resend.emails.send({
+        from: FROM_EMAIL,
+        to: [params.to],
+        subject: params.subject,
+        html: params.html,
+        attachments: [
+          {
+            content: params.attachment.content,
+            filename: params.attachment.filename,
+            contentType: "application/pdf",
+          },
+        ],
+      });
+
+      if (error) {
+        lastError = new Error(error.message);
+
+        if (
+          error.message.includes("invalid") ||
+          error.message.includes("blocked")
+        ) {
+          Sentry.captureMessage(`Resend attachment permanent: ${error.message}`, {
+            level: "error",
+            extra: { recipient: params.to, filename: params.attachment.filename },
+          });
+          return { success: false, error: error.message };
+        }
+
+        if (attempt < MAX_RETRIES) {
+          await sleep(INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt));
+        }
+        continue;
+      }
+
+      if (data?.id) {
+        return { success: true, messageId: data.id };
+      }
+
+      return { success: false, error: "No message ID returned" };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+
+      if (attempt < MAX_RETRIES) {
+        await sleep(INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt));
+      }
+    }
+  }
+
+  Sentry.captureException(lastError, {
+    extra: { recipient: params.to, filename: params.attachment.filename },
+  });
+
+  return {
+    success: false,
+    error: lastError?.message ?? "Unknown error after retries",
+  };
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

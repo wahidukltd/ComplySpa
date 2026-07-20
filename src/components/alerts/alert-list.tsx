@@ -14,7 +14,7 @@ import { formatDateTime } from "@/lib/utils/date";
 import { Mail, Phone } from "lucide-react";
 import type { Tables } from "@/types/database";
 
-type AlertLog = Tables<"alert_logs">;
+type AlertLog = Omit<Tables<"alert_logs">, "twilio_message_id">;
 
 interface AlertListProps {
   alerts: AlertLog[];

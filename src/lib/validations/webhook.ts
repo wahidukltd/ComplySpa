@@ -60,24 +60,4 @@ export const resendWebhookSchema = z.object({
 
 export type ResendWebhookPayload = z.infer<typeof resendWebhookSchema>;
 
-// ============================================================================
-// Twilio Webhook Schema
-// ============================================================================
 
-export const twilioWebhookSchema = z.object({
-  MessageSid: z.string(),
-  SmsStatus: z.enum([
-    "sent",
-    "delivered",
-    "failed",
-    "undelivered",
-    "queued",
-  ]),
-  MessageStatus: z.string(),
-  To: z.string(),
-  From: z.string(),
-  Body: z.string().optional(),
-  AccountSid: z.string(),
-});
-
-export type TwilioWebhookPayload = z.infer<typeof twilioWebhookSchema>;

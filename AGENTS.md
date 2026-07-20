@@ -19,7 +19,9 @@ The following are configured at Claude Code **user scope** and shape how code ge
 
 ComplySpa is a vertical SaaS product for medical spas globally, launching in the US market. It tracks staff credentials, sends automated expiration alerts, generates audit-ready compliance reports, and runs an inspection-readiness & mock-audit engine.
 
-**Stack:** Next.js 14+ (App Router) · TypeScript · Tailwind CSS · shadcn/ui (component library) · Framer Motion (micro-interactions + page transitions) · React Three Fiber + Three.js (landing page hero 3D only) · Supabase (PostgreSQL, Edge Functions, Storage, pg_cron) · Clerk (Auth) · Vercel (Hosting) · Resend (Email) · Twilio (SMS) · Polar.sh (Payments) · Sentry (Errors)
+**Stack:** Next.js 14+ (App Router) · TypeScript · Tailwind CSS · shadcn/ui (component library) · Framer Motion (micro-interactions + page transitions) · React Three Fiber + Three.js (landing page hero 3D only) · Supabase (PostgreSQL, Edge Functions, Storage, pg_cron) · Clerk (Auth) · Vercel (Hosting) · Resend (Email) · Polar.sh (Payments) · Sentry (Errors)
+
+**Alert channel:** Email-only via Resend. SMS (Twilio) was removed — founder is non-US citizen, Twilio requires US business tax ID for upgrade beyond trial. Email handles all alert use cases (detailed info, paper trail, attachments) at $0 cost. SMS can be reintroduced later via Vonage or MessageBird if needed.
 
 **Architecture:** Two services only — Vercel (frontend) + Supabase (database, auth fallback, storage, crons, edge functions). No separate backend server. No Railway. No microservices. No message queues.
 
@@ -76,7 +78,6 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
       /api
         /polar/webhook/route.ts   # Polar billing webhook
         /resend/webhook/route.ts  # Email delivery status webhook
-        /twilio/webhook/route.ts  # SMS delivery status webhook
       /sign-in/[[...index]]/page.tsx
       /sign-up/[[...index]]/page.tsx
       /onboarding/page.tsx        # New user onboarding flow
@@ -103,8 +104,6 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
       /email/
         templates.tsx             # Email templates (alert, quarterly audit reminder)
         send.ts                   # Resend API wrapper
-      /sms/
-        send.ts                   # Twilio API wrapper
       /pdf/
         report-template.tsx       # react-pdf template for audit report
       /polar/
@@ -555,7 +554,7 @@ ships:
 ```
 
 ### API Routes (Vercel)
-- Used only for webhooks (Polar, Resend, Twilio) and server-side operations that cannot run in Edge Functions
+- Used only for webhooks (Polar, Resend) and server-side operations that cannot run in Edge Functions
 - All API routes validate input with Zod
 - All webhook routes validate signatures before processing
 - All API routes return JSON with the same consistent shape as Edge Functions
@@ -610,8 +609,8 @@ Plan values: `trial`, `expired_trial`, `inactive`, `solo`, `practice`, `multi_lo
 - After 30 days: pg_cron sets `plan='inactive'`. User sees reactivation page only.
 
 **Plan limits and feature gating:**
-- `solo`: email alerts only (no SMS), 5 staff, 50 credentials, 1 user, basic report, no audit engine
-- `practice`: email + SMS, 15 staff, 300 credentials, 3 users, audit-ready report, MD tracking, inspection-readiness & mock-audit engine
+- `solo`: email alerts, 5 staff, 50 credentials, 1 user, basic report, no audit engine
+- `practice`: email alerts, 15 staff, 300 credentials, 3 users, audit-ready report, MD tracking, inspection-readiness & mock-audit engine
 - `multi_location`: all features, 50 staff, 1000 credentials, 5 locations, 10 users, API, white-label, audit engine per location
 
 **Enforcement at THREE layers (all implemented Phase 4):**
@@ -623,7 +622,7 @@ Layer 1 — MIDDLEWARE (route-level):
 - `plan='solo'` → `/dashboard/settings/users` returns 403 (1 user only)
 
 Layer 2 — SERVER COMPONENT (feature-level):
-- Before rendering SMS settings: if `plan='solo'`, show upgrade banner instead
+- Before rendering premium features: if plan doesn't include the feature, show upgrade banner instead
 - Before rendering audit report: if `plan='solo'`, show basic report only
 - Before rendering audit engine: if `plan='solo'`, show upgrade CTA card
 
@@ -660,7 +659,6 @@ Layer 3 — DATABASE (data-level):
 
 ### What NOT to Test Automated
 - Email delivery (Resend) — tested manually, verified in Resend dashboard
-- SMS delivery (Twilio) — tested manually, verified in Twilio console
 - Polar webhook — tested manually with Polar sandbox
 - pg_cron execution — tested manually via SQL function call
 
@@ -712,7 +710,7 @@ Before merging any PR:
 
 - Every new dependency must be justified — "what does this do that I cannot do with existing tools?"
 - Avoid dependencies for things that are trivial in TypeScript (date formatting, string manipulation)
-- Preferred dependencies are already in the stack: Clerk, Supabase, Resend, Twilio, Polar, Sentry
+- Preferred dependencies are already in the stack: Clerk, Supabase, Resend, Polar, Sentry
 - Run `npm audit` weekly. Fix high-severity vulnerabilities within 48 hours.
 - Dependabot enabled for automated vulnerability alerts
 - Lockfile (`package-lock.json`) is committed for reproducible builds
@@ -722,7 +720,7 @@ Before merging any PR:
 
 - Dashboard page load: under 2 seconds on 4G mobile connection
 - Supabase queries: under 500ms for any dashboard query (use indexes on frequently queried columns)
-- Edge Function execution: under 5 seconds (Resend + Twilio API calls)
+- Edge Function execution: under 5 seconds (Resend API call)
 - PDF generation: under 3 seconds for a 20-staff clinic (client-side, browser-dependent)
 - No N+1 queries — use Supabase's nested select syntax (`select('*, credentials()')`)
 - Images are not optimized by Vercel (no `Image` component for uploaded documents — they are served from Supabase Storage)
@@ -734,7 +732,6 @@ Before merging any PR:
 - **Vercel Analytics:** page load performance and traffic. Free.
 - **Supabase Dashboard:** database health, Edge Function logs, storage usage. Check weekly.
 - **Resend Dashboard:** email delivery logs, bounce rate. Check weekly.
-- **Twilio Console:** SMS delivery logs. Check weekly.
 - **Polar Dashboard:** subscription status, failed payments.
 - No `console.log` in production code. Use `Sentry.captureException()` for errors, `Sentry.captureMessage()` for info.
 - In development, `console.log` is acceptable for debugging but must be removed before commit.
@@ -750,9 +747,6 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 RESEND_API_KEY=
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_PHONE_NUMBER=
 POLAR_ACCESS_TOKEN=
 POLAR_WEBHOOK_SECRET=
 SENTRY_DSN=
@@ -848,7 +842,6 @@ Provisioning items only — code-quality pre-checks (tests, tsc, lint, types, se
 - [ ] pg_cron jobs created in production Supabase
 - [ ] Polar webhook URL points to production domain
 - [ ] Resend sending domain verified (DKIM, SPF, DMARC)
-- [ ] Twilio webhook URL points to production domain
 - [ ] Clerk production URLs configured
 - [ ] Clerk third-party auth configured in Supabase Dashboard: Authentication → Third-Party Auth → Clerk → paste domain (`moving-sheepdog-44.clerk.accounts.dev`)
 - [ ] DNS configured (A record + CNAME to Vercel)

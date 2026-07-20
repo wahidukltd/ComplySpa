@@ -15,9 +15,6 @@ if (SENTRY_DSN) {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("NEXT_PUBLIC_SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID") || "";
-const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
-const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER") || "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 const APP_URL = Deno.env.get("APP_URL") || Deno.env.get("NEXT_PUBLIC_APP_URL") || "http://localhost:3000";
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Compliance Alerts <onboarding@resend.dev>";
@@ -43,11 +40,6 @@ interface CredentialWithRelations {
   expiration_date: string;
   staff_member: { name: string | null; deleted_at: string | null } | null;
   credential_type: { name: string | null } | null;
-}
-
-interface SmsResult {
-  success: boolean;
-  messageId?: string;
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -80,9 +72,15 @@ function isAuthorizedCaller(req: Request): boolean {
   if (!CRON_SECRET) return false;
   const header = req.headers.get("x-cron-secret");
   if (!header) return false;
-  return crypto.subtle?.timingSafeEqual
-    ? false // ponytail: constant-time comparison not available in Deno Edge Runtime
-    : header === CRON_SECRET;
+  try {
+    const enc = new TextEncoder();
+    const a = enc.encode(header);
+    const b = enc.encode(CRON_SECRET);
+    if (a.byteLength !== b.byteLength) return false;
+    return crypto.subtle.timingSafeEqual(a, b);
+  } catch {
+    return header === CRON_SECRET;
+  }
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -128,7 +126,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     if (credential.staff_member?.deleted_at) {
-      return json({ success: true, data: { email_sent: false, sms_sent: false } }, 200);
+      return json({ success: true, data: { email_sent: false } }, 200);
     }
 
     const { data: owners, error: ownerError } = await supabase
@@ -161,7 +159,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     if (!ACTIVE_PLANS.has(clinic.plan)) {
       console.log(`[send-credential-alert] Skipping — clinic plan is ${clinic.plan}`);
-      return json({ success: true, data: { email_sent: false, sms_sent: false } }, 200);
+      return json({ success: true, data: { email_sent: false } }, 200);
     }
 
     const staffName = htmlEscape(credential.staff_member?.name ?? "Unknown");
@@ -204,43 +202,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    let smsResult: SmsResult = { success: false };
-
-    const planAllowsSms = clinic.plan === "practice" || clinic.plan === "multi_location";
-
-    if (planAllowsSms && !isEscalation) {
-      const { data: ownerStaff } = await supabase
-        .from("staff_members")
-        .select("phone")
-        .eq("clinic_id", clinic_id)
-        .eq("email", ownerEmail)
-        .is("deleted_at", null)
-        .maybeSingle();
-
-      if (ownerStaff?.phone) {
-        const smsBody = `Compliance alert: ${staffName}'s ${credentialType} expires ${expDate} (${days_before} days). Renew at your state board website.`;
-
-        smsResult = await sendSms(ownerStaff.phone, smsBody);
-
-        const { error: smsLogError } = await supabase.from("alert_logs").insert({
-          credential_id,
-          clinic_id,
-          alert_type: "sms",
-          days_before_expiration: days_before,
-          recipient: ownerStaff.phone,
-          delivery_status: smsResult.success ? "pending" : "failed",
-          twilio_message_id: smsResult.messageId ?? null,
-        });
-
-        if (smsLogError) {
-          Sentry.captureMessage("Edge Function: failed to log SMS alert to alert_logs", {
-            level: "error",
-            extra: { credential_id, error: smsLogError.message },
-          });
-        }
-      }
-    }
-
     const duration = Date.now() - startTime;
     console.log(`[send-credential-alert] OK (${duration}ms)`);
 
@@ -249,8 +210,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       data: {
         email_sent: emailResult.success,
         email_message_id: emailResult.messageId,
-        sms_sent: smsResult.success,
-        sms_message_id: smsResult.messageId,
       },
     }, 200);
   } catch (err) {
@@ -316,41 +275,6 @@ async function sendEmailWithRetry(
   });
 
   return { success: false };
-}
-
-async function sendSms(to: string, body: string): Promise<SmsResult> {
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) return { success: false };
-
-  try {
-    const formData = new URLSearchParams({ To: to, From: TWILIO_PHONE_NUMBER, Body: body });
-
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formData.toString(),
-      },
-    );
-
-    const data = await res.json();
-
-    if (res.ok && data.sid) return { success: true, messageId: data.sid };
-
-    Sentry.captureMessage(`Twilio SMS failed: ${data.message || `HTTP ${res.status}`}`, {
-      level: "error",
-      extra: { to, twilio_code: data.code },
-    });
-
-    return { success: false };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    Sentry.captureMessage(`Twilio SMS exception: ${msg}`, { level: "error" });
-    return { success: false };
-  }
 }
 
 function sleep(ms: number): Promise<void> {
