@@ -4,11 +4,15 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { credentialSchema, type CredentialInput } from "@/lib/validations/staff";
+import { getClinicIdAndPlan } from "@/lib/utils/clinic";
+import { getPlanLimits } from "@/lib/utils/plan";
 import * as Sentry from "@sentry/nextjs";
 
 export async function addCredential(input: CredentialInput & { document_url?: string }) {
-  const { userId } = await auth();
-  if (!userId) return { error: "Unauthorized" };
+  const clinicData = await getClinicIdAndPlan();
+  if (!clinicData) return { error: "Unauthorized" };
+
+  const { clinicId, plan } = clinicData;
 
   const { document_url, ...credInput } = input;
   const parsed = credentialSchema.safeParse(credInput);
@@ -18,21 +22,26 @@ export async function addCredential(input: CredentialInput & { document_url?: st
 
   const supabase = await createClient();
 
-  const { data: user } = await supabase
-    .from("users")
-    .select("clinic_id, role")
-    .eq("clerk_user_id", userId)
-    .maybeSingle();
-  if (!user) return { error: "Unauthorized" };
-  if (user.role === "viewer") return { error: "Insufficient permissions" };
+  const limits = getPlanLimits(plan);
+
+  const { count } = await supabase
+    .from("credentials")
+    .select("id", { count: "exact", head: true })
+    .eq("clinic_id", clinicId);
+
+  if ((count ?? 0) >= limits.maxCredentials) {
+    return {
+      error: `Your plan allows up to ${limits.maxCredentials} credentials. You currently have ${count ?? 0}. Upgrade to add more.`,
+    };
+  }
 
   const { data: staff } = await supabase
     .from("staff_members")
     .select("id")
     .eq("id", parsed.data.staff_member_id)
-    .eq("clinic_id", user.clinic_id)
+    .eq("clinic_id", clinicId)
     .is("deleted_at", null)
-    .maybeSingle();
+    .single();
 
   if (!staff) return { error: "Staff member not found." };
 
@@ -41,7 +50,7 @@ export async function addCredential(input: CredentialInput & { document_url?: st
     .insert({
       staff_member_id: parsed.data.staff_member_id,
       credential_type_id: parsed.data.credential_type_id,
-      clinic_id: user.clinic_id,
+      clinic_id: clinicId,
       license_number: parsed.data.license_number || null,
       state: parsed.data.state || null,
       issue_date: parsed.data.issue_date || null,

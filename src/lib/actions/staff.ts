@@ -4,11 +4,15 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { staffMemberSchema, type StaffMemberInput } from "@/lib/validations/staff";
+import { getClinicIdAndPlan } from "@/lib/utils/clinic";
+import { getPlanLimits } from "@/lib/utils/plan";
 import * as Sentry from "@sentry/nextjs";
 
 export async function addStaffMember(input: StaffMemberInput) {
-  const { userId } = await auth();
-  if (!userId) return { error: "Unauthorized" };
+  const clinicData = await getClinicIdAndPlan();
+  if (!clinicData) return { error: "Unauthorized" };
+
+  const { clinicId, plan } = clinicData;
 
   const parsed = staffMemberSchema.safeParse(input);
   if (!parsed.success) {
@@ -19,17 +23,31 @@ export async function addStaffMember(input: StaffMemberInput) {
 
   const { data: user } = await supabase
     .from("users")
-    .select("id, clinic_id, role")
-    .eq("clerk_user_id", userId)
+    .select("role")
+    .eq("clinic_id", clinicId)
     .maybeSingle();
   if (!user) return { error: "Unauthorized" };
   if (user.role === "viewer") return { error: "Insufficient permissions" };
+
+  const limits = getPlanLimits(plan);
+
+  const { count } = await supabase
+    .from("staff_members")
+    .select("id", { count: "exact", head: true })
+    .eq("clinic_id", clinicId)
+    .is("deleted_at", null);
+
+  if ((count ?? 0) >= limits.maxStaff) {
+    return {
+      error: `Your plan allows up to ${limits.maxStaff} staff members. You currently have ${count ?? 0}. Upgrade to add more.`,
+    };
+  }
 
   const { data: staff, error } = await supabase
     .from("staff_members")
     .insert({
       ...parsed.data,
-      clinic_id: user.clinic_id,
+      clinic_id: clinicId,
       hire_date: parsed.data.hire_date || null,
       email: parsed.data.email || null,
       phone: parsed.data.phone || null,
