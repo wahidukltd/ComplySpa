@@ -1,16 +1,16 @@
 # Graph Report - complyspa  (2026-07-21)
 
 ## Corpus Check
-- 185 files · ~91,248 words
+- 193 files · ~94,252 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 889 nodes · 1657 edges · 101 communities (69 shown, 32 thin omitted)
+- 939 nodes · 1378 edges · 120 communities (86 shown, 34 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `14f1167d`
+- Built from commit: `a39548b5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -75,8 +75,10 @@
 - Community 59
 - Community 74
 - Community 75
+- Community 81
 - AGENTS.md
 - Frontend Conventions
+- audit/page.tsx
 - Database Conventions
 - Public Pages & Marketing Conventions
 - Engineering Principles
@@ -88,67 +90,77 @@
 - Domain Knowledge
 - Claude Code Behavior Guidelines
 - Email Responsibilities
+- edit-staff-form-wrapper.tsx
+- credentials.ts
+- onboarding/page.tsx
+- validations/settings.ts
+- 020_reconcile_plan_limits.sql
+- badge.tsx
+- validations/webhook.ts
+- resend/webhook/route.ts
+- validations/clinic.ts
+- 022_soft_delete_credentials_users.sql
 
 ## God Nodes (most connected - your core abstractions)
-1. `cn()` - 94 edges
-2. `createClient()` - 62 edges
-3. `buttonVariants` - 24 edges
-4. `Button()` - 23 edges
-5. `compilerOptions` - 18 edges
-6. `Card()` - 14 edges
-7. `CardContent()` - 14 edges
-8. `CardHeader()` - 13 edges
-9. `CardTitle()` - 13 edges
-10. `Input()` - 12 edges
+1. `cn()` - 82 edges
+2. `createClient()` - 67 edges
+3. `compilerOptions` - 18 edges
+4. `Deploy Without Domain (Vercel First, Domain Later)` - 16 edges
+5. `buttonVariants` - 12 edges
+6. `ScrollReveal()` - 11 edges
+7. `getAuth()` - 10 edges
+8. `scripts` - 10 edges
+9. `Frontend Conventions` - 8 edges
+10. `Tables` - 8 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `getClinicProfile()` --calls--> `createClient()`  [EXTRACTED]
+  src/lib/actions/settings.ts → src/lib/supabase/server.ts
 - `NavLink()` --calls--> `cn()`  [EXTRACTED]
   src/components/layout/sidebar.tsx → src/lib/utils/cn.ts
-- `DialogOverlay()` --calls--> `cn()`  [EXTRACTED]
-  src/components/ui/dialog.tsx → src/lib/utils/cn.ts
-- `CredentialsTable()` --calls--> `verifyCredentialNow()`  [EXTRACTED]
-  src/app/dashboard/credentials/credentials-table.tsx → src/lib/actions/credentials.ts
-- `POST()` --calls--> `createClient()`  [EXTRACTED]
-  src/app/api/reports/email/route.ts → src/lib/supabase/server.ts
-- `POST()` --calls--> `createAdminClient()`  [EXTRACTED]
-  src/app/api/resend/webhook/route.ts → src/lib/supabase/admin.ts
+- `CardDescription()` --calls--> `cn()`  [EXTRACTED]
+  src/components/ui/card.tsx → src/lib/utils/cn.ts
+- `CardAction()` --calls--> `cn()`  [EXTRACTED]
+  src/components/ui/card.tsx → src/lib/utils/cn.ts
+- `CardFooter()` --calls--> `cn()`  [EXTRACTED]
+  src/components/ui/card.tsx → src/lib/utils/cn.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (101 total, 32 thin omitted)
+## Communities (120 total, 34 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (56): CredentialRow, STATUS_LABELS, STATUS_VARIANTS, AlertListProps, AlertLog, DeliveryStatus, DeliveryStatusBadge(), DeliveryStatusBadgeProps (+48 more)
+Cohesion: 0.13
+Nodes (22): CredentialRow, CredentialsTable(), STATUS_LABELS, STATUS_VARIANTS, AlertList(), AlertListProps, AlertLog, CATEGORIES (+14 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.07
-Nodes (26): Credential, EditCredentialFormWrapper(), NewCredentialFormWrapper(), EditStaffFormWrapper(), StaffMember, StaffFormWrapper(), StaffMember, StaffTableWrapper() (+18 more)
+Cohesion: 0.19
+Nodes (7): PlanLimitError, RlsViolationError, WebhookValidationError, getPlanLimits(), Plan, PLAN_LIMITS, PlanLimit
 
 ### Community 2 - "Community 2"
-Cohesion: 0.09
-Nodes (41): STEPS, WizardProgress(), WizardStepClinic(), CredentialRow, CredentialType, StaffRef, WizardStepCredentials(), WizardStepCredentialsProps (+33 more)
+Cohesion: 0.07
+Nodes (30): OnboardingForm(), OnboardingWizard(), STEPS, WizardProgress(), WizardStepChecklist(), WizardStepChecklistProps, WizardStepClinic(), CredentialRow (+22 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.07
-Nodes (35): jsonLd, metadata, metadata, pricingJsonLd, PricingPage(), BenefitsSection(), ROWS, CTASection() (+27 more)
+Cohesion: 0.09
+Nodes (26): jsonLd, metadata, BenefitsSection(), ROWS, FAQS, FAQSection(), FEATURES, FeaturesSection() (+18 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.11
-Nodes (22): Props, ReportGenerator(), createReport(), getReportData(), C, ComplianceReport(), ReportData, styles (+14 more)
+Cohesion: 0.06
+Nodes (33): Credential, StaffMember, StaffMember, Credential, CredentialForm(), CredentialFormProps, CredentialTypeOption, ROLES (+25 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.04
 Nodes (47): eslint, eslint-config-next, jsdom, devDependencies, eslint, eslint-config-next, jsdom, @playwright/test (+39 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.11
-Nodes (32): AuditPage(), AuditChecklist(), Props, STATUS_BADGE, CompleteAuditButton(), DateCell(), GapTracker(), Props (+24 more)
+Cohesion: 0.14
+Nodes (19): Props, STATUS_BADGE, Props, ReadinessReportDocument(), STATUS_COLORS, STATUS_LABELS, styles, Props (+11 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.08
-Nodes (22): POST(), createAdminClient(), PolarWebhookPayload, polarWebhookSchema, ResendWebhookPayload, resendWebhookSchema, subscriptionDataSchema, anonKeyJwt (+14 more)
+Cohesion: 0.11
+Nodes (16): createAdminClient(), anonKeyJwt, createJwt(), execSql(), fetchAsUser(), getServiceClient(), patchAsUser(), projectIdMatch (+8 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.07
@@ -167,8 +179,8 @@ Cohesion: 0.22
 Nodes (11): emailReportSchema, escapeHtml(), POST(), rateLimitMap, resend, sendEmail(), SendEmailParams, SendEmailResult (+3 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.11
-Nodes (31): SettingsPage(), AlertRecipients(), ClinicProfileForm(), CustomCredentialTypes(), UserInviteForm(), Tabs(), TabsContent(), TabsList() (+23 more)
+Cohesion: 0.08
+Nodes (37): SettingsPage(), PageHeader(), PageHeaderProps, AlertRecipient, AlertRecipients(), AlertRecipientsProps, emailSchema, ClinicProfileForm() (+29 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.35
@@ -180,7 +192,7 @@ Nodes (7): HTML_ESCAPE_MAP, json(), RequestBody, sendEmailWithRetry(), SENTRY_DS
 
 ### Community 16 - "Community 16"
 Cohesion: 0.32
-Nodes (5): DashboardShell(), navItems, NavLink(), Sidebar(), Topbar()
+Nodes (4): navItems, NavLink(), Sidebar(), Topbar()
 
 ### Community 17 - "Community 17"
 Cohesion: 0.29
@@ -227,8 +239,12 @@ Cohesion: 0.50
 Nodes (3): alert_logs, audit_runs, trigger_audit_runs_updated_at
 
 ### Community 35 - "Community 35"
-Cohesion: 0.08
-Nodes (36): AlertsPage(), CredentialsTable(), CredentialsListPage(), DashboardLayout(), DashboardPage(), ReportsPage(), EditCredentialPage(), NewCredentialPage() (+28 more)
+Cohesion: 0.06
+Nodes (43): AlertsPage(), AuditPage(), CredentialsListPage(), DashboardLayout(), DashboardPage(), ReportsPage(), EditCredentialPage(), NewCredentialPage() (+35 more)
+
+### Community 81 - "Community 81"
+Cohesion: 0.10
+Nodes (23): DropdownMenuCheckboxItem(), DropdownMenuContent(), DropdownMenuItem(), DropdownMenuLabel(), DropdownMenuRadioItem(), DropdownMenuSeparator(), DropdownMenuShortcut(), DropdownMenuSubContent() (+15 more)
 
 ### Community 88 - "AGENTS.md"
 Cohesion: 0.12
@@ -236,11 +252,15 @@ Nodes (14): Architecture Decision Records, Dependency Management, Environment Va
 
 ### Community 89 - "Frontend Conventions"
 Cohesion: 0.12
-Nodes (16): Accessibility, Animation & 3D Graphics, Component Design, Component Library, Dark theme — tokens DEFINED, UI toggle is POST-MVP, Data visualization (audit-report charts, dashboard KPIs), Derived tokens (built from the five foundation colors), Foundation — warm spa palette (five colors only) (+8 more)
+Nodes (16): Accessibility, Animation & 3D Graphics, Component Design, Component Library, Dark theme — tokens DEFINED, UI toggle is POST-MVP, Data visualization (charts, KPIs), Derived tokens (built from the three foundation colors + white), Foundation — three colors only (+8 more)
+
+### Community 90 - "audit/page.tsx"
+Cohesion: 0.20
+Nodes (11): metadata, pricingJsonLd, PricingPage(), CTASection(), Hero3D, HeroSection(), NAV_LINKS, Navbar() (+3 more)
 
 ### Community 91 - "Database Conventions"
-Cohesion: 0.29
-Nodes (7): Audit Engine Tables, Database Conventions, Migrations, pg_cron, Row Level Security, Schema, Trial Lifecycle
+Cohesion: 0.22
+Nodes (9): Audit Engine Tables, Database Conventions, Mid-Trial Upgrade (Subscribe During Trial), Migrations, pg_cron, Row Level Security, Schema, Skip Trial (Subscribe Immediately) (+1 more)
 
 ### Community 92 - "Public Pages & Marketing Conventions"
 Cohesion: 0.29
@@ -282,25 +302,57 @@ Nodes (3): Before Implementing Any Change, Claude Code Behavior Guidelines, Duri
 Cohesion: 0.67
 Nodes (3): Clerk Handles (free, included in 10K MAU), Email Responsibilities, Resend Handles (free, 3,000 emails/month)
 
+### Community 102 - "edit-staff-form-wrapper.tsx"
+Cohesion: 0.12
+Nodes (16): Cloudflare Proxy Warning, Deploy Without Domain (Vercel First, Domain Later), Domain Migration Reference — What Points Where, Step 10: Update Environment Variables for Domain, Step 11: Configure Clerk for Custom Domain, Step 12: Verify Resend Sending Domain + Add DNS Records, Step 13: Post-Domain Launch, Step 1: Supabase Production Project (Already Exists) (+8 more)
+
+### Community 103 - "credentials.ts"
+Cohesion: 0.18
+Nodes (6): DialogContent(), DialogDescription(), DialogFooter(), DialogHeader(), DialogOverlay(), DialogTitle()
+
+### Community 104 - "onboarding/page.tsx"
+Cohesion: 0.29
+Nodes (8): PLANS, Card(), CardAction(), CardContent(), CardDescription(), CardFooter(), CardHeader(), CardTitle()
+
+### Community 105 - "validations/settings.ts"
+Cohesion: 0.29
+Nodes (8): AlertRecipientInput, alertRecipientSchema, ClinicProfileInput, clinicProfileSchema, CustomCredentialTypeInput, customCredentialTypeSchema, InviteUserInput, inviteUserSchema
+
+### Community 106 - "020_reconcile_plan_limits.sql"
+Cohesion: 0.70
+Nodes (4): enforce_plan_limits(), trigger_enforce_plan_limits_credentials, trigger_enforce_plan_limits_staff, trigger_enforce_plan_limits_users
+
+### Community 107 - "badge.tsx"
+Cohesion: 0.38
+Nodes (5): DeliveryStatus, DeliveryStatusBadge(), DeliveryStatusBadgeProps, Badge(), badgeVariants
+
+### Community 108 - "validations/webhook.ts"
+Cohesion: 0.33
+Nodes (5): PolarWebhookPayload, polarWebhookSchema, ResendWebhookPayload, resendWebhookSchema, subscriptionDataSchema
+
+### Community 109 - "resend/webhook/route.ts"
+Cohesion: 0.67
+Nodes (3): checkRateLimit(), POST(), webhookRateLimit
+
 ## Knowledge Gaps
-- **302 isolated node(s):** `Plan`, `PlanLimit`, `$schema`, `style`, `rsc` (+297 more)
+- **343 isolated node(s):** `Tooling that governs work in this repo`, `Project Overview`, `1. Security First`, `2. Simplicity Over Cleverness`, `3. Type Safety Is Non-Negotiable` (+338 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **32 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **34 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `cn()` connect `Community 0` to `Community 2`, `Community 3`, `Community 35`, `Community 11`, `Community 13`, `Community 16`?**
-  _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `createClient()` connect `Community 35` to `Community 1`, `Community 2`, `Community 4`, `Community 6`, `Community 12`, `Community 13`?**
-  _High betweenness centrality (0.048) - this node is a cross-community bridge._
-- **Why does `Button()` connect `Community 2` to `Community 0`, `Community 35`, `Community 4`, `Community 6`?**
-  _High betweenness centrality (0.017) - this node is a cross-community bridge._
-- **What connects `Plan`, `PlanLimit`, `$schema` to the rest of the system?**
-  _302 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `cn()` connect `Community 81` to `Community 0`, `Community 3`, `credentials.ts`, `onboarding/page.tsx`, `badge.tsx`, `Community 11`, `Community 13`, `Community 16`, `audit/page.tsx`?**
+  _High betweenness centrality (0.079) - this node is a cross-community bridge._
+- **Why does `createClient()` connect `Community 35` to `Community 2`, `Community 12`, `Community 13`, `Community 6`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
+- **Why does `Button()` connect `audit/page.tsx` to `Community 0`, `Community 2`, `Community 35`, `Community 6`, `credentials.ts`, `Community 81`?**
+  _High betweenness centrality (0.009) - this node is a cross-community bridge._
+- **What connects `Tooling that governs work in this repo`, `Project Overview`, `1. Security First` to the rest of the system?**
+  _343 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.061828952239911146 - nodes in this community are weakly interconnected._
-- **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.06866002214839424 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.13333333333333333 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.08683853459972862 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06659619450317125 - nodes in this community are weakly interconnected._
+- **Should `Community 3` be split into smaller, more focused modules?**
+  _Cohesion score 0.08846153846153847 - nodes in this community are weakly interconnected._
