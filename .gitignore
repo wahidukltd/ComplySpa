@@ -64,6 +64,10 @@ test-results/
 __pycache__/
 *.pyc
 
+# Graphify knowledge graph — local-only artifacts
+graphify-out/cost.json
+graphify-out/cache/
+
 # OS
 Thumbs.db
 desktop.ini
