@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateClinicProfile } from "@/lib/actions/settings";
+import { clinicProfileSchema } from "@/lib/validations/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,12 +23,14 @@ export function ClinicProfileForm({ name, address, state }: ClinicProfileFormPro
     event.preventDefault();
     setIsSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
-    const result = await updateClinicProfile({
-      name: (formData.get("name") as string)?.trim() ?? "",
-      address: (formData.get("address") as string)?.trim() ?? "",
-      state: (formData.get("state") as string)?.trim().toUpperCase() ?? "",
-    });
+    const formData = Object.fromEntries(new FormData(event.currentTarget));
+    const parsed = clinicProfileSchema.safeParse(formData);
+    if (!parsed.success) {
+      setIsSubmitting(false);
+      toast.error(parsed.error.issues.map((e) => e.message).join(", "));
+      return;
+    }
+    const result = await updateClinicProfile(parsed.data);
 
     if (result.error) {
       toast.error(result.error);

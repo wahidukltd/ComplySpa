@@ -69,11 +69,11 @@ export function WizardStepClinic({ onNext }: { onNext: (clinicId: string) => voi
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full" style={{ backgroundColor: "#F6E3D6" }}>
-          <Building2 className="size-5" style={{ color: "#9C6B5D" }} />
+        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-[#F0F4F5]">
+          <Building2 className="size-5 text-[#6E97A7]" />
         </div>
-        <CardTitle className="text-xl" style={{ color: "#3D2A25" }}>Set up your clinic</CardTitle>
-        <CardDescription style={{ color: "#8B7D78" }}>
+        <CardTitle className="text-xl text-black">Set up your clinic</CardTitle>
+        <CardDescription className="text-[rgba(0,0,0,0.55)]">
           Enter your clinic details to get started.
         </CardDescription>
       </CardHeader>
@@ -81,7 +81,7 @@ export function WizardStepClinic({ onNext }: { onNext: (clinicId: string) => voi
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">
-              Clinic name <span style={{ color: "#B8443A" }}>*</span>
+              Clinic name <span className="text-[#B8443A]">*</span>
             </Label>
             <Input
               id="name"
@@ -92,7 +92,7 @@ export function WizardStepClinic({ onNext }: { onNext: (clinicId: string) => voi
               aria-describedby={errors.name ? "name-error" : undefined}
             />
             {errors.name && (
-              <p id="name-error" className="text-sm" style={{ color: "#B8443A" }}>{errors.name}</p>
+              <p id="name-error" className="text-sm text-[#B8443A]">{errors.name}</p>
             )}
           </div>
 
@@ -115,12 +115,12 @@ export function WizardStepClinic({ onNext }: { onNext: (clinicId: string) => voi
               className="w-20 uppercase"
             />
             {errors.state && (
-              <p className="text-sm" style={{ color: "#B8443A" }}>{errors.state}</p>
+              <p className="text-sm text-[#B8443A]">{errors.state}</p>
             )}
           </div>
 
           {serverError && (
-            <div className="rounded-md p-3 text-sm" style={{ backgroundColor: "#FCE8E5", color: "#7A2A26" }}>
+            <div className="rounded-md p-3 text-sm bg-[#FCE8E5] text-[#7A2A26]">
               {serverError}
             </div>
           )}

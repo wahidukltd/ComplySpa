@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { inviteUser } from "@/lib/actions/settings";
+import { inviteUserSchema } from "@/lib/validations/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,9 +16,15 @@ export function UserInviteForm() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!email.trim()) return;
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    const parsed = inviteUserSchema.safeParse({ email: trimmed, role });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues.map((e) => e.message).join(", "));
+      return;
+    }
     setIsSubmitting(true);
-    const result = await inviteUser({ email: email.trim(), role: role as "manager" | "viewer" });
+    const result = await inviteUser(parsed.data);
     if (result.error) {
       toast.error(result.error);
     } else {

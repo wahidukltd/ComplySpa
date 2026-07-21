@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { z } from "zod";
 import { addAlertRecipient, removeAlertRecipient } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Trash2, Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+
+const emailSchema = z.string().email("Invalid email address");
 
 interface AlertRecipient {
   id: string;
@@ -29,9 +32,15 @@ export function AlertRecipients({ recipients, ownerEmail, role }: AlertRecipient
 
   async function handleAdd(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!email.trim()) return;
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    const parsed = emailSchema.safeParse(trimmed);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Invalid email");
+      return;
+    }
     setIsSubmitting(true);
-    const result = await addAlertRecipient({ email: email.trim() });
+    const result = await addAlertRecipient({ email: parsed.data });
     if (result.error) {
       toast.error(result.error);
     } else {
@@ -42,11 +51,15 @@ export function AlertRecipients({ recipients, ownerEmail, role }: AlertRecipient
   }
 
   async function handleRemove(id: string) {
-    const result = await removeAlertRecipient(id);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success("Recipient removed");
+    try {
+      const result = await removeAlertRecipient(id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Recipient removed");
+      }
+    } catch {
+      toast.error("Failed to remove recipient");
     }
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import * as Sentry from "@sentry/nextjs";
 import type { Database } from "@/types/database";
 
 // ponytail: minimal Window.Clerk type for the accessToken callback.
@@ -32,7 +33,8 @@ export function createClient() {
           template: "supabase",
         });
         return token ?? null;
-      } catch {
+      } catch (err) {
+        Sentry.captureException(err);
         return null;
       }
     },

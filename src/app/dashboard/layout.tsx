@@ -74,9 +74,9 @@ export default async function DashboardLayout({
         position="top-right"
         toastOptions={{
           style: {
-            background: "#FFFFFF",
-            border: "1px solid #D9B7A7",
-            color: "#3D2A25",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-hairline)",
+            color: "var(--color-ink)",
           },
         }}
       />

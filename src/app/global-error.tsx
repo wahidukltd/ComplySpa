@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
+
 export default function GlobalError({
   error,
   reset,
@@ -7,17 +10,21 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <html>
       <body>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: "1.5rem", gap: "1rem" }}>
-          <h1 style={{ fontSize: "1.25rem", fontWeight: 600 }}>Something went wrong</h1>
-          <p style={{ maxWidth: "28rem", fontSize: "0.875rem", color: "#8B7D78" }}>
+        <div className="flex flex-col items-center justify-center min-h-screen p-6 gap-4">
+          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <p className="max-w-[28rem] text-sm text-[#8B7D78]">
             {error.message || "An unexpected error occurred."}
           </p>
           <button
             onClick={reset}
-            style={{ borderRadius: "0.5rem", background: "#3D2A25", color: "#FFF8F2", padding: "0.5rem 1rem", fontSize: "0.875rem", fontWeight: 500 }}
+            className="rounded-lg bg-[#3D2A25] text-[#FFF8F2] px-4 py-2 text-sm font-medium"
           >
             Try again
           </button>

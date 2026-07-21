@@ -365,6 +365,7 @@ export type Database = {
           clinic_id: string
           created_at: string
           credential_type_id: string
+          deleted_at: string | null
           document_url: string | null
           expiration_date: string | null
           id: string
@@ -383,6 +384,7 @@ export type Database = {
           clinic_id: string
           created_at?: string
           credential_type_id: string
+          deleted_at?: string | null
           document_url?: string | null
           expiration_date?: string | null
           id?: string
@@ -401,6 +403,7 @@ export type Database = {
           clinic_id?: string
           created_at?: string
           credential_type_id?: string
+          deleted_at?: string | null
           document_url?: string | null
           expiration_date?: string | null
           id?: string
@@ -501,6 +504,7 @@ export type Database = {
           clerk_user_id: string
           clinic_id: string
           created_at: string
+          deleted_at: string | null
           email: string
           id: string
           role: string
@@ -510,6 +514,7 @@ export type Database = {
           clerk_user_id: string
           clinic_id: string
           created_at?: string
+          deleted_at?: string | null
           email: string
           id?: string
           role?: string
@@ -519,6 +524,7 @@ export type Database = {
           clerk_user_id?: string
           clinic_id?: string
           created_at?: string
+          deleted_at?: string | null
           email?: string
           id?: string
           role?: string

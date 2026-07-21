@@ -67,7 +67,7 @@ export function buildAlertEmail(params: AlertTemplateParams): string {
           Visit your state board website to renew this credential before the expiration date. Upload the new certificate in the dashboard once complete. Lapsed credentials can result in fines, license suspension, or board investigations.
         </p>
 
-        <a href="${params.dashboardLink}" style="display: inline-block; background: #9C6B5D; color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none; padding: 10px 20px; border-radius: 6px;">
+        <a href="${htmlEscape(params.dashboardLink)}" style="display: inline-block; background: #9C6B5D; color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none; padding: 10px 20px; border-radius: 6px;">
           View in dashboard
         </a>
 
@@ -119,7 +119,7 @@ export function buildEscalationEmail(params: AlertTemplateParams): string {
           An expired credential means the staff member cannot legally perform procedures that require it. This is the #1 cause of board investigations, fines, and licensing actions for med spas.
         </p>
 
-        <a href="${params.dashboardLink}" style="display: inline-block; background: #B8443A; color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none; padding: 10px 20px; border-radius: 6px;">
+        <a href="${htmlEscape(params.dashboardLink)}" style="display: inline-block; background: #B8443A; color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none; padding: 10px 20px; border-radius: 6px;">
           View in dashboard
         </a>
 

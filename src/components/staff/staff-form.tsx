@@ -104,6 +104,9 @@ export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save" }: Sta
             ))}
           </SelectContent>
         </Select>
+        {errors.role && (
+          <p className="text-sm text-destructive">{errors.role.message}</p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -164,6 +167,9 @@ export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save" }: Sta
           placeholder="e.g. Botox injections, Dermal fillers, Laser hair removal"
           rows={2}
         />
+        {errors.procedures_performed && (
+          <p className="text-sm text-destructive">{errors.procedures_performed.message}</p>
+        )}
       </div>
 
       <Button type="submit" disabled={isSubmitting}>

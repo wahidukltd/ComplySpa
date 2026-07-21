@@ -5,6 +5,7 @@ import { WizardProgress } from "./wizard-progress";
 import { WizardStepClinic } from "./wizard-step-clinic";
 import { WizardStepStaff } from "./wizard-step-staff";
 import { WizardStepCredentials } from "./wizard-step-credentials";
+import { WizardStepChecklist } from "./wizard-step-checklist";
 import { WizardStepScan } from "./wizard-step-scan";
 import { WizardStepDone } from "./wizard-step-done";
 
@@ -15,7 +16,7 @@ export function OnboardingWizard() {
   const [credentialCount, setCredentialCount] = useState(0);
 
   useEffect(() => {
-    if (currentStep >= 1 && currentStep <= 4) {
+    if (currentStep >= 1 && currentStep <= 5) {
       const handler = (e: BeforeUnloadEvent) => {
         e.preventDefault();
       };
@@ -59,12 +60,19 @@ export function OnboardingWizard() {
       )}
 
       {currentStep === 4 && (
-        <WizardStepScan
+        <WizardStepChecklist
+          onBack={() => setCurrentStep(3)}
           onNext={() => setCurrentStep(5)}
         />
       )}
 
       {currentStep === 5 && (
+        <WizardStepScan
+          onNext={() => setCurrentStep(6)}
+        />
+      )}
+
+      {currentStep === 6 && (
         <WizardStepDone
           staffCount={staff.length}
           credentialCount={credentialCount}

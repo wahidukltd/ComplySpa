@@ -1,4 +1,5 @@
 "use server";
+import "server-only";
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
@@ -53,7 +54,7 @@ async function createClinicInternal(input: CreateClinicInput) {
   );
 
   if (rpcError) {
-    Sentry.captureMessage("Onboarding RPC failed", { extra: { userId, error: rpcError } });
+    Sentry.captureException(rpcError);
     return { clinicId: null, error: "Unable to create clinic. Please try again.", fieldErrors: undefined };
   }
 
@@ -67,6 +68,19 @@ async function createClinicInternal(input: CreateClinicInput) {
     });
   } catch (err) {
     Sentry.captureException(err);
+  }
+
+  try {
+    const { sendEmail } = await import("@/lib/email/send");
+    await sendEmail({
+      to: userEmail,
+      subject: "Welcome to your compliance dashboard",
+      html: `<p>Your clinic "${name}" is set up and ready.</p>
+<p>You've added staff and credentials. Your first inspection-readiness scan is running now.</p>
+<p><a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard">Go to your dashboard</a></p>`,
+    });
+  } catch (emailErr) {
+    Sentry.captureException(emailErr);
   }
 
   return { clinicId, error: null, fieldErrors: undefined };

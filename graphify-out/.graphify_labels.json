@@ -89,7 +89,7 @@
   "87": "Community 87",
   "88": "AGENTS.md",
   "89": "Frontend Conventions",
-  "90": "report-generator.tsx",
+  "90": "audit/page.tsx",
   "91": "Database Conventions",
   "92": "Public Pages & Marketing Conventions",
   "93": "Engineering Principles",
@@ -100,5 +100,10 @@
   "98": "Git Workflow",
   "99": "Domain Knowledge",
   "100": "Claude Code Behavior Guidelines",
-  "101": "Email Responsibilities"
+  "101": "Email Responsibilities",
+  "102": "edit-staff-form-wrapper.tsx",
+  "103": "credentials.ts",
+  "104": "onboarding/page.tsx",
+  "105": "validations/settings.ts",
+  "106": "020_reconcile_plan_limits.sql"
 }

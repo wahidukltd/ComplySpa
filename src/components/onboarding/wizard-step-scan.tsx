@@ -60,8 +60,8 @@ export function WizardStepScan({ onNext }: { onNext: () => void }) {
     return (
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-xl" style={{ color: "#3D2A25" }}>Readiness scan</CardTitle>
-          <CardDescription style={{ color: "#8B7D78" }}>
+          <CardTitle className="text-xl text-black">Readiness scan</CardTitle>
+          <CardDescription className="text-[rgba(0,0,0,0.55)]">
             You can run your first readiness scan after adding staff and credentials from your dashboard.
           </CardDescription>
         </CardHeader>
@@ -79,10 +79,10 @@ export function WizardStepScan({ onNext }: { onNext: () => void }) {
   return (
     <Card className="w-full max-w-lg">
       <CardHeader className="text-center">
-        <CardTitle className="text-xl" style={{ color: "#3D2A25" }}>
+        <CardTitle className="text-xl text-black">
           {status === "scanning" ? "Running readiness scan..." : "Readiness scan complete"}
         </CardTitle>
-        <CardDescription style={{ color: "#8B7D78" }}>
+        <CardDescription className="text-[rgba(0,0,0,0.55)]">
           {status === "scanning"
             ? "Checking your credentials against the inspection checklist."
             : "Your first-readiness scan found the following:"}
@@ -91,55 +91,55 @@ export function WizardStepScan({ onNext }: { onNext: () => void }) {
       <CardContent className="space-y-4">
         {status === "scanning" && (
           <div className="flex justify-center py-8">
-            <Loader2 className="size-10 animate-spin" style={{ color: "#9C6B5D" }} />
+            <Loader2 className="size-10 animate-spin text-[#6E97A7]" />
           </div>
         )}
 
         {status === "results" && (
           <>
             {expired === 0 && expiring === 0 && (
-              <div className="rounded-md p-4 text-center" style={{ backgroundColor: "#E8F2EB" }}>
-                <CheckCircle2 className="mx-auto mb-2 size-8" style={{ color: "#4A8C5C" }} />
-                <p className="font-medium" style={{ color: "#2D5C3A" }}>
+              <div className="rounded-md p-4 text-center bg-[#E8F2EB]">
+                <CheckCircle2 className="mx-auto mb-2 size-8 text-[#5B8A6A]" />
+                <p className="font-medium text-[#2D5C3A]">
                   No expired or expiring credentials found
                 </p>
-                <p className="text-sm mt-1" style={{ color: "#4A8C5C" }}>
+                <p className="text-sm mt-1 text-[#5B8A6A]">
                   Your clinic is in good shape.
                 </p>
               </div>
             )}
 
             {expired > 0 && (
-              <div className="rounded-md p-4" style={{ backgroundColor: "#FCE8E5" }}>
+              <div className="rounded-md p-4 bg-[#FCE8E5]">
                 <div className="flex items-center gap-2">
-                  <XCircle className="size-5" style={{ color: "#B8443A" }} />
-                  <span className="font-medium" style={{ color: "#7A2A26" }}>
+                  <XCircle className="size-5 text-[#B8443A]" />
+                  <span className="font-medium text-[#7A2A26]">
                     {expired} expired credential{expired !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <p className="text-sm mt-1" style={{ color: "#7A2A26" }}>
+                <p className="text-sm mt-1 text-[#7A2A26]">
                   These need immediate attention to avoid compliance gaps.
                 </p>
               </div>
             )}
 
             {expiring > 0 && (
-              <div className="rounded-md p-4" style={{ backgroundColor: "#FBF0E0" }}>
+              <div className="rounded-md p-4 bg-[#FBF0E0]">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="size-5" style={{ color: "#C2853A" }} />
-                  <span className="font-medium" style={{ color: "#7A4E1F" }}>
+                  <AlertTriangle className="size-5 text-[#C2853A]" />
+                  <span className="font-medium text-[#7A4E1F]">
                     {expiring} credential{expiring !== 1 ? "s" : ""} expiring within 30 days
                   </span>
                 </div>
-                <p className="text-sm mt-1" style={{ color: "#7A4E1F" }}>
+                <p className="text-sm mt-1 text-[#7A4E1F]">
                   Schedule renewals soon to stay compliant.
                 </p>
               </div>
             )}
 
-            <div className="rounded-md p-3 text-sm" style={{ backgroundColor: "#F6E3D6", color: "#3D2A25" }}>
+            <div className="rounded-md p-3 text-sm bg-[#F0F4F5] text-black">
               <p className="font-medium">Audit created</p>
-              <p className="mt-1" style={{ color: "#8B7D78" }}>
+              <p className="mt-1 text-[rgba(0,0,0,0.55)]">
                 A readiness audit has been created. Review and complete it from the dashboard to get your full readiness score.
               </p>
             </div>
@@ -147,7 +147,7 @@ export function WizardStepScan({ onNext }: { onNext: () => void }) {
         )}
 
         {status === "error" && (
-          <div className="rounded-md p-4" style={{ backgroundColor: "#FCE8E5", color: "#7A2A26" }}>
+          <div className="rounded-md p-4 bg-[#FCE8E5] text-[#7A2A26]">
             <p className="font-medium">Scan could not be completed</p>
             <p className="text-sm mt-1">{error}</p>
           </div>
@@ -160,7 +160,7 @@ export function WizardStepScan({ onNext }: { onNext: () => void }) {
                 Continue
               </Button>
               <Button type="button" variant="outline" onClick={handleDashboard}
-                style={{ borderColor: "#D9B7A7", color: "#3D2A25" }}
+                className="border-[rgba(0,0,0,0.12)] text-black"
               >
                 Go to dashboard <ArrowRight className="ml-2 size-4" />
               </Button>

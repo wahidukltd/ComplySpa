@@ -121,7 +121,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // associated credential. Add a separate email_logs table if audit-trail
     // persistence is needed for non-credential emails.
 
-    return json({ success: true, messageId: emailResult.messageId }, 200);
+    return json({ success: true, data: { messageId: emailResult.messageId } }, 200);
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     Sentry.captureException(err instanceof Error ? err : new Error(errorMsg));

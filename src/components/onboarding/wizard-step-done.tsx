@@ -17,45 +17,45 @@ export function WizardStepDone({
   return (
     <Card className="w-full max-w-lg">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full" style={{ backgroundColor: "#E8F2EB" }}>
-          <CheckCircle2 className="size-6" style={{ color: "#4A8C5C" }} />
+        <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-[#E8F2EB]">
+          <CheckCircle2 className="size-6 text-[#5B8A6A]" />
         </div>
-        <CardTitle className="text-xl" style={{ color: "#3D2A25" }}>
+        <CardTitle className="text-xl text-black">
           You&apos;re all set
         </CardTitle>
-        <CardDescription style={{ color: "#8B7D78" }}>
+        <CardDescription className="text-[rgba(0,0,0,0.55)]">
           Your clinic is configured and ready to go. Here&apos;s what you set up:
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg p-4 text-center" style={{ backgroundColor: "#FFF8F2" }}>
-            <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full" style={{ backgroundColor: "#F6E3D6" }}>
-              <Users className="size-5" style={{ color: "#9C6B5D" }} />
+          <div className="rounded-lg p-4 text-center bg-[#FFF8F2]">
+            <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full bg-[#F0F4F5]">
+              <Users className="size-5 text-[#6E97A7]" />
             </div>
-            <p className="text-2xl font-bold" style={{ color: "#3D2A25" }}>{staffCount}</p>
-            <p className="text-sm" style={{ color: "#8B7D78" }}>Staff members</p>
+            <p className="text-2xl font-bold text-black">{staffCount}</p>
+            <p className="text-sm text-[rgba(0,0,0,0.55)]">Staff members</p>
           </div>
-          <div className="rounded-lg p-4 text-center" style={{ backgroundColor: "#FFF8F2" }}>
-            <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full" style={{ backgroundColor: "#F6E3D6" }}>
-              <ShieldCheck className="size-5" style={{ color: "#9C6B5D" }} />
+          <div className="rounded-lg p-4 text-center bg-[#FFF8F2]">
+            <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full bg-[#F0F4F5]">
+              <ShieldCheck className="size-5 text-[#6E97A7]" />
             </div>
-            <p className="text-2xl font-bold" style={{ color: "#3D2A25" }}>{credentialCount}</p>
-            <p className="text-sm" style={{ color: "#8B7D78" }}>Credentials tracked</p>
+            <p className="text-2xl font-bold text-black">{credentialCount}</p>
+            <p className="text-sm text-[rgba(0,0,0,0.55)]">Credentials tracked</p>
           </div>
         </div>
 
-        <ul className="space-y-2 text-sm" style={{ color: "#8B7D78" }}>
+        <ul className="space-y-2 text-sm text-[rgba(0,0,0,0.55)]">
           <li className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0" style={{ color: "#4A8C5C" }} />
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#5B8A6A]" />
             <span>Email alerts for expiring credentials</span>
           </li>
           <li className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0" style={{ color: "#4A8C5C" }} />
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#5B8A6A]" />
             <span>Audit-ready compliance reports</span>
           </li>
           <li className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0" style={{ color: "#4A8C5C" }} />
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#5B8A6A]" />
             <span>Inspection readiness tracking</span>
           </li>
         </ul>

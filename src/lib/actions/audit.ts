@@ -1,4 +1,5 @@
 "use server";
+import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
@@ -7,6 +8,7 @@ import * as Sentry from "@sentry/nextjs";
 import { CHECKLIST_ITEMS } from "@/lib/audit/checklist";
 import { autoFillAll } from "@/lib/audit/auto-fill";
 import { calculateReadinessScore } from "@/lib/audit/readiness";
+import { updateFindingSchema, completeAuditSchema } from "@/lib/validations/audit";
 import type { FindingStatus, ChecklistItemId } from "@/lib/audit/checklist";
 
 type UserEmailRef = { email: string } | null;
@@ -130,6 +132,12 @@ export async function updateFinding(
   const { userId } = await auth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
+  const parsed = updateFindingSchema.safeParse(updates);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid update data" };
+  }
+  const validated = parsed.data;
+
   const supabase = await createClient();
 
   const { data: user } = await supabase
@@ -166,12 +174,12 @@ export async function updateFinding(
     remediation_status?: string | null;
     remediation_closed_at?: string;
   } = {};
-  if (updates.status !== undefined) payload.status = updates.status;
-  if (updates.notes !== undefined) payload.notes = updates.notes;
-  if (updates.remediation_due_date !== undefined) payload.remediation_due_date = updates.remediation_due_date;
-  if (updates.remediation_status !== undefined) payload.remediation_status = updates.remediation_status;
+  if (validated.status !== undefined) payload.status = validated.status;
+  if (validated.notes !== undefined) payload.notes = validated.notes;
+  if (validated.remediation_due_date !== undefined) payload.remediation_due_date = validated.remediation_due_date;
+  if (validated.remediation_status !== undefined) payload.remediation_status = validated.remediation_status;
 
-  if (updates.remediation_status === "closed") {
+  if (validated.remediation_status === "closed") {
     payload.remediation_closed_at = new Date().toISOString();
   }
 
@@ -194,6 +202,11 @@ export async function completeAudit(
 ): Promise<{ score: number | null; error: string | null }> {
   const { userId } = await auth();
   if (!userId) return { score: null, error: "Unauthorized" };
+
+  const parsed = completeAuditSchema.safeParse({ runId });
+  if (!parsed.success) {
+    return { score: null, error: "Invalid audit run ID" };
+  }
 
   const supabase = await createClient();
 

@@ -11,15 +11,15 @@ export default async function AlertsPage() {
   if (!userId) redirect("/sign-in");
 
   const supabase = await createClient();
-  const { data: userRecord } = await supabase
+  const { data: userRecord, error: userErr } = await supabase
     .from("users")
     .select("clinic_id")
     .eq("clerk_user_id", userId)
-    .single();
+    .maybeSingle();
 
-  if (!userRecord) redirect("/onboarding");
+  if (userErr || !userRecord) redirect("/onboarding");
 
-  const { data: alerts } = await supabase
+  const { data: alerts, error: alertsError } = await supabase
     .from("alert_logs")
     .select("id, clinic_id, credential_id, alert_type, recipient, sent_at, delivery_status, days_before_expiration, created_at, resend_webhook_id")
     .eq("clinic_id", userRecord.clinic_id)
@@ -32,7 +32,11 @@ export default async function AlertsPage() {
         title="Alert History"
         description="Record of all expiration alerts sent for your clinic's credentials."
       />
-      <AlertList alerts={alerts ?? []} />
+      {alertsError ? (
+        <p className="text-sm text-red-600">Failed to load alerts. Please try again.</p>
+      ) : (
+        <AlertList alerts={alerts ?? []} />
+      )}
     </div>
   );
 }

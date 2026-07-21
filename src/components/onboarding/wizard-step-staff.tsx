@@ -100,11 +100,11 @@ export function WizardStepStaff({
   return (
     <Card className="w-full max-w-lg">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full" style={{ backgroundColor: "#F6E3D6" }}>
-          <Users className="size-5" style={{ color: "#9C6B5D" }} />
+        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-[#F0F4F5]">
+          <Users className="size-5 text-[#6E97A7]" />
         </div>
-        <CardTitle className="text-xl" style={{ color: "#3D2A25" }}>Add staff members</CardTitle>
-        <CardDescription style={{ color: "#8B7D78" }}>
+        <CardTitle className="text-xl text-black">Add staff members</CardTitle>
+        <CardDescription className="text-[rgba(0,0,0,0.55)]">
           Add the staff who will have credentials tracked. You can add more later.
         </CardDescription>
       </CardHeader>
@@ -121,7 +121,7 @@ export function WizardStepStaff({
                 aria-invalid={!!errors[row.tempId]}
               />
               {errors[row.tempId] && (
-                <p className="text-xs" style={{ color: "#B8443A" }}>{errors[row.tempId]}</p>
+                <p className="text-xs text-[#B8443A]">{errors[row.tempId]}</p>
               )}
             </div>
             <div className="w-36">
@@ -130,12 +130,7 @@ export function WizardStepStaff({
                 id={`role-${row.tempId}`}
                 value={row.role}
                 onChange={(e) => updateRow(row.tempId, "role", e.target.value)}
-                className="flex h-10 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                style={{
-                  borderColor: "#D9B7A7",
-                  color: "#3D2A25",
-                  backgroundColor: "#FFFFFF",
-                }}
+                className="flex h-10 w-full rounded-md border border-[rgba(0,0,0,0.12)] px-3 py-2 text-sm focus:outline-none focus:ring-2 text-black bg-white"
               >
                 {ROLE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -151,34 +146,34 @@ export function WizardStepStaff({
                 onClick={() => removeRow(row.tempId)}
                 aria-label="Remove staff member"
               >
-                <X className="size-4" style={{ color: "#8B7D78" }} />
+                <X className="size-4 text-[rgba(0,0,0,0.55)]" />
               </Button>
             )}
           </div>
         ))}
 
         <Button type="button" variant="outline" size="sm" onClick={addRow}
-          style={{ borderColor: "#D9B7A7", color: "#9C6B5D" }}
+          className="border-[rgba(0,0,0,0.12)] text-[#6E97A7]"
         >
           <UserPlus className="mr-2 size-4" />
           Add another
         </Button>
 
         {lastError && (
-          <div className="rounded-md p-3 text-sm" style={{ backgroundColor: "#FCE8E5", color: "#7A2A26" }}>
+          <div className="rounded-md p-3 text-sm bg-[#FCE8E5] text-[#7A2A26]">
             {lastError}
           </div>
         )}
 
         {savedStaff.length > 0 && (
-          <div className="rounded-md p-3 text-sm space-y-1" style={{ backgroundColor: "#E8F2EB", color: "#2D5C3A" }}>
+          <div className="rounded-md p-3 text-sm space-y-1 bg-[#E8F2EB] text-[#2D5C3A]">
             <p className="font-medium"><Check className="mr-1 inline size-4" />{savedStaff.length} staff member{savedStaff.length !== 1 ? "s" : ""} saved</p>
           </div>
         )}
 
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="outline" onClick={onBack}
-            style={{ borderColor: "#D9B7A7", color: "#3D2A25" }}
+            className="border-[rgba(0,0,0,0.12)] text-black"
           >
             Back
           </Button>
@@ -186,7 +181,7 @@ export function WizardStepStaff({
             {saving ? <><Loader2 className="mr-2 size-4 animate-spin" /> Saving...</> : "Continue"}
           </Button>
           <Button type="button" variant="ghost" onClick={() => onNext([])}
-            style={{ color: "#8B7D78" }}
+            className="text-[rgba(0,0,0,0.55)]"
           >
             Skip
           </Button>

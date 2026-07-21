@@ -1,4 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
 import { getAuditHistory, getAuditRun, createAuditRun } from "@/lib/actions/audit";
 import { ReadinessScore } from "@/components/audit/readiness-score";
@@ -15,16 +17,23 @@ export const dynamic = "force-dynamic";
 
 export default async function AuditPage() {
   const { userId } = await auth();
-  if (!userId) return null;
+  if (!userId) redirect("/sign-in");
 
   const supabase = await createClient();
-  const { data: user } = await supabase
+  const { data: user, error: userErr } = await supabase
     .from("users")
     .select("clinic_id")
     .eq("clerk_user_id", userId)
-    .single();
+    .maybeSingle();
 
-  const clinicId = user?.clinic_id ?? "";
+  if (userErr) {
+    Sentry.captureException(userErr);
+    throw new Error("Failed to load user data");
+  }
+
+  if (!user) redirect("/onboarding");
+
+  const clinicId = user.clinic_id;
 
   const { data: recentRun } = await supabase
     .from("audit_runs")
@@ -47,7 +56,7 @@ export default async function AuditPage() {
     }
   }
 
-  const { audits: history } = await getAuditHistory();
+  const { audits: history, error: historyError } = await getAuditHistory();
 
   const { data: clinic } = await supabase
     .from("clinics")
@@ -167,7 +176,9 @@ export default async function AuditPage() {
           Audit History
         </h2>
 
-        {history.length === 0 ? (
+        {historyError ? (
+          <p className="text-sm text-red-600">Failed to load audit history.</p>
+        ) : history.length === 0 ? (
           <p className="text-sm" style={{ color: "#8B7D78" }}>
             No audit history yet. Your completed audits will appear here.
           </p>

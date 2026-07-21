@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { z } from "zod";
 import { addCustomCredentialType, removeCustomCredentialType } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, Plus, Trash2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+
+const typeSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  category: z.string().min(1),
+  renewalDays: z.coerce.number().int().positive("Must be a positive number"),
+});
 
 interface CredentialType {
   id: string;
@@ -40,11 +47,16 @@ export function CustomCredentialTypes({ custom, builtin, role }: CustomCredentia
   async function handleAdd(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) return;
+    const parsed = typeSchema.safeParse({ name: name.trim(), category, renewalDays });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues.map((e) => e.message).join(", "));
+      return;
+    }
     setIsSubmitting(true);
     const result = await addCustomCredentialType({
-      name: name.trim(),
-      category: category as "license" | "training" | "insurance" | "agreement",
-      default_renewal_cycle_days: renewalDays ? parseInt(renewalDays, 10) : undefined,
+      name: parsed.data.name,
+      category: parsed.data.category as "license" | "training" | "insurance" | "agreement",
+      default_renewal_cycle_days: parsed.data.renewalDays || undefined,
     });
     if (result.error) {
       toast.error(result.error);
@@ -57,11 +69,15 @@ export function CustomCredentialTypes({ custom, builtin, role }: CustomCredentia
   }
 
   async function handleRemove(id: string) {
-    const result = await removeCustomCredentialType(id);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success("Credential type removed");
+    try {
+      const result = await removeCustomCredentialType(id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Credential type removed");
+      }
+    } catch {
+      toast.error("Failed to remove credential type");
     }
   }
 

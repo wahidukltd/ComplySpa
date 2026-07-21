@@ -238,12 +238,53 @@ CREATE POLICY "clinic_isolation_select" ON staff_members
 
 ### Trial Lifecycle
 - `clinic.plan` values: `'trial'`, `'expired_trial'`, `'inactive'`, `'solo'`, `'practice'`, `'multi_location'`
-- `clinic.trial_end_date`: `TIMESTAMPTZ`, set to `NOW() + 14 days` on clinic creation
-- pg_cron job `daily-trial-expiry-check`: updates `plan` from `'trial'` to `'expired_trial'` when `trial_end_date < NOW()`
-- pg_cron job `daily-inactive-cleanup`: updates `plan` from `'expired_trial'` to `'inactive'` when `trial_end_date < NOW() - 30 days`
+- `clinic.trial_end_date`: `TIMESTAMPTZ`, set to `NOW() + 14 days` on clinic creation (column DEFAULT)
+- pg_cron job `daily-trial-expiry-check` (07:00 UTC): updates `plan` from `'trial'` to `'expired_trial'` when `trial_end_date < NOW()`
+- pg_cron job `daily-inactive-cleanup` (08:00 UTC): updates `plan` from `'expired_trial'` to `'inactive'` when `trial_end_date < NOW() - 30 days`
 - Polar webhook `subscription.active`: updates `plan` to paid tier (`solo`/`practice`/`multi_location`)
 - Polar webhook `subscription.canceled`: updates `plan` to `'inactive'`
 - Data is never deleted due to plan status — only access is gated
+
+#### Skip Trial (Subscribe Immediately)
+
+A user can bypass the 14-day trial entirely and pay immediately. Two flows:
+
+**Flow A — Checkout first, then sign up (recommended):**
+1. User visits landing page / pricing page → selects a paid plan
+2. Clicks "Subscribe" → Polar checkout → completes payment
+3. Polar webhook marks payment as pending (associates with email, not clinic_id yet — no clinic exists)
+4. User signs up via Clerk → completes onboarding wizard
+5. `create_clinic_for_user` RPC creates clinic with `plan = 'trial'` (default)
+6. Polar webhook detects the new user's email matches a pending subscription → fires `subscription.active` → updates `plan` from `'trial'` to the paid tier
+7. User lands on dashboard with paid plan limits — trial was skipped in milliseconds
+
+**Flow B — Sign up first, subscribe immediately:**
+1. User signs up → completes onboarding → clinic created with `plan = 'trial'`
+2. On dashboard or settings/billing, user clicks "Upgrade"
+3. Polar checkout → completes payment
+4. Polar webhook `subscription.active` fires → updates `plan` to paid tier
+5. User gets immediate access to paid features — trial_end_date becomes irrelevant
+
+**Database support**: `clinics.plan` CHECK constraint includes all values. Updating from `'trial'` to `'practice'` is allowed. pg_cron only touches rows where `plan = 'trial'` — if plan is already changed, pg_cron ignores it.
+
+#### Mid-Trial Upgrade (Subscribe During Trial)
+
+A user on trial wants to upgrade to a paid plan before the 14 days expire:
+
+1. Banner on dashboard: "X days left in your trial" with "Upgrade now" button
+2. Settings → Billing: shows current plan + "Upgrade" button
+3. Pricing page: shows "Subscribe" CTAs (not "Start free trial") for authenticated users
+4. Polar checkout → payment → webhook → plan updated → immediate paid access
+5. `trial_end_date` continues to exist but is irrelevant — pg_cron only checks `plan = 'trial'`
+
+**No RPC change needed for pre-Polar (Phase 7)**: The `create_clinic_for_user` RPC always creates clinics with `plan = 'trial'`. Plan changes happen via Polar webhook (Phase 9), which updates the plan column directly. The RPC does NOT need a `p_plan` parameter — the plan defaults to trial and Polar upgrades it. This is simpler and avoids parameter validation.
+
+**Manual upgrade during development (pre-Polar)**:
+```sql
+-- Set yourself to any plan for testing
+UPDATE clinics SET plan = 'practice' WHERE id = 'YOUR_CLINIC_ID';
+-- No other changes needed — middleware, Edge Functions, RLS all react to plan immediately
+```
 
 ### Audit Engine Tables
 
@@ -310,54 +351,52 @@ pg_cron job `daily-audit-overdue-check`:
 ### Styling
 - Tailwind CSS only. No CSS modules, no styled-components, no inline styles
 - Use the `cn()` utility (`clsx` + `tailwind-merge`) for conditional classes
-- Color tokens are defined in `tailwind.config.ts` and are non-negotiable. The palette is the product of a founder-directed warm-spa aesthetic: soft skin tones, warm browns, muted terracotta. Do not introduce new tokens, revert to cold Tailwind defaults, or pick ad-hoc brand colors — each such change breaks the spa-luxury trust signaling, WCAG accessibility, and brand identity simultaneously. Every hex below is the final, approved value.
+- Color tokens are defined in `globals.css` as CSS variables and are non-negotiable. The palette uses exactly three colors. Do not introduce new tokens, revert to cold Tailwind defaults, or pick ad-hoc brand colors.
 
-#### Foundation — warm spa palette (five colors only)
-- `--color-canvas` = `#FFF8F2` — Warm peach-cream. Page backgrounds, empty states, hero surface. The dominant color across the entire product.
-- `--color-surface` = `#FFFFFF` — Clean white. Elevated cards, dashboard panels, input backgrounds. Contrast layer on the warm canvas.
-- `--color-surface-alt` = `#F6E3D6` — Soft blush. Alternating section bands, hover backgrounds, secondary surfaces. Never used as a primary background — it supports, never dominates.
-- `--color-action` = `#9C6B5D` — Terracotta brown. The ONLY filled-button / link / focus-ring / active-nav color. Warm, grounded, confident. No indigo, no teal, no violet — this is a med spa, not a dev-tool dashboard.
-- `--color-ink` = `#3D2A25` — Deep espresso. Primary text, structural chrome, footer, dark pill backgrounds, headings. Never pure `#000`.
+#### Foundation — three colors only
 
-#### Derived tokens (built from the five foundation colors)
-- `--color-hairline` = `#D9B7A7` — Warm rosewood. Borders, dividers, input outlines. NEVER cold gray (`#E5E7EB`, `#D1D5DB`) — those read as developer dashboard, not med-spa premium.
-- `--color-text` = `#3D2A25` — Deep espresso. Same as `--color-ink`. Primary body and heading text.
-- `--color-text-muted` = `#8B7D78` — Warm gray-brown. Secondary text, metadata, helper copy, captions.
-- `--color-input-border` = `#9C6B5D` — Terracotta. Focused input border. Matches the action color for a unified interactive vocabulary.
+| Token | Hex | Role |
+|---|---|---|
+| `--color-canvas` | `#FFF8F2` | Cream. Page backgrounds, empty states, hero surface. The dominant color everywhere. |
+| `--color-action` | `#6E97A7` | Blue-teal. The ONLY filled-button / link / focus-ring / active-nav color. |
+| `--color-ink` | `#000000` | Pure black. Primary text, headings, structural chrome. No dark grays — black delivers maximum contrast and readability. |
 
-#### Semantic status tier — WCAG AA, ALWAYS paired with icon + visible text label
-Status colors are RESERVED for compliance state. The action terracotta never borrows them. Pure yellow (`#FACC15`) is FORBIDDEN as a status background (fails WCAG at ~1.3:1 on white — "essentially invisible"). Every status pill ships as `tint background + dark foreground text + icon + visible label` so the ~8% of male users with red-green color-vision deficiency can still read state (WCAG 1.4.1: Use of Color). All status colors are warm-harmonized — no cold greens, no clinical blues.
+#### Derived tokens (built from the three foundation colors + white)
+
+| Token | Value | Role |
+|---|---|---|
+| `--color-surface` | `#FFFFFF` | White. Elevated cards, dashboard panels, input backgrounds. Sits on the cream canvas. |
+| `--color-surface-alt` | `#F0F4F5` | Very light blue-teal tint. Hover backgrounds, alternating section bands. |
+| `--color-hairline` | `rgba(0,0,0,0.12)` | 12% black. Borders, dividers, input outlines. |
+| `--color-text` | `#000000` | Same as `--color-ink`. Primary body and heading text. |
+| `--color-text-muted` | `rgba(0,0,0,0.55)` | 55% black. Secondary text, metadata, helper copy, captions. |
+| `--color-input-border` | `rgba(0,0,0,0.20)` | 20% black. Default input border. On focus, shifts to `--color-action`. |
+
+#### Semantic status tier — functional colors, not brand colors
+
+Status colors exist for compliance state communication. They are NOT additional brand colors — they serve a functional purpose (WCAG 1.4.1: Use of Color). Every status pill ships as `tint background + dark foreground text + icon + visible label`.
 
 | Status | Strong | Tint Bg | Text on tint | Icon | Label |
 |---|---|---|---|---|---|
-| Valid / Active | `#4A8C5C` (sage green) | `#E8F2EB` | `#2D5C3A` | ✓ check | "Valid" |
-| Expiring / Warning | `#C2853A` (warm amber) | `#FBF0E0` | `#7A4E1F` | ▲ triangle | "Expiring" |
-| Expired / Critical | `#B8443A` (terracotta red) | `#FCE8E5` | `#7A2A26` | ✕ X | "Expired" |
-| Unknown / Not tracked | `#8B7D78` (warm gray) | `#F2EFED` | `#5A504C` | dash | "Unknown" |
+| Valid / Active | `#5B8A6A` | `#E8F2EB` | `#2D5C3A` | ✓ check | "Valid" |
+| Expiring / Warning | `#C2853A` | `#FBF0E0` | `#7A4E1F` | ▲ triangle | "Expiring" |
+| Expired / Critical | `#B8443A` | `#FCE8E5` | `#7A2A26` | ✕ X | "Expired" |
+| Unknown / Not tracked | `rgba(0,0,0,0.40)` | `#F0F0F0` | `rgba(0,0,0,0.60)` | dash | "Unknown" |
 
-No Tailwind default status colors (`green-500`/`yellow-500`/`red-500`) are used — they clash with the warm palette and fail perceptual-weight requirements. The sage green replaces clinical `#16A34A`; warm amber replaces harsh `#D97706`; terracotta red replaces aggressive `#DC2626`.
+#### Data visualization (charts, KPIs)
+Blue-teal anchors the first series. All chart colors derive from the primary hue family or use opacity variations of black.
 
-#### Data visualization (audit-report charts, dashboard KPIs)
-Terracotta anchors the first series so charts read as ComplySpa, not a generic charting library. All colors are warm-harmonized. Never use red + green as the first two slots — that pairing is the most-cited color-blindness failure (WCAG 1.4.1, Okabe-Ito research). Prefer direct data labels over a legend; apply tabular figures (`font-feature-settings: "tnum"`) to every numeric cell.
-
-| Slot | Hex | Use |
+| Slot | Value | Use |
 |---|---|---|
-| 1 | `#9C6B5D` (terracotta) | Default series — the brand anchor |
-| 2 | `#C2853A` (warm amber) | CVD-safe contrast with terracotta |
-| 3 | `#7B8C5C` (sage) | Distinguishable from amber and terracotta under deuteranopia |
-| 4 | `#6A5B7B` (muted violet) | Distinct under all CVD conditions |
-| 5 | `#5B7B8C` (muted teal) | "In progress / processing" convention |
-| 6 | `#8B7D78` (warm gray) | "Other" / low-priority bucket |
+| 1 | `#6E97A7` | Default series — the brand anchor |
+| 2 | `#5B8A6A` | Distinguishable cool green |
+| 3 | `rgba(0,0,0,0.45)` | Muted gray-black |
+| 4 | `#8DA7B0` | Lighter primary |
+| 5 | `#4A7D8C` | Darker primary |
 
 #### Dark theme — tokens DEFINED, UI toggle is POST-MVP
-Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfaces. The tokens below ARE defined in `tailwind.config.ts` as a deferred design system, ready to ship when dark mode is prioritized. This preserves WCAG perceptual weight on warm-dark backgrounds (status mid-tones shift lighter and more saturated than their light-theme counterparts).
 
-- Dark surface: `#2A1F1C` (deep warm espresso)
-- Text on dark: `#F5EDE8` (warm off-white)
-- Action on dark: `#C4A091` (lighter terracotta — brighter than `#9C6B5D` for perceptual weight on dark)
-- Status-on-dark shifts to lighter variants:
-  - Active `#6DB580` · Warning `#DA9E4A` · Critical `#D06960` · Unknown `#A89890`
-- Hairline on dark: `rgba(255,255,255,0.08)`
+Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfaces. The tokens are defined in `globals.css` as a deferred design system.
 
 #### Responsive
 - Mobile-first. Test at 375px (mobile), 768px (tablet), 1280px (desktop)
@@ -365,34 +404,26 @@ Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfac
 ### Component Library
 - Use shadcn/ui for all UI components (Button, Table, Badge, Dialog, Input, Select, Toast, Dropdown, Tabs, Card, Skeleton)
 - Install: `npx shadcn@latest init`
-- shadcn/ui components are copied into the project (not imported from a package) — they live in `src/components/ui/`
-- Customize shadcn/ui components to match the product's design language (sage/amber/terracotta status system — see the Styling section for exact tokens, Inter font, generous whitespace). Do not configure shadcn to use `yellow` for warning — warm amber is mandatory (pure yellow fails WCAG contrast on white)
-- Do not install shadcn/ui components that are not needed — install only what each feature requires
-- All UI must look enterprise-grade: clean typography, consistent spacing, professional color palette, no generic or amateur styling
+- shadcn/ui components are copied into the project — they live in `src/components/ui/`
+- All UI must look enterprise-grade: clean typography, consistent spacing, no amateur styling
 - Use `lucide-react` for all icons (included with shadcn/ui)
 
 ### Animation & 3D Graphics
 
 #### Framer Motion — used EVERYWHERE in the product
 - Install: `npm install motion`
-- Use for: page transitions, list item enter/exit animations, card hover effects, loading skeletons, toast notifications, sidebar slide-in on mobile, dialog open/close, tab transitions, badge state changes (sage→amber→terracotta), readiness score animation
+- Use for: page transitions, list item enter/exit animations, card hover effects, loading skeletons, toast notifications, sidebar slide-in on mobile, dialog open/close, tab transitions, badge state changes, readiness score animation
 - Keep animations subtle and fast: 200-400ms duration, ease-out easing
-- Never block user interaction — animations are decorative, not functional
-- Use `AnimatePresence` for route transitions in the dashboard layout
-- Use `motion.div` for staggered list item entrance (staff table, credential list, audit checklist)
 - Respect `prefers-reduced-motion`: wrap motion components in a check and disable animation for users who request it
-- Every animation must have a purpose: feedback (button click), orientation (page transition), or visual hierarchy (staggered list). No decorative-only animation in the dashboard.
 
 #### React Three Fiber + Three.js — LANDING PAGE ONLY
 - Install: `npm install three @react-three/fiber @react-three/drei`
-- Use for: landing page (`/`) hero section 3D background ONLY. Animated gradient mesh, particle field, or subtle 3D geometry that signals premium quality.
-- DO NOT use Three.js or React Three Fiber in the dashboard, settings, reports, or audit pages. The dashboard is a productivity tool — 3D effects slow down page load and distract from data.
-- Auth pages (`/sign-in`, `/sign-up`): subtle Framer Motion entrance animations only. No Three.js. Auth pages must load in under 1 second.
-- The 3D hero must lazy-load: use `next/dynamic` with `ssr: false` to prevent server-side rendering of Three.js. Show a static fallback (gradient background) while loading.
-- Keep the 3D scene lightweight: maximum 50MB bundle for Three.js + Drei. Use simple geometry, not complex models.
-- The 3D scene must respect `prefers-reduced-motion`: render a static gradient instead of animated 3D.
-- Performance budget: landing page must score >90 on Lighthouse despite the 3D hero. If it does not, simplify the scene.
-- Color palette for 3D: soft organic forms in `#F6E3D6` (blush) and `#D9B7A7` (rosewood) against a `#FFF8F2` (peach-cream) canvas. Warm ambient lighting only. No dark backgrounds. No hard-edge geometry. No generic Three.js colors. Med-spa is warm and soft — the 3D scene must match.
+- Use for: landing page (`/`) hero section 3D background ONLY
+- DO NOT use Three.js in the dashboard, settings, reports, or audit pages
+- The 3D hero must lazy-load: use `next/dynamic` with `ssr: false`, show static gradient fallback
+- Max 50KB gzipped for Three.js payload. Simple geometry only. No GLTF, no textures.
+- Respect `prefers-reduced-motion`: render a static gradient instead
+- Color palette for 3D: `#FFF8F2` (cream) and `#B5CED6` (lightened primary) against a `#FFF8F2` canvas. Soft lighting only. No dark backgrounds.
 
 ### Accessibility
 - All interactive elements are keyboard-accessible
@@ -413,12 +444,12 @@ for the complete specification. This section documents the code-level convention
 
 - Server Component. Pre-rendered HTML for SEO.
 - Three.js 3D hero background ONLY — soft organic forms (smooth, flowing,
-  rounded metaball-like shapes) in brand surface colors (`#F6E3D6` blush,
-  `#D9B7A7` rosewood) against a `#FFF8F2` (peach-cream) canvas. Not geometric.
+  rounded metaball-like shapes) in brand colors (`#B5CED6` lightened primary,
+  `#6E97A7` primary) against a `#FFF8F2` (cream) canvas. Not geometric.
   Not hard-edge. Not dark. Subtle slow morphing (0.001 rad/frame max). Warm
   ambient lighting creating soft shadows.
 - Three.js lazy-loaded via `next/dynamic` with `ssr: false`. Static gradient
-  fallback (`#FFF8F2 → #D9B7A7`) while loading.
+  fallback (`#FFF8F2 → #6E97A7`) while loading.
 - Three.js canvas has `aria-hidden="true"` and `role="presentation"` — purely
   decorative. Screen readers read the hero text, not the 3D.
 - On mobile (< 768px): replace Three.js with a static gradient. No 3D on
@@ -438,7 +469,7 @@ for the complete specification. This section documents the code-level convention
 
 - Server Component. Pre-rendered HTML for SEO.
 - Three plan cards: Solo ($29/mo), Practice ($79/mo), Multi-Location ($149/mo).
-- "Practice" card has subtle terracotta border highlight + "Most popular" badge.
+- "Practice" card has subtle primary border highlight + "Most popular" badge.
 - Annual/monthly toggle: Framer Motion on price numbers only (transform +
   opacity, 200ms). No layout shift — card dimensions fixed.
 - Card entrance: Framer Motion stagger on page load (100ms per card, 300ms
@@ -461,8 +492,8 @@ for the complete specification. This section documents the code-level convention
 - Max 50KB gzipped for the Three.js payload.
 - Respects `prefers-reduced-motion`: renders static gradient instead.
 - Canvas is a background layer (z-index behind hero text).
-- Colors: `#F6E3D6` (blush), `#D9B7A7` (rosewood), `#FFF8F2` (peach-cream
-  — the page background that the 3D fades to). Warm tones only. No dark hues.
+- Colors: `#FFF8F2` (cream), `#B5CED6` (lightened primary), `#6E97A7` (primary
+  — the page canvas the 3D sits on). No dark hues.
 
 ### Framer Motion on Public Pages — Rules
 
@@ -845,6 +876,221 @@ Provisioning items only — code-quality pre-checks (tests, tsc, lint, types, se
 - [ ] Clerk production URLs configured
 - [ ] Clerk third-party auth configured in Supabase Dashboard: Authentication → Third-Party Auth → Clerk → paste domain (`moving-sheepdog-44.clerk.accounts.dev`)
 - [ ] DNS configured (A record + CNAME to Vercel)
+
+## Deploy Without Domain (Vercel First, Domain Later)
+
+The founder's PC is not strong enough for full local testing. Deploy on Vercel immediately using the free `*.vercel.app` subdomain for STAGING/TESTING ONLY. Clerk, Resend, and Supabase work out of the box on the free tier — no domain configuration needed. Buy a domain later for the real production launch. The vercel.app URL never becomes the production URL — it stays as a staging environment.
+
+**IMPORTANT**: Do NOT configure Clerk production instance URL, Resend sending domain, DNS records, or any service-specific domain settings on the vercel.app URL. Everything gets configured on the real domain only. The vercel.app deployment is for testing your code, not for configuring external services.
+
+### Step 1: Supabase Production Project (Already Exists)
+
+The founder has already created the `ComplaSpa` Supabase project and connected it via CLI + MCP. Skip project creation. Use the existing project:
+
+1. Verify connection: `supabase projects list`
+2. Re-link if needed: `supabase link --project-ref YOUR_EXISTING_REF`
+3. Verify migrations are pushed: `supabase db push` (idempotent — safe to re-run)
+4. Run in SQL Editor: `CREATE EXTENSION IF NOT EXISTS pg_cron; CREATE EXTENSION IF NOT EXISTS pg_net;`
+5. Verify 6 pg_cron jobs exist: `SELECT cron.jobname FROM cron.job;`
+
+### Step 2: Set Environment Variables (Vercel Only)
+
+Vercel Dashboard (vercel.com → project → Settings → Environment Variables):
+
+```
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
+CLERK_SECRET_KEY=sk_live_...
+NEXT_PUBLIC_SUPABASE_URL=https://[ref].supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
+RESEND_API_KEY=re_...
+RESEND_WEBHOOK_SECRET=...
+FROM_EMAIL=Compliance Alerts <onboarding@resend.dev>
+POLAR_ACCESS_TOKEN=                    (LEAVE EMPTY — Phase 9)
+POLAR_WEBHOOK_SECRET=                  (LEAVE EMPTY — Phase 9)
+SENTRY_DSN=https://...@...ingest.sentry.io/...
+NEXT_PUBLIC_APP_URL=https://your-project.vercel.app
+CRON_SECRET=(generate: openssl rand -hex 32)
+```
+
+### Step 3: Deploy Edge Functions to Supabase + Set Secrets
+
+```bash
+# Deploy Edge Functions
+supabase functions deploy send-credential-alert --project-ref YOUR_PROJECT_REF
+supabase functions deploy send-audit-reminder --project-ref YOUR_PROJECT_REF
+supabase functions list --project-ref YOUR_PROJECT_REF
+```
+
+Supabase Dashboard → Settings → Edge Functions → Secrets:
+
+```
+SUPABASE_URL=https://[ref].supabase.co
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
+RESEND_API_KEY=re_...
+SENTRY_DSN=https://...@...ingest.sentry.io/...
+APP_URL=https://your-project.vercel.app
+CRON_SECRET=(same value as Vercel)
+```
+
+### Step 4: Configure Clerk + Supabase Auth
+
+1. Clerk Dashboard → Configure:
+   - Clerk handles the URLs automatically — no manual Instance URL change needed
+   - The app already uses relative redirects (`/sign-in`, `/sign-up`, `/dashboard`, `/onboarding`) which work on any domain
+2. Clerk Dashboard → JWT Templates → supabase template: `{"sub": "{{user.id}}"}`, HS256
+3. Supabase Dashboard → Authentication → Third-Party Auth → Clerk → paste Frontend API domain
+4. On `https://your-project.vercel.app`, test sign-in flow works
+
+### Step 5: First Deploy to Vercel
+
+- Push to GitHub (private repo: `gh repo create complyspa --private --source=. --push`)
+- vercel.com → New Project → import repo → auto-detects Next.js → set env vars from Step 2 → Deploy
+- Gets `https://your-project.vercel.app` automatically
+- Every `git push` to main auto-deploys
+
+### Step 6: Post-Deploy Verification (staging)
+
+- [ ] `/` landing page loads, 3D renders on desktop, no console errors
+- [ ] `/pricing` loads, all 3 cards, toggle, FAQ accordion work
+- [ ] `/sitemap.xml` returns valid XML
+- [ ] `/robots.txt` disallows `/dashboard/`, `/api/`, `/onboarding/`
+- [ ] Sign-up → 5-step onboarding wizard → dashboard with correct counts
+- [ ] Sign-in with same credentials works
+- [ ] Add staff/credential (verifies Supabase production RLS + write path)
+- [ ] Run audit: checklist auto-fills, readiness score calculates, PDF downloads
+- [ ] Settings: edit profile, manage recipients, toast notifications appear
+- [ ] Resend dashboard: welcome email delivered (may go to spam — onboarding@resend.dev, expected for staging)
+- [ ] Sentry: error captured on production
+- [ ] Solo plan: redirects to `/pricing` from `/dashboard/audit`
+- [ ] Mobile: landing page responsive at 375px, 3D becomes gradient
+
+### Step 7: Known Staging Limitations
+
+These are expected and OK for a staging environment:
+
+- `FROM_EMAIL` uses `onboarding@resend.dev` — no sending domain verified. Emails may go to spam. OK for staging.
+- No Polar checkout — `POLAR_ACCESS_TOKEN` is empty. Trial CTA goes to `/sign-up`.
+- URL is `your-project.vercel.app` — not branded. OK for staging. This URL is never shared publicly.
+- Clerk uses the default `clerk.accounts.dev` domain for auth — no custom domain needed for Clerk to work.
+
+### Step 8: Buy a Domain (When Ready for Real Launch)
+
+When you're ready to go live publicly:
+
+1. Buy `.com` on Cloudflare Registrar (~$12/year, cost price, includes WHOIS privacy)
+2. Domain auto-added to Cloudflare with DNS management ready
+
+### Step 9: Add Domain to Vercel
+
+1. Vercel → Settings → Domains → Add `yourdomain.com`
+2. Vercel shows required DNS: `A @ 76.76.21.21` + `CNAME www cname.vercel-dns.com`
+3. Add both records in Cloudflare DNS → Proxy: DNS only (gray cloud)
+4. Wait 5-15 min → Vercel auto-verifies + provisions SSL
+5. Set as Primary domain → `vercel.app` URL auto-redirects to custom domain
+
+### Step 10: Update Environment Variables for Domain
+
+After domain is live on Vercel:
+
+```
+Vercel Dashboard → Settings → Environment Variables:
+- Update: NEXT_PUBLIC_APP_URL=https://yourdomain.com
+- Update: FROM_EMAIL=Compliance Alerts <alerts@yourdomain.com>
+```
+
+```
+Supabase Dashboard → Edge Functions → Secrets:
+- Update: APP_URL=https://yourdomain.com
+- Re-deploy Edge Functions (Step 3)
+```
+
+### Step 11: Configure Clerk for Custom Domain
+
+1. Clerk Dashboard → Configure → Domain → Change Instance URL from auto to `https://yourdomain.com`
+2. Update redirect URLs to use `yourdomain.com` (sign-in, sign-up, after-sign-in, after-sign-up)
+3. Both vercel.app and yourdomain.com work during propagation — Clerk handles the transition
+4. Clerk JWT template and Supabase third-party auth DO NOT change — they work independently of domain
+
+### Step 12: Verify Resend Sending Domain + Add DNS Records
+
+Resend requires a verified sending domain for production email deliverability.
+
+1. Resend Dashboard → Domains → Add `yourdomain.com` → Region: us-east-1
+2. Resend generates DNS records. Add ALL of them to Cloudflare (Proxy: DNS only — gray cloud):
+
+   **DKIM** (3 CNAME records — Resend provides unique name/value pairs per domain):
+   ```
+   xxx._domainkey → CNAME → xxx.dkim.amazonses.com
+   ```
+   Copy exactly from Resend. Do NOT use example values.
+
+   **SPF** (MX + TXT):
+   ```
+   send → MX → feedback-smtp.us-east-1.amazonses.com (priority 10)
+   send → TXT → "v=spf1 include:amazonses.com ~all"
+   ```
+
+   **DMARC** (TXT — add manually, Resend does not provide this):
+   ```
+   _dmarc → TXT → "v=DMARC1; p=none; rua=mailto:admin@yourdomain.com"
+   ```
+   Start with `p=none`. Change to `p=reject` after 2-4 weeks of monitoring.
+
+3. Click Verify in Resend Dashboard → wait 15 min (up to 72 hours globally)
+4. Verify: `nslookup -type=TXT send.yourdomain.com`
+5. Update Resend Webhook endpoint: `https://yourdomain.com/api/resend/webhook`
+
+### Step 13: Post-Domain Launch
+
+- Google Search Console: add `yourdomain.com`, verify via DNS, submit `/sitemap.xml`
+- Add `admin@yourdomain.com` in Resend as reply-to address
+- Wait 1-2 weeks, then vercel.app auto-redirects to custom domain
+- **The vercel.app URL stays alive** — use it for staging/testing new features before pushing to `main`
+
+### Domain Migration Reference — What Points Where
+
+The vercel.app URL is STAGING ONLY. Nothing external is configured on it. When the real domain is purchased, configure everything ONCE on the domain.
+
+| Service | Staging (vercel.app) | Production (yourdomain.com) | Where to update |
+|---|---|---|---|
+| Vercel hosting | `your-project.vercel.app` | `yourdomain.com` + `www` | Vercel → Settings → Domains |
+| Clerk Instance URL | Auto (relative redirects work) | `https://yourdomain.com` | Clerk Dashboard → Configure |
+| Clerk redirect URLs | Auto (relative: `/sign-in`, etc.) | Absolute: `https://yourdomain.com/sign-in` | Clerk Dashboard → Configure |
+| Clerk JWT template | Supabase template (unchanged) | Unchanged | Clerk Dashboard → JWT Templates |
+| Clerk → Supabase auth | Frontend API domain (unchanged) | Unchanged | Supabase → Auth → Third-Party Auth |
+| Supabase URL | `https://[ref].supabase.co` | Unchanged | N/A |
+| Supabase Edge Functions | `https://[ref].supabase.co/functions/v1/...` | Unchanged | N/A |
+| Resend FROM_EMAIL | `onboarding@resend.dev` | `alerts@yourdomain.com` | Vercel env var `FROM_EMAIL` |
+| Resend sending domain | NOT verified | `yourdomain.com` verified | Resend Dashboard → Domains |
+| Resend webhook | NOT configured | `https://yourdomain.com/api/resend/webhook` | Resend Dashboard → Webhooks |
+| Vercel `NEXT_PUBLIC_APP_URL` | `https://your-project.vercel.app` | `https://yourdomain.com` | Vercel → Settings → Env Vars |
+| Supabase `APP_URL` secret | `https://your-project.vercel.app` | `https://yourdomain.com` | Supabase → Edge Functions → Secrets |
+| Cloudflare DNS | Nothing | A, CNAME, MX, TXT records | Cloudflare → DNS → Records |
+
+**Cloudflare DNS records (only added when domain is purchased):**
+
+| Type | Name | Value | Proxy |
+|---|---|---|---|
+| A | @ | `76.76.21.21` | DNS only (gray) |
+| CNAME | www | `cname.vercel-dns.com` | DNS only (gray) |
+| CNAME | `xxx._domainkey` | `xxx.dkim.amazonses.com` | DNS only (gray) |
+| CNAME | `xxx._domainkey` | `xxx.dkim.amazonses.com` | DNS only (gray) |
+| CNAME | `xxx._domainkey` | `xxx.dkim.amazonses.com` | DNS only (gray) |
+| MX | send | `feedback-smtp.us-east-1.amazonses.com` | DNS only (gray) |
+| TXT | send | `"v=spf1 include:amazonses.com ~all"` | DNS only (gray) |
+| TXT | _dmarc | `"v=DMARC1; p=none; rua=mailto:admin@yourdomain.com"` | DNS only (gray) |
+
+The three DKIM CNAME records are generated by Resend when you add the domain — copy them exactly from the Resend dashboard. Do NOT use any example values.
+
+### Cloudflare Proxy Warning
+
+Do NOT enable Cloudflare proxy (orange cloud) on Vercel or Resend DNS records. Cloudflare proxy interferes with:
+- Clerk authentication (JWT cookies may not pass through)
+- Vercel edge functions (double-proxying)
+- Resend email DNS (MX/TXT must not be proxied)
+
+If you want Cloudflare DDoS/WAF later: test on a staging subdomain first, research "Cloudflare with Clerk" and "Cloudflare with Vercel", add Clerk IP ranges to Cloudflare allowlist, monitor auth for 48 hours before enabling on primary domain.
 
 ## Architecture Decision Records
 

@@ -183,6 +183,9 @@ export function CredentialForm({
           {...register("license_number")}
           placeholder="e.g. RN123456"
         />
+        {errors.license_number && (
+          <p className="text-sm text-destructive">{errors.license_number.message}</p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -193,6 +196,9 @@ export function CredentialForm({
           maxLength={100}
           placeholder="e.g. TX"
         />
+        {errors.state && (
+          <p className="text-sm text-destructive">{errors.state.message}</p>
+        )}
         <p className="text-xs text-muted-foreground">
           For multi-state tracking, add multiple credentials of the same type — one per state.
         </p>
@@ -202,10 +208,16 @@ export function CredentialForm({
         <div className="space-y-2">
           <Label htmlFor="issue_date">Issue date</Label>
           <Input id="issue_date" type="date" {...register("issue_date")} />
+          {errors.issue_date && (
+            <p className="text-sm text-destructive">{errors.issue_date.message}</p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="expiration_date">Expiration date</Label>
           <Input id="expiration_date" type="date" {...register("expiration_date")} />
+          {errors.expiration_date && (
+            <p className="text-sm text-destructive">{errors.expiration_date.message}</p>
+          )}
         </div>
       </div>
 
@@ -217,6 +229,9 @@ export function CredentialForm({
           {...register("verification_url")}
           placeholder="https://www.example.gov/verify"
         />
+        {errors.verification_url && (
+          <p className="text-sm text-destructive">{errors.verification_url.message}</p>
+        )}
         <p className="text-xs text-muted-foreground">
           Link to the state board license lookup page for this credential.
         </p>
@@ -258,6 +273,9 @@ export function CredentialForm({
           placeholder="Any additional notes about this credential..."
           rows={2}
         />
+        {errors.notes && (
+          <p className="text-sm text-destructive">{errors.notes.message}</p>
+        )}
       </div>
 
       <Button type="submit" disabled={isSubmitting}>

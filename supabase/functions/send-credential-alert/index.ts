@@ -22,7 +22,7 @@ const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Compliance Alerts <onboarding@
 const ACTIVE_PLANS = new Set(["trial", "solo", "practice", "multi_location"]);
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("[send-credential-alert] Missing Supabase credentials");
+  Sentry.captureMessage("send-credential-alert: Missing Supabase credentials", { level: "error" });
   throw new Error("Missing Supabase credentials");
 }
 
@@ -158,7 +158,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     if (!ACTIVE_PLANS.has(clinic.plan)) {
-      console.log(`[send-credential-alert] Skipping — clinic plan is ${clinic.plan}`);
+      Sentry.captureMessage("send-credential-alert: Skipping inactive clinic", { level: "info", extra: { clinic_id, plan: clinic.plan } });
       return json({ success: true, data: { email_sent: false } }, 200);
     }
 
@@ -203,7 +203,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const duration = Date.now() - startTime;
-    console.log(`[send-credential-alert] OK (${duration}ms)`);
+    Sentry.captureMessage("send-credential-alert: OK", { level: "info", extra: { credential_id, clinic_id, duration_ms: duration } });
 
     return json({
       success: true,
@@ -215,7 +215,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     Sentry.captureException(err instanceof Error ? err : new Error(errorMsg));
-    console.error(`[send-credential-alert] Unhandled error:`, errorMsg);
+    Sentry.captureMessage("send-credential-alert: Unhandled error", { level: "error", extra: { error: errorMsg } });
     await Sentry.flush(2000);
     return json({ success: false, error: "Internal server error" }, 500);
   }

@@ -20,13 +20,13 @@ export default async function StaffCredentialsPage({
   if (!userId) redirect("/sign-in");
 
   const supabase = await createClient();
-  const { data: userRecord } = await supabase
+  const { data: userRecord, error: userErr } = await supabase
     .from("users")
     .select("clinic_id")
     .eq("clerk_user_id", userId)
-    .single();
+    .maybeSingle();
 
-  if (!userRecord) redirect("/onboarding");
+  if (userErr || !userRecord) redirect("/onboarding");
 
   const { data: staff } = await supabase
     .from("staff_members")

@@ -46,11 +46,15 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
   }
 
   async function handleRoleChange(id: string, newRole: string) {
-    const result = await updateUserRole(id, newRole as "manager" | "viewer");
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success("Role updated");
+    try {
+      const result = await updateUserRole(id, newRole as "manager" | "viewer");
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Role updated");
+      }
+    } catch {
+      toast.error("Failed to update role");
     }
   }
 

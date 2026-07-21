@@ -1,13 +1,18 @@
 "use server";
+import "server-only";
 
+import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
-
 import type { Json } from "@/types/database";
 import type { ReportData } from "@/lib/pdf/report-template";
+
+const createReportSchema = z.object({
+  reportUrl: z.string().nullable(),
+});
 
 export async function getReportData(): Promise<{
   data: ReportData | null;
@@ -207,6 +212,21 @@ export async function createReport(
 
   if (userRecord.role === "viewer") {
     return { id: null, error: "Viewers cannot generate reports" };
+  }
+
+  const parsed = createReportSchema.safeParse({ reportUrl });
+  if (!parsed.success) {
+    return { id: null, error: "Invalid report URL" };
+  }
+
+  const { data: clinic } = await supabase
+    .from("clinics")
+    .select("plan")
+    .eq("id", userRecord.clinic_id)
+    .single();
+
+  if (!clinic || clinic.plan === "expired_trial" || clinic.plan === "inactive") {
+    return { id: null, error: "Your plan does not support report generation." };
   }
 
   const { data: report, error } = await supabase

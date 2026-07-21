@@ -4,8 +4,9 @@ const STEPS = [
   { step: 1, label: "Clinic" },
   { step: 2, label: "Staff" },
   { step: 3, label: "Credentials" },
-  { step: 4, label: "Scan" },
-  { step: 5, label: "Done" },
+  { step: 4, label: "Checklist" },
+  { step: 5, label: "Scan" },
+  { step: 6, label: "Done" },
 ];
 
 export function WizardProgress({ currentStep }: { currentStep: number }) {
@@ -20,27 +21,23 @@ export function WizardProgress({ currentStep }: { currentStep: number }) {
             <li key={s.step} className="flex items-center">
               {i > 0 && (
                 <div
-                  className="h-px w-8 sm:w-16"
-                  style={{ backgroundColor: isCompleted ? "#9C6B5D" : "#D9B7A7" }}
+                  className={`h-px w-8 sm:w-16 ${isCompleted ? "bg-[#6E97A7]" : "bg-[rgba(0,0,0,0.12)]"}`}
                 />
               )}
               <div className="flex flex-col items-center gap-1">
                 <div
-                  className="flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors"
-                  style={{
-                    backgroundColor: isCompleted ? "#9C6B5D" : isCurrent ? "#FFF8F2" : "transparent",
-                    border: isCurrent ? "2px solid #9C6B5D" : isCompleted ? "2px solid #9C6B5D" : "2px solid #D9B7A7",
-                    color: isCompleted ? "#FFFFFF" : isCurrent ? "#9C6B5D" : "#8B7D78",
-                  }}
+                  className={`flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
+                    isCompleted
+                      ? "bg-[#6E97A7] text-white border-2 border-[#6E97A7]"
+                      : isCurrent
+                        ? "bg-[#FFF8F2] text-[#6E97A7] border-2 border-[#6E97A7]"
+                        : "bg-transparent text-[rgba(0,0,0,0.55)] border-2 border-[rgba(0,0,0,0.12)]"
+                  }`}
                 >
                   {isCompleted ? <Check className="size-4" /> : s.step}
                 </div>
                 <span
-                  className="hidden text-xs sm:block"
-                  style={{
-                    color: isCurrent ? "#3D2A25" : "#8B7D78",
-                    fontWeight: isCurrent ? 500 : 400,
-                  }}
+                  className={`hidden text-xs sm:block ${isCurrent ? "text-black font-medium" : "text-[rgba(0,0,0,0.55)]"}`}
                 >
                   {s.label}
                 </span>

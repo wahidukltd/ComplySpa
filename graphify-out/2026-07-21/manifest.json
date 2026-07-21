@@ -565,9 +565,9 @@
     "semantic_hash": "72a248fecb29080e5ee05c430b701798"
   },
   "src/lib/actions/credentials.ts": {
-    "mtime": 1784612181.2564907,
-    "ast_hash": "39a2d5f78b98bd0a676946cdb7f4f605",
-    "semantic_hash": "39a2d5f78b98bd0a676946cdb7f4f605"
+    "mtime": 1784617201.191205,
+    "ast_hash": "b5e40515dc99741ac7d8356b07e186f0",
+    "semantic_hash": ""
   },
   "src/lib/actions/onboarding.ts": {
     "mtime": 1784612250.9432,
@@ -585,9 +585,9 @@
     "semantic_hash": "dafb5804772a82492b725af4e685eabb"
   },
   "src/lib/actions/staff.ts": {
-    "mtime": 1784612379.2603793,
-    "ast_hash": "34565e81c5213e106b39e275c25b7dd5",
-    "semantic_hash": "34565e81c5213e106b39e275c25b7dd5"
+    "mtime": 1784617038.1845677,
+    "ast_hash": "3231c1d4fb0360e42f5b0660cb27f7a9",
+    "semantic_hash": ""
   },
   "src/lib/audit/auto-fill.ts": {
     "mtime": 1784553325.5595589,
@@ -645,9 +645,9 @@
     "semantic_hash": "e50fd872d0e1c8d441f06c7b6efd1497"
   },
   "src/lib/utils/clinic.ts": {
-    "mtime": 1784286837.9300735,
-    "ast_hash": "2330658d7596bcb9fcd49615d03b6603",
-    "semantic_hash": "2330658d7596bcb9fcd49615d03b6603"
+    "mtime": 1784616805.027783,
+    "ast_hash": "727a427fa0ab0b74c6083d20586f1932",
+    "semantic_hash": ""
   },
   "src/lib/utils/cn.ts": {
     "mtime": 1784283529.6132627,
@@ -665,9 +665,9 @@
     "semantic_hash": "adbf62dc8c070d3e87a49f03a75069b9"
   },
   "src/lib/utils/errors.ts": {
-    "mtime": 1784603451.8895428,
-    "ast_hash": "3b2c012052b3344476d4d1ef0bc791b3",
-    "semantic_hash": "3b2c012052b3344476d4d1ef0bc791b3"
+    "mtime": 1784616796.142324,
+    "ast_hash": "591f14c11163410919b28db38d00078e",
+    "semantic_hash": ""
   },
   "src/lib/utils/id.ts": {
     "mtime": 1784612307.9258375,
@@ -680,9 +680,9 @@
     "semantic_hash": "b5384e52110745cf19ac153a228d1982"
   },
   "src/lib/utils/plan.ts": {
-    "mtime": 1784612192.733327,
-    "ast_hash": "5409364b409b6f6bf5fda6cfc83e3951",
-    "semantic_hash": "5409364b409b6f6bf5fda6cfc83e3951"
+    "mtime": 1784616795.223362,
+    "ast_hash": "0399eb80179da4f3d48b9bd0aa2bcc62",
+    "semantic_hash": ""
   },
   "src/lib/utils/status.ts": {
     "mtime": 1784283529.6207857,
@@ -947,6 +947,16 @@
   "public/window.svg": {
     "mtime": 1784283529.4872198,
     "ast_hash": "a2760511c65806022ad20adf74370ff3",
+    "semantic_hash": ""
+  },
+  "tests/integration/plan-enforcement.test.ts": {
+    "mtime": 1784617576.5647776,
+    "ast_hash": "05791ab358969b4f87fc27d2ca945726",
+    "semantic_hash": ""
+  },
+  "tests/unit/plan-limits.test.ts": {
+    "mtime": 1784617573.3815954,
+    "ast_hash": "248fb605a91e34d8c9a3773cb6ce61d3",
     "semantic_hash": ""
   }
 }

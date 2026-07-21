@@ -1,16 +1,16 @@
 # Graph Report - complyspa  (2026-07-21)
 
 ## Corpus Check
-- 183 files · ~90,490 words
+- 185 files · ~91,248 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 880 nodes · 1652 edges · 102 communities (69 shown, 33 thin omitted)
+- 889 nodes · 1657 edges · 101 communities (69 shown, 32 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e0983238`
+- Built from commit: `14f1167d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -77,7 +77,6 @@
 - Community 75
 - AGENTS.md
 - Frontend Conventions
-- report-generator.tsx
 - Database Conventions
 - Public Pages & Marketing Conventions
 - Engineering Principles
@@ -92,7 +91,7 @@
 
 ## God Nodes (most connected - your core abstractions)
 1. `cn()` - 94 edges
-2. `createClient()` - 74 edges
+2. `createClient()` - 62 edges
 3. `buttonVariants` - 24 edges
 4. `Button()` - 23 edges
 5. `compilerOptions` - 18 edges
@@ -105,39 +104,39 @@
 ## Surprising Connections (you probably didn't know these)
 - `NavLink()` --calls--> `cn()`  [EXTRACTED]
   src/components/layout/sidebar.tsx → src/lib/utils/cn.ts
-- `SelectGroup()` --calls--> `cn()`  [EXTRACTED]
-  src/components/ui/select.tsx → src/lib/utils/cn.ts
-- `SelectLabel()` --calls--> `cn()`  [EXTRACTED]
-  src/components/ui/select.tsx → src/lib/utils/cn.ts
-- `SelectSeparator()` --calls--> `cn()`  [EXTRACTED]
-  src/components/ui/select.tsx → src/lib/utils/cn.ts
-- `SelectScrollUpButton()` --calls--> `cn()`  [EXTRACTED]
-  src/components/ui/select.tsx → src/lib/utils/cn.ts
+- `DialogOverlay()` --calls--> `cn()`  [EXTRACTED]
+  src/components/ui/dialog.tsx → src/lib/utils/cn.ts
+- `CredentialsTable()` --calls--> `verifyCredentialNow()`  [EXTRACTED]
+  src/app/dashboard/credentials/credentials-table.tsx → src/lib/actions/credentials.ts
+- `POST()` --calls--> `createClient()`  [EXTRACTED]
+  src/app/api/reports/email/route.ts → src/lib/supabase/server.ts
+- `POST()` --calls--> `createAdminClient()`  [EXTRACTED]
+  src/app/api/resend/webhook/route.ts → src/lib/supabase/admin.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (102 total, 33 thin omitted)
+## Communities (101 total, 32 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.06
-Nodes (57): CredentialRow, CredentialsTable(), STATUS_LABELS, STATUS_VARIANTS, NotFound(), AlertList(), AlertListProps, AlertLog (+49 more)
+Nodes (56): CredentialRow, STATUS_LABELS, STATUS_VARIANTS, AlertListProps, AlertLog, DeliveryStatus, DeliveryStatusBadge(), DeliveryStatusBadgeProps (+48 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.09
-Nodes (34): AlertsPage(), CredentialsListPage(), DashboardLayout(), DashboardPage(), Credential, EditCredentialFormWrapper(), EditCredentialPage(), NewCredentialFormWrapper() (+26 more)
+Cohesion: 0.07
+Nodes (26): Credential, EditCredentialFormWrapper(), NewCredentialFormWrapper(), EditStaffFormWrapper(), StaffMember, StaffFormWrapper(), StaffMember, StaffTableWrapper() (+18 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.12
-Nodes (30): STEPS, WizardProgress(), WizardStepClinic(), CredentialRow, CredentialType, StaffRef, WizardStepCredentials(), WizardStepCredentialsProps (+22 more)
+Cohesion: 0.09
+Nodes (41): STEPS, WizardProgress(), WizardStepClinic(), CredentialRow, CredentialType, StaffRef, WizardStepCredentials(), WizardStepCredentialsProps (+33 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.07
 Nodes (35): jsonLd, metadata, metadata, pricingJsonLd, PricingPage(), BenefitsSection(), ROWS, CTASection() (+27 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.07
-Nodes (43): EditStaffFormWrapper(), StaffMember, StaffFormWrapper(), StaffMember, StaffTableWrapper(), Credential, CredentialFormProps, CredentialTypeOption (+35 more)
+Cohesion: 0.11
+Nodes (22): Props, ReportGenerator(), createReport(), getReportData(), C, ComplianceReport(), ReportData, styles (+14 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.04
@@ -149,7 +148,7 @@ Nodes (32): AuditPage(), AuditChecklist(), Props, STATUS_BADGE, CompleteAuditBut
 
 ### Community 7 - "Community 7"
 Cohesion: 0.08
-Nodes (23): POST(), createAdminClient(), PolarWebhookPayload, polarWebhookSchema, ResendWebhookPayload, resendWebhookSchema, subscriptionDataSchema, Database (+15 more)
+Nodes (22): POST(), createAdminClient(), PolarWebhookPayload, polarWebhookSchema, ResendWebhookPayload, resendWebhookSchema, subscriptionDataSchema, anonKeyJwt (+14 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.07
@@ -168,8 +167,8 @@ Cohesion: 0.22
 Nodes (11): emailReportSchema, escapeHtml(), POST(), rateLimitMap, resend, sendEmail(), SendEmailParams, SendEmailResult (+3 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.10
-Nodes (34): SettingsPage(), AlertRecipients(), ClinicProfileForm(), CustomCredentialTypes(), UserInviteForm(), Tabs(), TabsContent(), TabsList() (+26 more)
+Cohesion: 0.11
+Nodes (31): SettingsPage(), AlertRecipients(), ClinicProfileForm(), CustomCredentialTypes(), UserInviteForm(), Tabs(), TabsContent(), TabsList() (+23 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.35
@@ -180,8 +179,8 @@ Cohesion: 0.20
 Nodes (7): HTML_ESCAPE_MAP, json(), RequestBody, sendEmailWithRetry(), SENTRY_DSN, sleep(), supabase
 
 ### Community 16 - "Community 16"
-Cohesion: 0.38
-Nodes (4): navItems, NavLink(), Sidebar(), Topbar()
+Cohesion: 0.32
+Nodes (5): DashboardShell(), navItems, NavLink(), Sidebar(), Topbar()
 
 ### Community 17 - "Community 17"
 Cohesion: 0.29
@@ -227,6 +226,10 @@ Nodes (3): set_audit_report_author(), trigger_set_audit_report_author, users
 Cohesion: 0.50
 Nodes (3): alert_logs, audit_runs, trigger_audit_runs_updated_at
 
+### Community 35 - "Community 35"
+Cohesion: 0.08
+Nodes (36): AlertsPage(), CredentialsTable(), CredentialsListPage(), DashboardLayout(), DashboardPage(), ReportsPage(), EditCredentialPage(), NewCredentialPage() (+28 more)
+
 ### Community 88 - "AGENTS.md"
 Cohesion: 0.12
 Nodes (14): Architecture Decision Records, Dependency Management, Environment Variables, graphify, Logging & Monitoring, Naming Conventions, Page Inventory, Performance Expectations (+6 more)
@@ -234,10 +237,6 @@ Nodes (14): Architecture Decision Records, Dependency Management, Environment Va
 ### Community 89 - "Frontend Conventions"
 Cohesion: 0.12
 Nodes (16): Accessibility, Animation & 3D Graphics, Component Design, Component Library, Dark theme — tokens DEFINED, UI toggle is POST-MVP, Data visualization (audit-report charts, dashboard KPIs), Derived tokens (built from the five foundation colors), Foundation — warm spa palette (five colors only) (+8 more)
-
-### Community 90 - "report-generator.tsx"
-Cohesion: 0.23
-Nodes (10): ReportsPage(), Props, ReportGenerator(), createReport(), getReportData(), getReportHistory(), C, ComplianceReport() (+2 more)
 
 ### Community 91 - "Database Conventions"
 Cohesion: 0.29
@@ -284,24 +283,24 @@ Cohesion: 0.67
 Nodes (3): Clerk Handles (free, included in 10K MAU), Email Responsibilities, Resend Handles (free, 3,000 emails/month)
 
 ## Knowledge Gaps
-- **301 isolated node(s):** `Tooling that governs work in this repo`, `Project Overview`, `1. Security First`, `2. Simplicity Over Cleverness`, `3. Type Safety Is Non-Negotiable` (+296 more)
+- **302 isolated node(s):** `Plan`, `PlanLimit`, `$schema`, `style`, `rsc` (+297 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **33 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **32 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `cn()` connect `Community 0` to `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 11`, `Community 13`, `Community 16`?**
-  _High betweenness centrality (0.069) - this node is a cross-community bridge._
-- **Why does `createClient()` connect `Community 1` to `Community 0`, `Community 2`, `Community 4`, `Community 6`, `Community 12`, `Community 13`, `report-generator.tsx`?**
-  _High betweenness centrality (0.056) - this node is a cross-community bridge._
-- **Why does `Button()` connect `Community 2` to `Community 0`, `Community 1`, `Community 4`, `Community 6`, `report-generator.tsx`?**
-  _High betweenness centrality (0.016) - this node is a cross-community bridge._
-- **What connects `Tooling that governs work in this repo`, `Project Overview`, `1. Security First` to the rest of the system?**
-  _301 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `cn()` connect `Community 0` to `Community 2`, `Community 3`, `Community 35`, `Community 11`, `Community 13`, `Community 16`?**
+  _High betweenness centrality (0.068) - this node is a cross-community bridge._
+- **Why does `createClient()` connect `Community 35` to `Community 1`, `Community 2`, `Community 4`, `Community 6`, `Community 12`, `Community 13`?**
+  _High betweenness centrality (0.048) - this node is a cross-community bridge._
+- **Why does `Button()` connect `Community 2` to `Community 0`, `Community 35`, `Community 4`, `Community 6`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
+- **What connects `Plan`, `PlanLimit`, `$schema` to the rest of the system?**
+  _302 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.055176890619928594 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.061828952239911146 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.08665269042627533 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06866002214839424 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.12141779788838612 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08683853459972862 - nodes in this community are weakly interconnected._

@@ -58,6 +58,13 @@ export function StaffTable({ staff, onDelete }: StaffTableProps) {
             key={member.id}
             className="cursor-pointer"
             onClick={() => router.push(`/dashboard/staff/${member.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                router.push(`/dashboard/staff/${member.id}`);
+              }
+            }}
+            tabIndex={0}
+            role="link"
           >
             <TableCell className="font-medium">{member.name}</TableCell>
             <TableCell>

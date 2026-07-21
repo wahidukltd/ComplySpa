@@ -3,7 +3,7 @@
 import { updateFinding } from "@/lib/actions/audit";
 import { CHECKLIST_ITEMS } from "@/lib/audit/checklist";
 import type { AuditFinding } from "@/lib/audit/checklist";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 interface Props {
   findings: AuditFinding[];
@@ -77,6 +77,19 @@ function RemediationCell({
   readonly: boolean;
 }) {
   const [status, setStatus] = useState(finding.remediationStatus ?? "open");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleChange = useCallback(async (newStatus: string) => {
+    const previous = status;
+    setStatus(newStatus);
+    const result = await updateFinding(finding.id, {
+      remediation_status: newStatus as "open" | "in_progress" | "closed",
+    });
+    if (result.error) {
+      setStatus(previous);
+      setError(result.error);
+    }
+  }, [finding.id, status]);
 
   if (readonly) {
     return (
@@ -86,24 +99,20 @@ function RemediationCell({
     );
   }
 
-  const handleChange = async (newStatus: string) => {
-    setStatus(newStatus);
-    await updateFinding(finding.id, {
-      remediation_status: newStatus as "open" | "in_progress" | "closed",
-    });
-  };
-
   return (
-    <select
-      value={status}
-      onChange={(e) => handleChange(e.target.value)}
-      className="text-xs border rounded px-2 py-1"
-      style={{ borderColor: "#D9B7A7", color: "#3D2A25" }}
-    >
-      <option value="open">Open</option>
-      <option value="in_progress">In Progress</option>
-      <option value="closed">Closed</option>
-    </select>
+    <div className="flex flex-col gap-1">
+      <select
+        value={status}
+        onChange={(e) => handleChange(e.target.value)}
+        className="text-xs border rounded px-2 py-1"
+        style={{ borderColor: "#D9B7A7", color: "#3D2A25" }}
+      >
+        <option value="open">Open</option>
+        <option value="in_progress">In Progress</option>
+        <option value="closed">Closed</option>
+      </select>
+      {error && <span className="text-xs" style={{ color: "#B8443A" }}>{error}</span>}
+    </div>
   );
 }
 

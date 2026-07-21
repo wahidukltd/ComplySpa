@@ -25,8 +25,14 @@ export async function createClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll() {
-        Sentry.captureMessage("Server client: setAll called but not implemented", "info");
+      setAll(cookiesToSet) {
+        for (const { name, value, options } of cookiesToSet) {
+          try {
+            cookieStore.set(name, value, options);
+          } catch {
+            Sentry.captureMessage("Server client: failed to set cookie", "warning");
+          }
+        }
       },
     },
     ...(supabaseToken

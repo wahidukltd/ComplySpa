@@ -301,7 +301,7 @@ export async function removeUser(id: string) {
 
   const { error } = await supabase
     .from("users")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
     .eq("clinic_id", user.clinic_id);
 

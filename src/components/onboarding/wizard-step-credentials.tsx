@@ -129,18 +129,18 @@ export function WizardStepCredentials({ staffMembers, onNext, onBack }: WizardSt
     return (
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full" style={{ backgroundColor: "#F6E3D6" }}>
-            <ShieldCheck className="size-5" style={{ color: "#9C6B5D" }} />
+          <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-[#F0F4F5]">
+            <ShieldCheck className="size-5 text-[#6E97A7]" />
           </div>
-          <CardTitle className="text-xl" style={{ color: "#3D2A25" }}>Add credentials</CardTitle>
-          <CardDescription style={{ color: "#8B7D78" }}>
+          <CardTitle className="text-xl text-black">Add credentials</CardTitle>
+          <CardDescription className="text-[rgba(0,0,0,0.55)]">
             No staff members to add credentials for. You can add credentials later from your dashboard.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" onClick={onBack}
-              style={{ borderColor: "#D9B7A7", color: "#3D2A25" }}
+              className="border-[rgba(0,0,0,0.12)] text-black"
             >
               Back
             </Button>
@@ -156,19 +156,17 @@ export function WizardStepCredentials({ staffMembers, onNext, onBack }: WizardSt
   return (
     <Card className="w-full max-w-2xl">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full" style={{ backgroundColor: "#F6E3D6" }}>
-          <ShieldCheck className="size-5" style={{ color: "#9C6B5D" }} />
+        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-[#F0F4F5]">
+          <ShieldCheck className="size-5 text-[#6E97A7]" />
         </div>
-        <CardTitle className="text-xl" style={{ color: "#3D2A25" }}>Add credentials</CardTitle>
-        <CardDescription style={{ color: "#8B7D78" }}>
+        <CardTitle className="text-xl text-black">Add credentials</CardTitle>
+        <CardDescription className="text-[rgba(0,0,0,0.55)]">
           Enter license and certification details. You can add more later.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {rows.map((row) => (
-          <div key={row.tempId} className="rounded-lg border p-4 space-y-3"
-            style={{ borderColor: "#D9B7A7" }}
-          >
+          <div key={row.tempId} className="rounded-lg border border-[rgba(0,0,0,0.12)] p-4 space-y-3">
             <div className="flex items-start gap-3">
               <div className="flex-1 space-y-1">
                 <Label htmlFor={`staff-${row.tempId}`}>Staff member</Label>
@@ -176,8 +174,7 @@ export function WizardStepCredentials({ staffMembers, onNext, onBack }: WizardSt
                   id={`staff-${row.tempId}`}
                   value={row.staffMemberId}
                   onChange={(e) => updateRow(row.tempId, "staffMemberId", e.target.value)}
-                  className="flex h-10 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                  style={{ borderColor: errors[`${row.tempId}-staffMemberId`] ? "#B8443A" : "#D9B7A7", color: "#3D2A25", backgroundColor: "#FFFFFF" }}
+                  className={`flex h-10 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${errors[`${row.tempId}-staffMemberId`] ? "border-[#B8443A]" : "border-[rgba(0,0,0,0.12)]"} text-black bg-white`}
                 >
                   <option value="">Select staff member</option>
                   {staffMembers.map((sm) => (
@@ -191,8 +188,7 @@ export function WizardStepCredentials({ staffMembers, onNext, onBack }: WizardSt
                   id={`type-${row.tempId}`}
                   value={row.credentialTypeId}
                   onChange={(e) => updateRow(row.tempId, "credentialTypeId", e.target.value)}
-                  className="flex h-10 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                  style={{ borderColor: errors[`${row.tempId}-credentialTypeId`] ? "#B8443A" : "#D9B7A7", color: "#3D2A25", backgroundColor: "#FFFFFF" }}
+                  className={`flex h-10 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${errors[`${row.tempId}-credentialTypeId`] ? "border-[#B8443A]" : "border-[rgba(0,0,0,0.12)]"} text-black bg-white`}
                 >
                   <option value="">Select type</option>
                   {credentialTypes.map((ct) => (
@@ -209,7 +205,7 @@ export function WizardStepCredentials({ staffMembers, onNext, onBack }: WizardSt
                   onClick={() => removeRow(row.tempId)}
                   aria-label="Remove credential"
                 >
-                  <X className="size-4" style={{ color: "#8B7D78" }} />
+                  <X className="size-4 text-[rgba(0,0,0,0.55)]" />
                 </Button>
               )}
             </div>
@@ -238,27 +234,27 @@ export function WizardStepCredentials({ staffMembers, onNext, onBack }: WizardSt
         ))}
 
         <Button type="button" variant="outline" size="sm" onClick={addRow}
-          style={{ borderColor: "#D9B7A7", color: "#9C6B5D" }}
+          className="border-[rgba(0,0,0,0.12)] text-[#6E97A7]"
         >
           <Plus className="mr-2 size-4" />
           Add another credential
         </Button>
 
         {lastError && (
-          <div className="rounded-md p-3 text-sm" style={{ backgroundColor: "#FCE8E5", color: "#7A2A26" }}>
+          <div className="rounded-md p-3 text-sm bg-[#FCE8E5] text-[#7A2A26]">
             {lastError}
           </div>
         )}
 
         {savedCount > 0 && (
-          <div className="rounded-md p-3 text-sm" style={{ backgroundColor: "#E8F2EB", color: "#2D5C3A" }}>
+          <div className="rounded-md p-3 text-sm bg-[#E8F2EB] text-[#2D5C3A]">
             <p className="font-medium"><Check className="mr-1 inline size-4" />{savedCount} credential{savedCount !== 1 ? "s" : ""} saved</p>
           </div>
         )}
 
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="outline" onClick={onBack}
-            style={{ borderColor: "#D9B7A7", color: "#3D2A25" }}
+            className="border-[rgba(0,0,0,0.12)] text-black"
           >
             Back
           </Button>
@@ -267,7 +263,7 @@ export function WizardStepCredentials({ staffMembers, onNext, onBack }: WizardSt
           </Button>
           {rows.length > 0 && (
             <Button type="button" variant="ghost" onClick={() => onNext(0)}
-              style={{ color: "#8B7D78" }}
+              className="text-[rgba(0,0,0,0.55)]"
             >
               Skip
             </Button>
