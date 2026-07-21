@@ -1,6 +1,5 @@
-import { PagePlaceholder } from "@/components/page-placeholder";
+import { redirect } from "next/navigation";
 
-// User management — invite manager/viewer, manage roles (Phase 6).
 export default function UsersSettingsPage() {
-  return <PagePlaceholder label="Users" />;
+  redirect("/dashboard/settings");
 }

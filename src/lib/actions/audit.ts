@@ -44,6 +44,18 @@ export async function createAuditRun(): Promise<{
     };
   }
 
+  // Reuse existing in_progress run to prevent duplicates (e.g. back/forward navigation)
+  const { data: existingRun } = await supabase
+    .from("audit_runs")
+    .select("id")
+    .eq("clinic_id", user.clinic_id)
+    .eq("status", "in_progress")
+    .maybeSingle();
+
+  if (existingRun) {
+    return { runId: existingRun.id, error: null };
+  }
+
   const { data: run, error: runErr } = await supabase
     .from("audit_runs")
     .insert({

@@ -66,6 +66,41 @@ export type Database = {
           },
         ]
       }
+      alert_recipients: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_recipients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_findings: {
         Row: {
           audit_run_id: string

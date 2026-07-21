@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
+import { Toaster } from "sonner";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 
@@ -66,5 +67,19 @@ export default async function DashboardLayout({
     }
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <>
+      <DashboardShell>{children}</DashboardShell>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "#FFFFFF",
+            border: "1px solid #D9B7A7",
+            color: "#3D2A25",
+          },
+        }}
+      />
+    </>
+  );
 }

@@ -1,0 +1,25 @@
+import { ScrollReveal } from "./scroll-reveal";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
+
+export function CTASection() {
+  return (
+    <section className="mx-auto max-w-3xl px-4 py-20 text-center">
+      <ScrollReveal>
+        <h2 className="text-3xl font-bold tracking-tight" style={{ color: "#3D2A25" }}>
+          Start your 14-day free trial.
+        </h2>
+        <p className="mx-auto mt-3 max-w-md" style={{ color: "#8B7D78" }}>
+          No credit card. Cancel anytime. Data preserved for 30 days after trial.
+        </p>
+        <Link
+          href="/sign-up"
+          className={cn(buttonVariants({ variant: "default", size: "lg" }), "mt-6")}
+        >
+          Start free trial
+        </Link>
+      </ScrollReveal>
+    </section>
+  );
+}

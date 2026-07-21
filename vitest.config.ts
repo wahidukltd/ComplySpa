@@ -12,7 +12,7 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    setupFiles: ["@testing-library/jest-dom/vitest"],
+    setupFiles: ["@testing-library/jest-dom/vitest", "./tests/unit/setup.ts"],
     exclude: ["node_modules", ".next", "dist"],
   },
 });

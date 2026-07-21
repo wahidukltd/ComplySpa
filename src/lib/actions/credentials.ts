@@ -1,14 +1,14 @@
 "use server";
 
+import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { credentialSchema, type CredentialInput } from "@/lib/validations/staff";
-import { getClinicIdAndUser } from "@/lib/utils/clinic";
 import * as Sentry from "@sentry/nextjs";
 
 export async function addCredential(input: CredentialInput & { document_url?: string }) {
-  const authData = await getClinicIdAndUser();
-  if (!authData) return { error: "Unauthorized" };
+  const { userId } = await auth();
+  if (!userId) return { error: "Unauthorized" };
 
   const { document_url, ...credInput } = input;
   const parsed = credentialSchema.safeParse(credInput);
@@ -18,24 +18,30 @@ export async function addCredential(input: CredentialInput & { document_url?: st
 
   const supabase = await createClient();
 
+  const { data: user } = await supabase
+    .from("users")
+    .select("clinic_id, role")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+  if (!user) return { error: "Unauthorized" };
+  if (user.role === "viewer") return { error: "Insufficient permissions" };
+
   const { data: staff } = await supabase
     .from("staff_members")
     .select("id")
     .eq("id", parsed.data.staff_member_id)
-    .eq("clinic_id", authData.clinicId)
+    .eq("clinic_id", user.clinic_id)
     .is("deleted_at", null)
-    .single();
+    .maybeSingle();
 
-  if (!staff) {
-    return { error: "Staff member not found." };
-  }
+  if (!staff) return { error: "Staff member not found." };
 
   const { data: credential, error } = await supabase
     .from("credentials")
     .insert({
       staff_member_id: parsed.data.staff_member_id,
       credential_type_id: parsed.data.credential_type_id,
-      clinic_id: authData.clinicId,
+      clinic_id: user.clinic_id,
       license_number: parsed.data.license_number || null,
       state: parsed.data.state || null,
       issue_date: parsed.data.issue_date || null,
@@ -60,8 +66,8 @@ export async function addCredential(input: CredentialInput & { document_url?: st
 }
 
 export async function updateCredential(id: string, input: CredentialInput & { document_url?: string }) {
-  const authData = await getClinicIdAndUser();
-  if (!authData) return { error: "Unauthorized" };
+  const { userId } = await auth();
+  if (!userId) return { error: "Unauthorized" };
 
   const { document_url, ...credInput } = input;
   const parsed = credentialSchema.safeParse(credInput);
@@ -70,6 +76,15 @@ export async function updateCredential(id: string, input: CredentialInput & { do
   }
 
   const supabase = await createClient();
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("clinic_id, role")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+  if (!user) return { error: "Unauthorized" };
+  if (user.role === "viewer") return { error: "Insufficient permissions" };
+
   const { error } = await supabase
     .from("credentials")
     .update({
@@ -83,7 +98,7 @@ export async function updateCredential(id: string, input: CredentialInput & { do
       document_url: document_url ?? null,
     })
     .eq("id", id)
-    .eq("clinic_id", authData.clinicId);
+    .eq("clinic_id", user.clinic_id);
 
   if (error) {
     Sentry.captureException(error);
@@ -98,17 +113,25 @@ export async function updateCredential(id: string, input: CredentialInput & { do
 }
 
 export async function deleteCredential(id: string, staffMemberId: string) {
-  const authData = await getClinicIdAndUser();
-  if (!authData) return { error: "Unauthorized" };
+  const { userId } = await auth();
+  if (!userId) return { error: "Unauthorized" };
 
   const supabase = await createClient();
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("clinic_id, role")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+  if (!user) return { error: "Unauthorized" };
+  if (user.role === "viewer") return { error: "Insufficient permissions" };
 
   const { data: cred } = await supabase
     .from("credentials")
     .select("staff_member_id")
     .eq("id", id)
-    .eq("clinic_id", authData.clinicId)
-    .single();
+    .eq("clinic_id", user.clinic_id)
+    .maybeSingle();
 
   if (!cred) return { error: "Credential not found." };
   if (cred.staff_member_id !== staffMemberId) return { error: "Credential does not belong to this staff member." };
@@ -117,7 +140,7 @@ export async function deleteCredential(id: string, staffMemberId: string) {
     .from("credentials")
     .delete()
     .eq("id", id)
-    .eq("clinic_id", authData.clinicId);
+    .eq("clinic_id", user.clinic_id);
 
   if (error) {
     Sentry.captureException(error);
@@ -132,19 +155,27 @@ export async function deleteCredential(id: string, staffMemberId: string) {
 }
 
 export async function verifyCredentialNow(credentialId: string) {
-  const authData = await getClinicIdAndUser();
-  if (!authData) return { error: "Unauthorized" };
+  const { userId } = await auth();
+  if (!userId) return { error: "Unauthorized" };
 
   const supabase = await createClient();
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("id, clinic_id, role")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+  if (!user) return { error: "Unauthorized" };
+  if (user.role === "viewer") return { error: "Insufficient permissions" };
 
   const { error } = await supabase
     .from("credentials")
     .update({
       last_verified_date: new Date().toISOString(),
-      verified_by_user_id: authData.internalUserId,
+      verified_by_user_id: user.id,
     })
     .eq("id", credentialId)
-    .eq("clinic_id", authData.clinicId);
+    .eq("clinic_id", user.clinic_id);
 
   if (error) {
     Sentry.captureException(error);

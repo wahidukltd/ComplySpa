@@ -163,6 +163,23 @@ export default async function DashboardPage() {
         </Card>
       )}
 
+      {s > 0 && c === 0 && (
+        <Card style={{ borderColor: "#FBF0E0", backgroundColor: "#FFF8F2" }}>
+          <CardContent className="flex items-center gap-3 py-4">
+            <AlertTriangle className="size-5 shrink-0" style={{ color: "#C2853A" }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: "#7A4E1F" }}>
+                Your staff has no credentials tracked yet
+              </p>
+              <p className="text-sm mt-0.5" style={{ color: "#8B7D78" }}>
+                Add credentials to start tracking expirations and compliance.
+                {' '}<Link href="/dashboard/staff" className="underline" style={{ color: "#9C6B5D" }}>Go to staff</Link>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {s === 0 && (
         <Card className="max-w-md">
           <CardHeader>
