@@ -235,21 +235,34 @@ export async function inviteUser(input: InviteUserInput) {
   const parsed = inviteUserSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Validation failed" };
 
-  const supabase = await createClient();
-  const { count } = await supabase
-    .from("users")
-    .select("id", { count: "exact", head: true })
-    .eq("clinic_id", user.clinic_id);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) {
+    Sentry.captureMessage("NEXT_PUBLIC_APP_URL is not set");
+    return { success: false, error: "Server configuration error. Contact support." };
+  }
 
-  const clinic = await supabase
-    .from("clinics")
-    .select("plan")
-    .eq("id", user.clinic_id)
-    .maybeSingle();
-  const plan = clinic.data?.plan ?? "trial";
+  const supabase = await createClient();
+
+  const [countResult, clinicResult] = await Promise.all([
+    supabase
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .eq("clinic_id", user.clinic_id),
+    supabase
+      .from("clinics")
+      .select("plan")
+      .eq("id", user.clinic_id)
+      .maybeSingle(),
+  ]);
+
+  const plan = clinicResult.data?.plan ?? "trial";
   const limits = getPlanLimits(plan);
 
-  if ((count ?? 0) >= limits.maxUsers) {
+  if (plan === "inactive" || plan === "expired_trial") {
+    return { success: false, error: "Your plan is inactive. Reactivate to invite users." };
+  }
+
+  if ((countResult.count ?? 0) >= limits.maxUsers) {
     return { success: false, error: "User limit reached for your plan. Upgrade to add more users." };
   }
 
@@ -257,7 +270,7 @@ export async function inviteUser(input: InviteUserInput) {
   try {
     await clerk.invitations.createInvitation({
       emailAddress: parsed.data.email,
-      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/sign-up`,
+      redirectUrl: `${appUrl}/sign-up`,
       publicMetadata: { clinic_id: user.clinic_id, role: parsed.data.role },
     });
   } catch (err) {

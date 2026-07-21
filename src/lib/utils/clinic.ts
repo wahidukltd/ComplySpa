@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
+import * as Sentry from "@sentry/nextjs";
 
 export async function getClinicId(): Promise<string | null> {
   const { userId } = await auth();
@@ -33,16 +34,21 @@ export async function getClinicIdAndUser(): Promise<{
 export async function getClinicIdAndPlan(): Promise<{
   clinicId: string;
   plan: string;
+  userId: string;
 } | null> {
   const authResult = await auth();
   if (!authResult.userId) return null;
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("users")
     .select("clinic_id, clinics:clinics(plan)")
     .eq("clerk_user_id", authResult.userId)
     .single();
+  if (error) {
+    Sentry.captureException(error);
+    return null;
+  }
   if (!data) return null;
   const plan = ((data.clinics as unknown) as { plan: string } | null)?.plan ?? "trial";
-  return { clinicId: data.clinic_id, plan };
+  return { clinicId: data.clinic_id, plan, userId: authResult.userId };
 }

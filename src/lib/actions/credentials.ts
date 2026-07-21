@@ -1,5 +1,6 @@
 "use server";
 
+import "server-only";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -10,18 +11,29 @@ import * as Sentry from "@sentry/nextjs";
 
 export async function addCredential(input: CredentialInput & { document_url?: string }) {
   const clinicData = await getClinicIdAndPlan();
-  if (!clinicData) return { error: "Unauthorized" };
+  if (!clinicData) return { success: false, error: "Unauthorized" };
 
-  const { clinicId, plan } = clinicData;
+  const { clinicId, plan, userId } = clinicData;
 
   const { document_url, ...credInput } = input;
   const parsed = credentialSchema.safeParse(credInput);
   if (!parsed.success) {
-    return { error: "Validation failed", fieldErrors: parsed.error.flatten().fieldErrors };
+    return { success: false, error: "Validation failed", fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
   const supabase = await createClient();
 
+  const { data: user } = await supabase
+    .from("users")
+    .select("role")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+  if (!user) return { success: false, error: "Unauthorized" };
+  if (user.role === "viewer") return { success: false, error: "Insufficient permissions" };
+
+  // ponytail: race window between count and insert — acceptable at current scale,
+  // use SERIALIZABLE isolation or BEFORE INSERT trigger if this becomes a problem
+  // ponytail: clinic-wide count, not per-staff — per-staff limits if needed later
   const limits = getPlanLimits(plan);
 
   const { count } = await supabase
@@ -31,6 +43,7 @@ export async function addCredential(input: CredentialInput & { document_url?: st
 
   if ((count ?? 0) >= limits.maxCredentials) {
     return {
+      success: false,
       error: `Your plan allows up to ${limits.maxCredentials} credentials. You currently have ${count ?? 0}. Upgrade to add more.`,
     };
   }
@@ -43,7 +56,7 @@ export async function addCredential(input: CredentialInput & { document_url?: st
     .is("deleted_at", null)
     .single();
 
-  if (!staff) return { error: "Staff member not found." };
+  if (!staff) return { success: false, error: "Staff member not found." };
 
   const { data: credential, error } = await supabase
     .from("credentials")
@@ -64,7 +77,7 @@ export async function addCredential(input: CredentialInput & { document_url?: st
 
   if (error) {
     Sentry.captureException(error);
-    return { error: "Failed to add credential. Please try again." };
+    return { success: false, error: "Failed to add credential. Please try again." };
   }
 
   revalidatePath(`/dashboard/staff/${parsed.data.staff_member_id}`);

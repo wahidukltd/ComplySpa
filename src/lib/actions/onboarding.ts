@@ -4,6 +4,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createClinicSchema, type CreateClinicInput } from "@/lib/validations/clinic";
+import { getPlanLimits } from "@/lib/utils/plan";
 import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 
@@ -103,6 +104,22 @@ export async function completeInvitationSignup(clerkUserId: string, clinicId: st
     .maybeSingle();
 
   if (existing) return { error: null };
+
+  const { data: planData } = await supabase
+    .from("clinics")
+    .select("plan")
+    .eq("id", clinicId)
+    .single();
+  const limits = getPlanLimits(planData?.plan ?? "trial");
+
+  const { count } = await supabase
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("clinic_id", clinicId);
+
+  if ((count ?? 0) >= limits.maxUsers) {
+    return { error: "User limit reached for this clinic plan." };
+  }
 
   const clerk = await clerkClient();
   const clerkUser = await clerk.users.getUser(clerkUserId);
