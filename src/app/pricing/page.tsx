@@ -51,10 +51,10 @@ export default function PricingPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-16">
       <div className="mb-12 text-center">
-        <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#3D2A25" }}>
+        <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#000000" }}>
           Simple, transparent pricing.
         </h1>
-        <p className="mt-2" style={{ color: "#8B7D78" }}>
+        <p className="mt-2" style={{ color: "rgba(0,0,0,0.55)" }}>
           14-day free trial. No credit card. Cancel anytime.
         </p>
       </div>
@@ -62,24 +62,24 @@ export default function PricingPage() {
       <PlanCards />
 
       <div className="mt-16">
-        <h2 className="mb-6 text-center text-2xl font-semibold" style={{ color: "#3D2A25" }}>
+        <h2 className="mb-6 text-center text-2xl font-semibold" style={{ color: "#000000" }}>
           Feature comparison
         </h2>
         <ComparisonTable />
       </div>
 
       <div className="mt-16 max-w-2xl mx-auto">
-        <h2 className="mb-6 text-center text-2xl font-semibold" style={{ color: "#3D2A25" }}>
+        <h2 className="mb-6 text-center text-2xl font-semibold" style={{ color: "#000000" }}>
           Frequently asked questions
         </h2>
         <FaqAccordion />
       </div>
 
       <ScrollReveal className="mt-16 text-center">
-        <h2 className="text-2xl font-semibold" style={{ color: "#3D2A25" }}>
+        <h2 className="text-2xl font-semibold" style={{ color: "#000000" }}>
           Start your 14-day free trial.
         </h2>
-        <p className="mt-2 text-sm" style={{ color: "#8B7D78" }}>
+        <p className="mt-2 text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
           No credit card. Cancel anytime. Data preserved for 30 days after trial.
         </p>
         <Link

@@ -84,45 +84,45 @@ export function CustomCredentialTypes({ custom, builtin, role }: CustomCredentia
   return (
     <Card>
       <CardHeader>
-        <CardTitle style={{ color: "#3D2A25" }}>Credential Types</CardTitle>
+        <CardTitle style={{ color: "#000000" }}>Credential Types</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div>
-          <h3 className="text-sm font-medium mb-2" style={{ color: "#3D2A25" }}>Pre-loaded Types</h3>
+          <h3 className="text-sm font-medium mb-2" style={{ color: "#000000" }}>Pre-loaded Types</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {builtin.map((t) => (
               <div
                 key={t.id}
                 className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "#F6E3D6", backgroundColor: "#FFF8F2", color: "#8B7D78" }}
+                style={{ borderColor: "#F0F4F5", backgroundColor: "#FFF8F2", color: "rgba(0,0,0,0.55)" }}
               >
-                <ShieldCheck className="size-3.5 shrink-0" style={{ color: "#9C6B5D" }} />
+                <ShieldCheck className="size-3.5 shrink-0" style={{ color: "#6E97A7" }} />
                 <span>{t.name}</span>
-                <span className="ml-auto text-xs capitalize" style={{ color: "#D9B7A7" }}>{t.category}</span>
+                <span className="ml-auto text-xs capitalize" style={{ color: "rgba(0,0,0,0.12)" }}>{t.category}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <Separator style={{ backgroundColor: "#D9B7A7" }} />
+        <Separator style={{ backgroundColor: "rgba(0,0,0,0.12)" }} />
 
         <div>
-          <h3 className="text-sm font-medium mb-2" style={{ color: "#3D2A25" }}>Custom Types</h3>
+          <h3 className="text-sm font-medium mb-2" style={{ color: "#000000" }}>Custom Types</h3>
           {custom.length === 0 ? (
-            <p className="text-sm mb-3" style={{ color: "#8B7D78" }}>No custom credential types yet.</p>
+            <p className="text-sm mb-3" style={{ color: "rgba(0,0,0,0.55)" }}>No custom credential types yet.</p>
           ) : (
             <div className="space-y-2 mb-3">
               {custom.map((t) => (
                 <div
                   key={t.id}
                   className="flex items-center justify-between rounded-lg border px-3 py-2"
-                  style={{ borderColor: "#D9B7A7" }}
+                  style={{ borderColor: "rgba(0,0,0,0.12)" }}
                 >
                   <div className="flex items-center gap-2 text-sm">
-                    <span style={{ color: "#3D2A25" }}>{t.name}</span>
-                    <span className="text-xs capitalize" style={{ color: "#8B7D78" }}>{t.category}</span>
+                    <span style={{ color: "#000000" }}>{t.name}</span>
+                    <span className="text-xs capitalize" style={{ color: "rgba(0,0,0,0.55)" }}>{t.category}</span>
                     {t.default_renewal_cycle_days && (
-                      <span className="text-xs" style={{ color: "#8B7D78" }}>
+                      <span className="text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>
                         {t.default_renewal_cycle_days}d cycle
                       </span>
                     )}
@@ -135,7 +135,7 @@ export function CustomCredentialTypes({ custom, builtin, role }: CustomCredentia
                       onClick={() => handleRemove(t.id)}
                       aria-label={`Remove ${t.name}`}
                     >
-                      <Trash2 className="size-4" style={{ color: "#8B7D78" }} />
+                      <Trash2 className="size-4" style={{ color: "rgba(0,0,0,0.55)" }} />
                     </Button>
                   )}
                 </div>
@@ -144,7 +144,7 @@ export function CustomCredentialTypes({ custom, builtin, role }: CustomCredentia
           )}
 
           {canManage && (
-            <form onSubmit={handleAdd} className="space-y-3 rounded-lg border p-4" style={{ borderColor: "#D9B7A7" }}>
+            <form onSubmit={handleAdd} className="space-y-3 rounded-lg border p-4" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
               <div className="space-y-1">
                 <Label htmlFor="ct-name">Name</Label>
                 <Input
@@ -163,7 +163,7 @@ export function CustomCredentialTypes({ custom, builtin, role }: CustomCredentia
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     className="flex h-10 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                    style={{ borderColor: "#D9B7A7", color: "#3D2A25", backgroundColor: "#FFFFFF" }}
+                    style={{ borderColor: "rgba(0,0,0,0.12)", color: "#000000", backgroundColor: "#FFFFFF" }}
                   >
                     {CATEGORIES.map((c) => (
                       <option key={c.value} value={c.value}>{c.label}</option>

@@ -32,10 +32,10 @@ export function ProblemSection() {
   return (
     <section className="mx-auto max-w-5xl px-4 py-20">
       <ScrollReveal>
-        <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: "#3D2A25" }}>
+        <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: "#000000" }}>
           The inspection isn&apos;t what sinks you. It&apos;s the gap before it.
         </h2>
-        <p className="mx-auto mt-3 max-w-2xl text-center" style={{ color: "#8B7D78" }}>
+        <p className="mx-auto mt-3 max-w-2xl text-center" style={{ color: "rgba(0,0,0,0.55)" }}>
           State board inspections are complaint-driven. Most med spas are never inspected — until they are.
         </p>
       </ScrollReveal>
@@ -45,19 +45,19 @@ export function ProblemSection() {
           <ScrollReveal key={i} delay={i * 100}>
             <div
               className="rounded-lg border p-6"
-              style={{ borderColor: "#D9B7A7", backgroundColor: "#FFFFFF" }}
+              style={{ borderColor: "rgba(0,0,0,0.12)", backgroundColor: "#FFFFFF" }}
             >
               <AlertTriangle className="mb-3 size-5" style={{ color: "#B8443A" }} aria-hidden="true" />
-              <p className="text-base" style={{ color: "#3D2A25" }}>
+              <p className="text-base" style={{ color: "#000000" }}>
                 {p.quote}
               </p>
-              <p className="mt-3 text-xs" style={{ color: "#8B7D78" }}>
+              <p className="mt-3 text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>
                 <a
                   href={p.href}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="transition-colors hover:underline"
-                  style={{ color: "#9C6B5D" }}
+                  style={{ color: "#6E97A7" }}
                 >
                   {p.source} →
                 </a>

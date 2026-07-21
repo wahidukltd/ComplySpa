@@ -25,12 +25,12 @@ const COLUMNS = [
 
 export function Footer() {
   return (
-    <footer className="border-t" style={{ borderColor: "#D9B7A7" }}>
+    <footer className="border-t" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
       <div className="mx-auto max-w-5xl px-4 py-12">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <h4 className="text-sm font-semibold" style={{ color: "#3D2A25" }}>
+              <h4 className="text-sm font-semibold" style={{ color: "#000000" }}>
                 {col.title}
               </h4>
               <ul className="mt-3 space-y-2">
@@ -39,7 +39,7 @@ export function Footer() {
                     <a
                       href={link.href}
                       className="text-sm transition-colors hover:underline"
-                      style={{ color: "#8B7D78" }}
+                      style={{ color: "rgba(0,0,0,0.55)" }}
                     >
                       {link.label}
                     </a>
@@ -49,8 +49,8 @@ export function Footer() {
             </div>
           ))}
         </div>
-        <div className="mt-8 border-t pt-6 text-center" style={{ borderColor: "#F6E3D6" }}>
-          <p className="text-sm" style={{ color: "#8B7D78" }}>
+        <div className="mt-8 border-t pt-6 text-center" style={{ borderColor: "#F0F4F5" }}>
+          <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
             © 2026 Med Spa Compliance. Built for the 15,000+ med spas in the US.
           </p>
         </div>

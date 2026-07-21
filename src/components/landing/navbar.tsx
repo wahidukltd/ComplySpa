@@ -14,12 +14,12 @@ export function Navbar() {
   return (
     <header
       className="sticky top-0 z-50 border-b backdrop-blur-sm"
-      style={{ borderColor: "#D9B7A7", backgroundColor: "rgba(255, 248, 242, 0.9)" }}
+      style={{ borderColor: "rgba(0,0,0,0.12)", backgroundColor: "rgba(255, 248, 242, 0.9)" }}
     >
       <nav className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/logo.png" alt="" width={28} height={28} className="rounded" />
-          <span className="text-sm font-semibold" style={{ color: "#3D2A25" }}>
+          <span className="text-sm font-semibold" style={{ color: "#000000" }}>
             Med Spa Compliance
           </span>
         </Link>
@@ -30,7 +30,7 @@ export function Navbar() {
               key={link.href}
               href={link.href}
               className="text-sm transition-colors hover:underline"
-              style={{ color: "#8B7D78" }}
+              style={{ color: "rgba(0,0,0,0.55)" }}
             >
               {link.label}
             </a>
@@ -41,7 +41,7 @@ export function Navbar() {
           <Link
             href="/sign-in"
             className="hidden text-sm transition-colors hover:underline sm:inline"
-            style={{ color: "#8B7D78" }}
+            style={{ color: "rgba(0,0,0,0.55)" }}
           >
             Sign in
           </Link>

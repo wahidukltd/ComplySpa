@@ -24,7 +24,7 @@ interface UserListProps {
 }
 
 const ROLE_STYLES: Record<string, { bg: string; text: string }> = {
-  owner: { bg: "#F6E3D6", text: "#3D2A25" },
+  owner: { bg: "#F0F4F5", text: "#000000" },
   manager: { bg: "#FBF0E0", text: "#7A4E1F" },
   viewer: { bg: "#F2EFED", text: "#5A504C" },
 };
@@ -61,11 +61,11 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
   return (
     <Card>
       <CardHeader>
-        <CardTitle style={{ color: "#3D2A25" }}>Team Members</CardTitle>
+        <CardTitle style={{ color: "#000000" }}>Team Members</CardTitle>
       </CardHeader>
       <CardContent>
         {users.length === 0 ? (
-          <p className="text-sm" style={{ color: "#8B7D78" }}>No team members yet.</p>
+          <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>No team members yet.</p>
         ) : (
           <div className="space-y-2">
             {users.map((u) => {
@@ -76,18 +76,18 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
                 <div
                   key={u.id}
                   className="flex items-center justify-between rounded-lg border px-4 py-3"
-                  style={{ borderColor: "#D9B7A7" }}
+                  style={{ borderColor: "rgba(0,0,0,0.12)" }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex size-8 items-center justify-center rounded-full" style={{ backgroundColor: "#F6E3D6" }}>
-                      <UserCog className="size-4" style={{ color: "#9C6B5D" }} />
+                    <div className="flex size-8 items-center justify-center rounded-full" style={{ backgroundColor: "#F0F4F5" }}>
+                      <UserCog className="size-4" style={{ color: "#6E97A7" }} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium" style={{ color: "#3D2A25" }}>
+                      <p className="text-sm font-medium" style={{ color: "#000000" }}>
                         {u.email}
-                        {isSelf && <span className="ml-1 text-xs" style={{ color: "#8B7D78" }}>(you)</span>}
+                        {isSelf && <span className="ml-1 text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>(you)</span>}
                       </p>
-                      <p className="text-xs" style={{ color: "#8B7D78" }}>
+                      <p className="text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>
                         Joined {formatDateTime(u.created_at)}
                       </p>
                     </div>
@@ -107,7 +107,7 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
                           value={u.role}
                           onChange={(e) => handleRoleChange(u.id, e.target.value)}
                           className="h-8 rounded-md border px-2 text-xs focus:outline-none focus:ring-2"
-                          style={{ borderColor: "#D9B7A7", color: "#3D2A25", backgroundColor: "#FFFFFF" }}
+                          style={{ borderColor: "rgba(0,0,0,0.12)", color: "#000000", backgroundColor: "#FFFFFF" }}
                           aria-label={`Change role for ${u.email}`}
                         >
                           <option value="manager">Manager</option>

@@ -41,39 +41,39 @@ export function buildAlertEmail(params: AlertTemplateParams): string {
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #FFF8F2; padding: 24px; margin: 0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 480px; margin: 0 auto;">
     <tr>
-      <td style="background: #FFFFFF; border: 1px solid #D9B7A7; border-radius: 8px; padding: 32px 24px;">
-        <p style="color: #8B7D78; font-size: 13px; margin: 0 0 8px;">COMPLIANCE ALERT</p>
-        <h2 style="color: #3D2A25; font-size: 20px; font-weight: 600; margin: 0 0 16px;">
+      <td style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; padding: 32px 24px;">
+        <p style="color: rgba(0,0,0,0.55); font-size: 13px; margin: 0 0 8px;">COMPLIANCE ALERT</p>
+        <h2 style="color: #000000; font-size: 20px; font-weight: 600; margin: 0 0 16px;">
           ${htmlEscape(params.staffName)}'s ${htmlEscape(params.credentialType)} expires in ${params.daysBeforeExpiration} days
         </h2>
 
-        <table width="100%" cellpadding="0" cellspacing="0" style="background: #F6E3D6; border-radius: 6px; padding: 16px; margin: 0 0 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: #F0F4F5; border-radius: 6px; padding: 16px; margin: 0 0 20px;">
           <tr>
             <td>
-              <p style="color: #3D2A25; font-size: 14px; margin: 0 0 4px;">
+              <p style="color: #000000; font-size: 14px; margin: 0 0 4px;">
                 <strong>${htmlEscape(params.credentialLabel)}</strong>
               </p>
-              <p style="color: #8B7D78; font-size: 13px; margin: 0 0 8px;">
+              <p style="color: rgba(0,0,0,0.55); font-size: 13px; margin: 0 0 8px;">
                 Expiration date: <strong>${params.expirationDate}</strong>
               </p>
-              <p style="color: #9C6B5D; font-size: 13px; margin: 0;">
+              <p style="color: #6E97A7; font-size: 13px; margin: 0;">
                 ${urgency}
               </p>
             </td>
           </tr>
         </table>
 
-        <p style="color: #3D2A25; font-size: 14px; line-height: 1.5; margin: 0 0 20px;">
+        <p style="color: #000000; font-size: 14px; line-height: 1.5; margin: 0 0 20px;">
           Visit your state board website to renew this credential before the expiration date. Upload the new certificate in the dashboard once complete. Lapsed credentials can result in fines, license suspension, or board investigations.
         </p>
 
-        <a href="${htmlEscape(params.dashboardLink)}" style="display: inline-block; background: #9C6B5D; color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none; padding: 10px 20px; border-radius: 6px;">
+        <a href="${htmlEscape(params.dashboardLink)}" style="display: inline-block; background: #6E97A7; color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none; padding: 10px 20px; border-radius: 6px;">
           View in dashboard
         </a>
 
-        <hr style="border: none; border-top: 1px solid #D9B7A7; margin: 24px 0 16px;">
+        <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 24px 0 16px;">
 
-        <p style="color: #8B7D78; font-size: 11px; line-height: 1.5; margin: 0;">
+        <p style="color: rgba(0,0,0,0.55); font-size: 11px; line-height: 1.5; margin: 0;">
           This is an automated alert from your compliance tracker. You received this because you configured expiration reminders for your clinic's credentials. Alerts are sent at 90, 60, 30, and 7 days before each expiration.
         </p>
       </td>
@@ -93,9 +93,9 @@ export function buildEscalationEmail(params: AlertTemplateParams): string {
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #FFF8F2; padding: 24px; margin: 0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 480px; margin: 0 auto;">
     <tr>
-      <td style="background: #FFFFFF; border: 1px solid #D9B7A7; border-top: 4px solid #B8443A; border-radius: 0 0 8px 8px; padding: 32px 24px;">
+      <td style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.12); border-top: 4px solid #B8443A; border-radius: 0 0 8px 8px; padding: 32px 24px;">
         <p style="color: #B8443A; font-size: 13px; font-weight: 600; margin: 0 0 8px;">ESCALATION — CREDENTIAL EXPIRED</p>
-        <h2 style="color: #3D2A25; font-size: 20px; font-weight: 600; margin: 0 0 16px;">
+        <h2 style="color: #000000; font-size: 20px; font-weight: 600; margin: 0 0 16px;">
           ${htmlEscape(params.staffName)}'s ${htmlEscape(params.credentialType)} has EXPIRED
         </h2>
 
@@ -115,7 +115,7 @@ export function buildEscalationEmail(params: AlertTemplateParams): string {
           </tr>
         </table>
 
-        <p style="color: #3D2A25; font-size: 14px; line-height: 1.5; margin: 0 0 20px;">
+        <p style="color: #000000; font-size: 14px; line-height: 1.5; margin: 0 0 20px;">
           An expired credential means the staff member cannot legally perform procedures that require it. This is the #1 cause of board investigations, fines, and licensing actions for med spas.
         </p>
 
@@ -123,9 +123,9 @@ export function buildEscalationEmail(params: AlertTemplateParams): string {
           View in dashboard
         </a>
 
-        <hr style="border: none; border-top: 1px solid #D9B7A7; margin: 24px 0 16px;">
+        <hr style="border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 24px 0 16px;">
 
-        <p style="color: #8B7D78; font-size: 11px; line-height: 1.5; margin: 0;">
+        <p style="color: rgba(0,0,0,0.55); font-size: 11px; line-height: 1.5; margin: 0;">
           This is an automated escalation alert. Previous alerts were sent at 90, 60, 30, and 7 days before expiration. If you have already renewed this credential, update the expiration date in the dashboard to stop receiving alerts.
         </p>
       </td>

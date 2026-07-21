@@ -7,10 +7,10 @@ export function CTASection() {
   return (
     <section className="mx-auto max-w-3xl px-4 py-20 text-center">
       <ScrollReveal>
-        <h2 className="text-3xl font-bold tracking-tight" style={{ color: "#3D2A25" }}>
+        <h2 className="text-3xl font-bold tracking-tight" style={{ color: "#000000" }}>
           Start your 14-day free trial.
         </h2>
-        <p className="mx-auto mt-3 max-w-md" style={{ color: "#8B7D78" }}>
+        <p className="mx-auto mt-3 max-w-md" style={{ color: "rgba(0,0,0,0.55)" }}>
           No credit card. Cancel anytime. Data preserved for 30 days after trial.
         </p>
         <Link

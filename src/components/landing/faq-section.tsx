@@ -37,7 +37,7 @@ export function FAQSection() {
   return (
     <section id="faq" className="mx-auto max-w-3xl px-4 py-20 scroll-mt-20">
       <ScrollReveal>
-        <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: "#3D2A25" }}>
+        <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: "#000000" }}>
           Frequently asked questions
         </h2>
       </ScrollReveal>
@@ -46,10 +46,10 @@ export function FAQSection() {
         <Accordion multiple={false} className="mt-8">
           {FAQS.map((faq) => (
             <AccordionItem key={faq.q} value={faq.q}>
-              <AccordionTrigger style={{ color: "#3D2A25" }}>
+              <AccordionTrigger style={{ color: "#000000" }}>
                 {faq.q}
               </AccordionTrigger>
-              <AccordionContent style={{ color: "#8B7D78" }}>
+              <AccordionContent style={{ color: "rgba(0,0,0,0.55)" }}>
                 {faq.a}
               </AccordionContent>
             </AccordionItem>

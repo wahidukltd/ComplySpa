@@ -21,17 +21,17 @@ export function BenefitsSection() {
           <div className={`grid items-center gap-12 md:grid-cols-2 ${i > 0 ? "mt-20" : ""}`}>
             <div
               className={`flex aspect-video items-center justify-center rounded-xl border ${row.imageFirst ? "md:order-1" : "md:order-2"}`}
-              style={{ borderColor: "#D9B7A7", backgroundColor: "#F6E3D6" }}
+              style={{ borderColor: "rgba(0,0,0,0.12)", backgroundColor: "#F0F4F5" }}
             >
-              <span className="text-sm" style={{ color: "#8B7D78" }}>
+              <span className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
                 Product preview
               </span>
             </div>
             <div className={row.imageFirst ? "md:order-2" : "md:order-1"}>
-              <h3 className="text-2xl font-bold tracking-tight" style={{ color: "#3D2A25" }}>
+              <h3 className="text-2xl font-bold tracking-tight" style={{ color: "#000000" }}>
                 {row.title}
               </h3>
-              <p className="mt-3" style={{ color: "#8B7D78" }}>
+              <p className="mt-3" style={{ color: "rgba(0,0,0,0.55)" }}>
                 {row.text}
               </p>
             </div>

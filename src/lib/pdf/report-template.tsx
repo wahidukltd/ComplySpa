@@ -40,12 +40,12 @@ export interface ReportData {
 }
 
 const C = {
-  ink: "#3D2A25",
-  action: "#9C6B5D",
-  hairline: "#D9B7A7",
-  surfaceAlt: "#F6E3D6",
+  ink: "#000000",
+  action: "#6E97A7",
+  hairline: "rgba(0,0,0,0.12)",
+  surfaceAlt: "#F0F4F5",
   canvas: "#FFF8F2",
-  muted: "#8B7D78",
+  muted: "rgba(0,0,0,0.55)",
   valid: "#4A8C5C",
   expiring: "#C2853A",
   expired: "#B8443A",

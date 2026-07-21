@@ -35,7 +35,7 @@ export function UserInviteForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-3 rounded-lg border p-4" style={{ borderColor: "#D9B7A7" }}>
+    <form onSubmit={handleSubmit} className="flex items-end gap-3 rounded-lg border p-4" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
       <div className="flex-1 space-y-1">
         <Label htmlFor="invite-email">Email address</Label>
         <Input
@@ -54,7 +54,7 @@ export function UserInviteForm() {
           value={role}
           onChange={(e) => setRole(e.target.value)}
           className="flex h-10 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2"
-          style={{ borderColor: "#D9B7A7", color: "#3D2A25", backgroundColor: "#FFFFFF" }}
+          style={{ borderColor: "rgba(0,0,0,0.12)", color: "#000000", backgroundColor: "#FFFFFF" }}
         >
           <option value="manager">Manager</option>
           <option value="viewer">Viewer</option>

@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
         <p>Your compliance audit report is attached.</p>
         <p>Clinic: ${escapeHtml(clinicName)}</p>
         <p>Report ID: ${reportId}</p>
-        <p style="color: #8B7D78; font-size: 12px;">
+        <p style="color: rgba(0,0,0,0.55); font-size: 12px;">
           This report was generated from your credential tracking system.
           Please verify all information before submitting to a regulatory body.
         </p>

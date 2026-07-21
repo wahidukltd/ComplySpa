@@ -32,7 +32,7 @@ export function FeaturesSection() {
   return (
     <section id="features" className="mx-auto max-w-5xl px-4 py-20 scroll-mt-20">
       <ScrollReveal>
-        <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: "#3D2A25" }}>
+        <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: "#000000" }}>
           Everything you need to stay inspection-ready
         </h2>
       </ScrollReveal>
@@ -42,18 +42,18 @@ export function FeaturesSection() {
           <ScrollReveal key={f.title} delay={i * 50}>
             <div
               className="rounded-lg border p-6"
-              style={{ borderColor: "#D9B7A7", backgroundColor: "#FFFFFF" }}
+              style={{ borderColor: "rgba(0,0,0,0.12)", backgroundColor: "#FFFFFF" }}
             >
               <div
                 className="mb-4 flex size-10 items-center justify-center rounded-full"
-                style={{ backgroundColor: "#F6E3D6" }}
+                style={{ backgroundColor: "#F0F4F5" }}
               >
-                <f.icon className="size-5" style={{ color: "#9C6B5D" }} aria-hidden="true" />
+                <f.icon className="size-5" style={{ color: "#6E97A7" }} aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-semibold" style={{ color: "#3D2A25" }}>
+              <h3 className="text-lg font-semibold" style={{ color: "#000000" }}>
                 {f.title}
               </h3>
-              <p className="mt-2 text-sm" style={{ color: "#8B7D78" }}>
+              <p className="mt-2 text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
                 {f.description}
               </p>
             </div>

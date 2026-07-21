@@ -66,26 +66,26 @@ export function AlertRecipients({ recipients, ownerEmail, role }: AlertRecipient
   return (
     <Card>
       <CardHeader>
-        <CardTitle style={{ color: "#3D2A25" }}>Alert Recipients</CardTitle>
+        <CardTitle style={{ color: "#000000" }}>Alert Recipients</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm" style={{ color: "#8B7D78" }}>
+        <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
           These email addresses receive credential expiration alerts.
         </p>
 
-        <div className="rounded-lg border p-3" style={{ borderColor: "#F6E3D6", backgroundColor: "#FFF8F2" }}>
+        <div className="rounded-lg border p-3" style={{ borderColor: "#F0F4F5", backgroundColor: "#FFF8F2" }}>
           <div className="flex items-center gap-2">
-            <ShieldCheck className="size-4" style={{ color: "#9C6B5D" }} />
-            <span className="text-sm font-medium" style={{ color: "#3D2A25" }}>Owner (always receives alerts)</span>
+            <ShieldCheck className="size-4" style={{ color: "#6E97A7" }} />
+            <span className="text-sm font-medium" style={{ color: "#000000" }}>Owner (always receives alerts)</span>
           </div>
-          <p className="text-sm mt-1" style={{ color: "#8B7D78" }}>{ownerEmail ?? "No email on file"}</p>
+          <p className="text-sm mt-1" style={{ color: "rgba(0,0,0,0.55)" }}>{ownerEmail ?? "No email on file"}</p>
         </div>
 
         {recipients.map((r) => (
-          <div key={r.id} className="flex items-center justify-between rounded-lg border p-3" style={{ borderColor: "#D9B7A7" }}>
+          <div key={r.id} className="flex items-center justify-between rounded-lg border p-3" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
             <div className="flex items-center gap-2">
-              <Mail className="size-4" style={{ color: "#9C6B5D" }} />
-              <span className="text-sm" style={{ color: "#3D2A25" }}>{r.email}</span>
+              <Mail className="size-4" style={{ color: "#6E97A7" }} />
+              <span className="text-sm" style={{ color: "#000000" }}>{r.email}</span>
             </div>
             {canManage && (
               <Button
@@ -95,7 +95,7 @@ export function AlertRecipients({ recipients, ownerEmail, role }: AlertRecipient
                 onClick={() => handleRemove(r.id)}
                 aria-label={`Remove ${r.email}`}
               >
-                <Trash2 className="size-4" style={{ color: "#8B7D78" }} />
+                <Trash2 className="size-4" style={{ color: "rgba(0,0,0,0.55)" }} />
               </Button>
             )}
           </div>

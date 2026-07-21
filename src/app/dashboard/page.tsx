@@ -171,9 +171,9 @@ export default async function DashboardPage() {
               <p className="text-sm font-medium" style={{ color: "#7A4E1F" }}>
                 Your staff has no credentials tracked yet
               </p>
-              <p className="text-sm mt-0.5" style={{ color: "#8B7D78" }}>
+              <p className="text-sm mt-0.5" style={{ color: "rgba(0,0,0,0.55)" }}>
                 Add credentials to start tracking expirations and compliance.
-                {' '}<Link href="/dashboard/staff" className="underline" style={{ color: "#9C6B5D" }}>Go to staff</Link>
+                {' '}<Link href="/dashboard/staff" className="underline" style={{ color: "#6E97A7" }}>Go to staff</Link>
               </p>
             </div>
           </CardContent>

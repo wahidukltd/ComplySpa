@@ -17,7 +17,7 @@ The following are configured at Claude Code **user scope** and shape how code ge
 
 ## Project Overview
 
-ComplySpa is a vertical SaaS product for medical spas globally, launching in the US market. It tracks staff credentials, sends automated expiration alerts, generates audit-ready compliance reports, and runs an inspection-readiness & mock-audit engine.
+ComplySpa is a vertical SaaS product for medical spas globally, launching in the US market. It tracks staff credentials, sends automated expiration alerts, and generates audit-ready compliance reports.
 
 **Stack:** Next.js 14+ (App Router) · TypeScript · Tailwind CSS · shadcn/ui (component library) · Framer Motion (micro-interactions + page transitions) · React Three Fiber + Three.js (landing page hero 3D only) · Supabase (PostgreSQL, Edge Functions, Storage, pg_cron) · Clerk (Auth) · Vercel (Hosting) · Resend (Email) · Polar.sh (Payments) · Sentry (Errors)
 
@@ -25,7 +25,7 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
 
 **Architecture:** Two services only — Vercel (frontend) + Supabase (database, auth fallback, storage, crons, edge functions). No separate backend server. No Railway. No microservices. No message queues.
 
-**Constraints:** Solo founder. Bootstrapped. Free-tier infrastructure until revenue justifies upgrades. No US LLC, no Stripe — Polar.sh is Merchant of Record. Product name "ComplySpa" is a placeholder — do not hardcode it in code, configs, or domain registrations.
+**Product name:** ComplySpa. This is the official brand name. Use it in domain registrations, metadata titles, email templates, and public-facing pages. Do NOT use alternative names — consistency across all touchpoints is mandatory.
 
 ## Engineering Principles
 
@@ -71,7 +71,6 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
         /staff                    # Staff CRUD pages
         /credentials              # Credential CRUD pages
         /reports                  # Audit report generation
-        /audit/page.tsx           # Inspection-readiness & mock-audit engine
         /settings                 # Clinic settings, billing, users
         layout.tsx                # Dashboard layout with auth guard
         page.tsx                  # Main dashboard
@@ -89,7 +88,6 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
       /staff/                     # Staff-specific: StaffForm, StaffTable, CredentialForm
       /alerts/                    # AlertList, DeliveryStatusBadge
       /reports/                   # PdfTemplate, ReportGenerator
-      /audit/                     # audit-checklist, readiness-score, gap-tracker, readiness-report
       /layout/                    # Sidebar, Topbar, PageHeader
     /lib
       /supabase/
@@ -109,9 +107,6 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
       /polar/
         client.ts                 # Polar SDK wrapper
         webhook.ts                # Webhook signature validation + event handler
-      /audit/
-        checklist.ts              # 7 first-look checklist definitions
-        readiness.ts              # Readiness score + auto-fill logic from F1/F2
       /utils/
         date.ts                   # Date formatting, timezone handling
         status.ts                 # Credential status calculation
@@ -130,8 +125,6 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
       007_post_review_fixes.sql
     /functions/
       send-credential-alert/
-        index.ts
-      send-audit-reminder/
         index.ts
     config.toml
   /tests
@@ -160,21 +153,20 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
 - `/sign-up` — Clerk `SignUp` component
 
 **Onboarding (built in Phase 8)**
-- `/onboarding` — 5-step wizard: create clinic → add staff → enter credentials → set initial audit checklist → first win (surface expired credentials + run first readiness scan)
+- `/onboarding` — 4-step wizard: create clinic → add staff → enter credentials → "You're all set" → dashboard
 
 **Dashboard Pages (the product — built across Phases 2-8)**
-- `/dashboard` — Main overview: status counts, expiring credentials, recent alerts, readiness score badge
+- `/dashboard` — Main overview: status counts, expiring credentials, recent alerts
 - `/dashboard/staff` — Staff list table with status badges, add/edit/delete
 - `/dashboard/staff/[id]` — Single staff profile with all credentials
 - `/dashboard/staff/[id]/credentials` — Credential list for one staff member, add/edit/delete
 - `/dashboard/credentials` — All credentials across all staff, filterable by type/status/staff
-- `/dashboard/reports` — Generate audit-ready compliance report, download/email, report history
-- `/dashboard/audit` — Inspection-readiness checklist, readiness score, gap remediation tracker, readiness report generation, audit history
-- `/dashboard/settings` — Clinic profile, alert recipients, custom credential types, audit reminders
+- `/dashboard/reports` — Report generation: select date range, generate PDF
+- `/dashboard/settings` — Clinic profile, alert recipients, custom credential types, user management
 - `/dashboard/settings/billing` — Current plan, manage subscription via Polar portal
 - `/dashboard/settings/users` — Invite manager/viewer, manage roles
 
-Total: 15 pages (2 public, 2 auth, 1 onboarding, 10 dashboard). `/dashboard/audit` is Feature 4 (Inspection-Readiness & Mock-Audit Engine); `/dashboard/settings/billing` and `/dashboard/settings/users` are distinct pages under `/dashboard/settings`.
+Total: 14 pages (2 public, 2 auth, 1 onboarding, 9 dashboard).
 
 ## Naming Conventions
 
@@ -284,42 +276,7 @@ A user on trial wants to upgrade to a paid plan before the 14 days expire:
 -- Set yourself to any plan for testing
 UPDATE clinics SET plan = 'practice' WHERE id = 'YOUR_CLINIC_ID';
 -- No other changes needed — middleware, Edge Functions, RLS all react to plan immediately
-```
-
-### Audit Engine Tables
-
-```
-AUDIT_RUNS
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
-  clinic_id UUID REFERENCES clinics(id) ON DELETE CASCADE
-  run_type TEXT CHECK (run_type IN ('quarterly', 'on_demand')) NOT NULL
-  status TEXT CHECK (status IN ('in_progress', 'completed')) DEFAULT 'in_progress'
-  readiness_score INTEGER CHECK (readiness_score >= 0 AND readiness_score <= 100)
-  started_at TIMESTAMPTZ DEFAULT NOW()
-  completed_at TIMESTAMPTZ
-  created_by_user_id UUID REFERENCES users(id)
-  created_at TIMESTAMPTZ DEFAULT NOW()
-
-AUDIT_FINDINGS
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
-  audit_run_id UUID REFERENCES audit_runs(id) ON DELETE CASCADE
-  checklist_item TEXT NOT NULL
-  status TEXT CHECK (status IN ('pass', 'fail', 'stale', 'manual_attest')) NOT NULL
-  auto_filled BOOLEAN DEFAULT FALSE
-  notes TEXT
-  remediation_due_date TIMESTAMPTZ
-  remediation_status TEXT CHECK (remediation_status IN ('open', 'in_progress', 'closed'))
-  remediation_closed_at TIMESTAMPTZ
-  created_at TIMESTAMPTZ DEFAULT NOW()
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-```
-
-RLS: both tables enforce `clinic_id`-based access.
-
-pg_cron job `daily-audit-overdue-check`:
-- Finds `practice`/`multi_location` clinics where last audit `completed_at < NOW() - 90 days`
-- Triggers `send-audit-reminder` Edge Function
-- Dashboard shows banner: "Audit overdue — last completed X days ago"
+- Data is never deleted due to plan status — only access is gated
 
 ## Frontend Conventions
 
@@ -412,7 +369,7 @@ Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfac
 
 #### Framer Motion — used EVERYWHERE in the product
 - Install: `npm install motion`
-- Use for: page transitions, list item enter/exit animations, card hover effects, loading skeletons, toast notifications, sidebar slide-in on mobile, dialog open/close, tab transitions, badge state changes, readiness score animation
+- Use for: page transitions, list item enter/exit animations, card hover effects, loading skeletons, toast notifications, sidebar slide-in on mobile, dialog open/close, tab transitions, badge state changes
 - Keep animations subtle and fast: 200-400ms duration, ease-out easing
 - Respect `prefers-reduced-motion`: wrap motion components in a check and disable animation for users who request it
 
@@ -468,7 +425,7 @@ for the complete specification. This section documents the code-level convention
 ### Pricing Page (`src/app/pricing/page.tsx`)
 
 - Server Component. Pre-rendered HTML for SEO.
-- Three plan cards: Solo ($29/mo), Practice ($79/mo), Multi-Location ($149/mo).
+- Three plan cards: Solo ($29/mo), Practice ($49/mo), Multi-Location ($79/mo).
 - "Practice" card has subtle primary border highlight + "Most popular" badge.
 - Annual/monthly toggle: Framer Motion on price numbers only (transform +
   opacity, 200ms). No layout shift — card dimensions fixed.
@@ -640,22 +597,20 @@ Plan values: `trial`, `expired_trial`, `inactive`, `solo`, `practice`, `multi_lo
 - After 30 days: pg_cron sets `plan='inactive'`. User sees reactivation page only.
 
 **Plan limits and feature gating:**
-- `solo`: email alerts, 5 staff, 50 credentials, 1 user, basic report, no audit engine
-- `practice`: email alerts, 15 staff, 300 credentials, 3 users, audit-ready report, MD tracking, inspection-readiness & mock-audit engine
-- `multi_location`: all features, 50 staff, 1000 credentials, 5 locations, 10 users, API, white-label, audit engine per location
+- `solo`: email alerts, 5 staff, 50 credentials, 1 user, basic report
+- `practice`: email alerts, 15 staff, 300 credentials, 3 users, audit-ready report, MD tracking
+- `multi_location`: all features, 50 staff, 1000 credentials, 5 locations, 10 users, API, white-label
 
 **Enforcement at THREE layers (all implemented Phase 4):**
 
 Layer 1 — MIDDLEWARE (route-level):
 - `plan='expired_trial'` → redirect to `/pricing`
 - `plan='inactive'` → redirect to `/reactivate`
-- `plan='solo'` → `/dashboard/audit` returns 403 (audit engine is Practice+ only)
 - `plan='solo'` → `/dashboard/settings/users` returns 403 (1 user only)
 
 Layer 2 — SERVER COMPONENT (feature-level):
 - Before rendering premium features: if plan doesn't include the feature, show upgrade banner instead
 - Before rendering audit report: if `plan='solo'`, show basic report only
-- Before rendering audit engine: if `plan='solo'`, show upgrade CTA card
 
 Layer 3 — DATABASE (data-level):
 - Before inserting staff: count existing. If `>=` plan limit, reject with `PlanLimitError`
@@ -684,9 +639,9 @@ Layer 3 — DATABASE (data-level):
 ## Testing Philosophy
 
 ### What to Test
-- Unit tests (Vitest, every commit): Zod schemas, status calculation, readiness score + auto-fill logic, date utilities
+- Unit tests (Vitest, every commit): Zod schemas, status calculation, date utilities
 - Integration tests (Vitest + local Supabase, every commit): CRUD operations, RLS enforcement, alert logging
-- E2E tests (Playwright, before every release): Full onboarding flow, auth flows, billing (mock Polar), audit engine flow (run readiness scan, generate readiness report, remediation tracking), report generation, mobile viewport
+- E2E tests (Playwright, before every release): Full onboarding flow, auth flows, billing (mock Polar), report generation, mobile viewport
 
 ### What NOT to Test Automated
 - Email delivery (Resend) — tested manually, verified in Resend dashboard
@@ -891,7 +846,7 @@ The founder has already created the `ComplaSpa` Supabase project and connected i
 2. Re-link if needed: `supabase link --project-ref YOUR_EXISTING_REF`
 3. Verify migrations are pushed: `supabase db push` (idempotent — safe to re-run)
 4. Run in SQL Editor: `CREATE EXTENSION IF NOT EXISTS pg_cron; CREATE EXTENSION IF NOT EXISTS pg_net;`
-5. Verify 6 pg_cron jobs exist: `SELECT cron.jobname FROM cron.job;`
+5. Verify 5 pg_cron jobs exist: `SELECT cron.jobname FROM cron.job;`
 
 ### Step 2: Set Environment Variables (Vercel Only)
 
@@ -918,7 +873,6 @@ CRON_SECRET=(generate: openssl rand -hex 32)
 ```bash
 # Deploy Edge Functions
 supabase functions deploy send-credential-alert --project-ref YOUR_PROJECT_REF
-supabase functions deploy send-audit-reminder --project-ref YOUR_PROJECT_REF
 supabase functions list --project-ref YOUR_PROJECT_REF
 ```
 
@@ -955,14 +909,13 @@ CRON_SECRET=(same value as Vercel)
 - [ ] `/pricing` loads, all 3 cards, toggle, FAQ accordion work
 - [ ] `/sitemap.xml` returns valid XML
 - [ ] `/robots.txt` disallows `/dashboard/`, `/api/`, `/onboarding/`
-- [ ] Sign-up → 5-step onboarding wizard → dashboard with correct counts
+- [ ] Sign-up → 4-step onboarding wizard → dashboard with correct counts
 - [ ] Sign-in with same credentials works
 - [ ] Add staff/credential (verifies Supabase production RLS + write path)
-- [ ] Run audit: checklist auto-fills, readiness score calculates, PDF downloads
 - [ ] Settings: edit profile, manage recipients, toast notifications appear
 - [ ] Resend dashboard: welcome email delivered (may go to spam — onboarding@resend.dev, expected for staging)
 - [ ] Sentry: error captured on production
-- [ ] Solo plan: redirects to `/pricing` from `/dashboard/audit`
+- [ ] Solo plan: redirects to `/pricing` from `/dashboard/settings/users`
 - [ ] Mobile: landing page responsive at 375px, 3D becomes gradient
 
 ### Step 7: Known Staging Limitations
@@ -978,7 +931,7 @@ These are expected and OK for a staging environment:
 
 When you're ready to go live publicly:
 
-1. Buy `.com` on Cloudflare Registrar (~$12/year, cost price, includes WHOIS privacy)
+1. Buy `complyspa.com` on Cloudflare Registrar (~$12/year, cost price, includes WHOIS privacy)
 2. Domain auto-added to Cloudflare with DNS management ready
 
 ### Step 9: Add Domain to Vercel
@@ -1113,19 +1066,18 @@ This creates a searchable history of architectural decisions without maintaining
 - State medical board inspections are complaint-driven, not routine — most med spas are never inspected
 - The product stores professional credential data, not medical records — this is why we do not need a HIPAA BAA for Vercel or Supabase on day one
 - Pre-loaded credential types are US-specific. The product supports custom types for international use
-- Inspection-readiness & mock-audit engine is the fourth compliance feature. It mirrors the 7 documents state board inspectors ask for first, auto-fills from credential data (F1/F2), and produces a readiness report (reuses F3 infrastructure). The recommended best practice per MedSpa Standards, Weitz Morgan, and DocuHealth is recurring self-audits against the inspector's checklist.
 
 ### Key Competitors
 - HCP: $3,000/year, general healthcare compliance, not med-spa-specific
 - ExpirationReminder: $49-$349/month, generic credential tracking
 - MedSpa Standards: $197 one-time SOP templates (not software)
 - AmSpa: 15,000+ members, sells SOPs and education (not software)
-- Booking software (Zenoti, Mangomint, Boulevard, Vagaro): handles scheduling, NOT compliance tracking or inspection-readiness
+- Booking software (Zenoti, Mangomint, Boulevard, Vagaro): handles scheduling, NOT compliance tracking
 
 ### Why This Product Exists
 - No med-spa-specific compliance tracking SaaS exists (confirmed via 3 competitor sweeps)
 - Med spa owners track compliance manually ("winging it", "post-it notes", "excel spreadsheets")
-- The #1 board citation is the "ghost medical director" — agreement on paper with no evidence of active oversight; the recommended defense (MedSpa Standards, Weitz Morgan, DocuHealth) is recurring self-audits against the inspector's 7 first-look documents, which no incumbent automates
+- The #1 board citation is expired credentials and undocumented staff licensing — spreadsheet tracking fails silently
 
 ## graphify
 

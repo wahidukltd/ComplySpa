@@ -43,7 +43,7 @@ export function ClinicProfileForm({ name, address, state }: ClinicProfileFormPro
   return (
     <Card>
       <CardHeader>
-        <CardTitle style={{ color: "#3D2A25" }}>Clinic Profile</CardTitle>
+        <CardTitle style={{ color: "#000000" }}>Clinic Profile</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
