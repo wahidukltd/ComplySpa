@@ -10,7 +10,7 @@ const cspValue = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https: blob:",
   "font-src 'self'",
-  `connect-src 'self' https://*.${supabaseHost} wss://*.${supabaseHost}`,
+  `connect-src 'self' https://*.${supabaseHost} wss://*.${supabaseHost} https://*.ingest.us.sentry.io`,
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -46,7 +46,9 @@ const nextConfig: NextConfig = {
 };
 
 export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT || "complyspa",
-  silent: true,
+  org: "complyspa",
+  project: "javascript-nextjs",
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  tunnelRoute: "/sentry-tunnel",
+  silent: !process.env.CI,
 });
