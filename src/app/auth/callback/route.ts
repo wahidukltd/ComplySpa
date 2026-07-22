@@ -8,34 +8,34 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/onboarding";
 
-  if (!code) {
-    return NextResponse.redirect(`${origin}/sign-in?error=missing_code`);
-  }
+  if (code) {
+    const res = NextResponse.redirect(`${origin}${next}`);
 
-  const res = NextResponse.redirect(`${origin}${next}`);
-
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          for (const { name, value, options } of cookiesToSet) {
-            res.cookies.set(name, value, options);
-          }
+    const supabase = createServerClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return req.cookies.getAll(); },
+          setAll(cookiesToSet) {
+            for (const { name, value, options } of cookiesToSet) {
+              res.cookies.set(name, value, options);
+            }
+          },
         },
       },
-    },
-  );
+    );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-  if (error) {
-    return NextResponse.redirect(`${origin}/sign-in?error=auth_callback_error`);
+    if (error) {
+      return NextResponse.redirect(`${origin}/sign-in?error=auth_callback_error`);
+    }
+
+    return res;
   }
 
-  return res;
+  // No code param — could be password recovery redirect with hash fragment.
+  // Hash fragments are only readable client-side, so redirect to reset-password page.
+  return NextResponse.redirect(`${origin}/reset-password`);
 }

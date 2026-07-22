@@ -42,6 +42,7 @@ export function SignUpForm() {
   const [loading, setLoading] = useState(false);
   const [isConfirmationSent, setIsConfirmationSent] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
+  const googleNonceRef = useRef<string>("");
   const router = useRouter();
   const supabase = createClient();
 
@@ -52,6 +53,7 @@ export function SignUpForm() {
     const { error: signInError } = await supabase.auth.signInWithIdToken({
       provider: "google",
       token: response.credential,
+      nonce: googleNonceRef.current || undefined,
     });
 
     if (signInError) {
@@ -119,11 +121,17 @@ export function SignUpForm() {
       <Script
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
-        onLoad={() => {
+        onLoad={async () => {
           if (window.google?.accounts?.id) {
+            const raw = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+            const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw))))
+              .map((b) => b.toString(16).padStart(2, "0")).join("");
+            googleNonceRef.current = raw;
+
             window.google.accounts.id.initialize({
               client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
               callback: onGoogleCredential,
+              nonce: hash,
               use_fedcm_for_prompt: true,
             });
             if (googleBtnRef.current) {
