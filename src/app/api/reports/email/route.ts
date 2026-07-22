@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { sendEmailWithAttachment } from "@/lib/email/send";
 import { createClient } from "@/lib/supabase/server";
 import * as Sentry from "@sentry/nextjs";
@@ -26,7 +25,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Request too large" }, { status: 413 });
     }
 
-    const { userId } = await auth();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -58,18 +59,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid report URL origin" }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const { data: user } = await supabase
+    const { data: userRecord } = await supabase
       .from("users")
       .select("email, role")
       .eq("clerk_user_id", userId)
       .single();
 
-    if (!user) {
+    if (!userRecord) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (user.role === "viewer") {
+    if (userRecord.role === "viewer") {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     const base64Content = Buffer.from(pdfBuffer).toString("base64");
 
     const result = await sendEmailWithAttachment({
-      to: user.email,
+      to: userRecord.email,
       subject: `Compliance Audit Report — ${escapeHtml(clinicName)}`,
       html: `
         <p>Your compliance audit report is attached.</p>
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     if (!result.success) {
       Sentry.captureMessage(`Report email: Resend send failed`, {
         level: "error",
-        extra: { reportId, error: result.error, recipient: user.email },
+        extra: { reportId, error: result.error, recipient: userRecord.email },
       });
       return NextResponse.json(
         { error: "Failed to send email. Please try again." },
