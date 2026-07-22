@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -56,17 +57,11 @@ export default function RootLayout({
         signUpFallbackRedirectUrl="/onboarding"
         afterSignOutUrl="/sign-in"
         appearance={{
+          theme: shadcn,
           options: {
-            logoPlacement: "none",
             socialButtonsPlacement: "bottom",
+            socialButtonsVariant: "blockButton",
           },
-          variables: {
-            colorPrimary: "#6E97A7",
-            colorBackground: "#FFFFFF",
-            colorForeground: "#000000",
-            colorNeutral: "#FFFFFF",
-            borderRadius: "0.5rem",
-          } as Record<string, string>,
         }}
       >
         <body className="min-h-full bg-background text-foreground">
