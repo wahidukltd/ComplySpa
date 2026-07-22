@@ -11,12 +11,22 @@ declare global {
   interface Window {
     google?: {
       accounts: {
-        oauth2: {
-          initTokenClient: (config: {
+        id: {
+          initialize: (config: {
             client_id: string;
-            scope: string;
-            callback: (response: { access_token?: string; id_token?: string; error?: string }) => void;
-          }) => { requestAccessToken: () => void };
+            callback: (response: { credential: string; select_by?: string }) => void;
+            use_fedcm_for_prompt?: boolean;
+          }) => void;
+          renderButton: (parent: HTMLElement, options: {
+            type?: "standard" | "icon";
+            theme?: "outline" | "filled_blue" | "filled_black";
+            size?: "small" | "medium" | "large";
+            text?: "signin_with" | "signup_with" | "continue_with" | "signin";
+            shape?: "rectangular" | "pill" | "circle" | "square";
+            width?: number;
+          }) => void;
+          prompt: (momentListener?: (notification: { getMomentType: () => string }) => void) => void;
+          cancel: () => void;
         };
       };
     };
@@ -29,9 +39,27 @@ export function SignUpForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isConfirmationSent, setIsConfirmationSent] = useState(false);
-  const googleClientRef = useRef<{ requestAccessToken: () => void } | null>(null);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  const gsiCallback = (response: { credential: string; select_by?: string }) => {
+    setLoading(true);
+    setError(null);
+
+    supabase.auth.signInWithIdToken({
+      provider: "google",
+      token: response.credential,
+    }).then(({ error: signInError }) => {
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
+      router.push("/onboarding");
+      router.refresh();
+    });
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,10 +87,23 @@ export function SignUpForm() {
   function handleGoogleSignUp() {
     setError(null);
 
-    if (googleClientRef.current) {
-      googleClientRef.current.requestAccessToken();
+    if (googleBtnRef.current) {
+      const btn = googleBtnRef.current.querySelector<HTMLElement>("div[role=button]");
+      if (btn) {
+        btn.click();
+        return;
+      }
+    }
+
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.initialize({
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
+        callback: gsiCallback,
+        use_fedcm_for_prompt: true,
+      });
+      window.google.accounts.id.prompt();
     } else {
-      setError("Google Sign-In is still loading. Please try again.");
+      setError("Google Sign-In is still loading. Please wait a moment and try again.");
     }
   }
 
@@ -86,34 +127,22 @@ export function SignUpForm() {
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
         onLoad={() => {
-          if (window.google?.accounts?.oauth2) {
-            googleClientRef.current = window.google.accounts.oauth2.initTokenClient({
+          if (window.google?.accounts?.id) {
+            window.google.accounts.id.initialize({
               client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
-              scope: "openid email profile",
-              callback: async (response) => {
-                if (response.error) {
-                  setError("Google sign-in was cancelled or failed.");
-                  return;
-                }
-                if (response.id_token) {
-                  setLoading(true);
-
-                  const { error: signInError } = await supabase.auth.signInWithIdToken({
-                    provider: "google",
-                    token: response.id_token,
-                  });
-
-                  if (signInError) {
-                    setError(signInError.message);
-                    setLoading(false);
-                    return;
-                  }
-
-                  router.push("/onboarding");
-                  router.refresh();
-                }
-              },
+              callback: gsiCallback,
+              use_fedcm_for_prompt: true,
             });
+            if (googleBtnRef.current) {
+              window.google.accounts.id.renderButton(googleBtnRef.current, {
+                type: "standard",
+                theme: "outline",
+                size: "large",
+                text: "signup_with",
+                shape: "rectangular",
+                width: 0,
+              });
+            }
           }
         }}
       />
@@ -144,6 +173,8 @@ export function SignUpForm() {
             </svg>
             {loading ? "Connecting..." : "Continue with Google"}
           </button>
+
+          <div ref={googleBtnRef} className="invisible absolute size-0 overflow-hidden" aria-hidden="true" />
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
