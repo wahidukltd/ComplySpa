@@ -56,17 +56,13 @@ export default function RootLayout({
         signUpFallbackRedirectUrl="/onboarding"
         afterSignOutUrl="/sign-in"
         appearance={{
-          layout: {
+          options: {
             logoPlacement: "none",
             socialButtonsPlacement: "bottom",
           },
           variables: {
             colorPrimary: "#6E97A7",
             colorBackground: "#FFFFFF",
-            colorText: "#000000",
-            colorTextSecondary: "rgba(0,0,0,0.55)",
-            colorInputBackground: "#FFFFFF",
-            colorInputText: "#000000",
             borderRadius: "0.5rem",
           },
         }}
