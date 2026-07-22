@@ -27,7 +27,6 @@
   "31": "next.config.ts",
   "32": "hero-3d.tsx",
   "33": "@clerk/nextjs",
-  "35": "actions/audit.ts",
   "36": "clsx",
   "37": "eslint.config.mjs",
   "38": "@hookform/resolvers",
@@ -72,6 +71,5 @@
   "87": "vitest.config.ts",
   "88": "AGENTS.md",
   "89": "Frontend Conventions",
-  "91": "Database Conventions",
-  "103": "credentials.ts"
+  "91": "Database Conventions"
 }
