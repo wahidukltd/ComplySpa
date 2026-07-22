@@ -1,8 +1,6 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { auth } from "@clerk/nextjs/server";
-import * as Sentry from "@sentry/nextjs";
 import type { Database } from "@/types/database";
 
 export async function createClient() {
@@ -14,12 +12,6 @@ export async function createClient() {
 
   const cookieStore = await cookies();
 
-  const { getToken } = await auth();
-  const supabaseToken = await getToken({ template: "supabase" });
-  if (!supabaseToken) {
-    Sentry.captureMessage("Server client: Clerk JWT template 'supabase' returned null", "warning");
-  }
-
   return createServerClient<Database>(url, anonKey, {
     cookies: {
       getAll() {
@@ -30,13 +22,10 @@ export async function createClient() {
           try {
             cookieStore.set(name, value, options);
           } catch {
-            Sentry.captureMessage("Server client: failed to set cookie", "warning");
+            // ponytail: cookie mutation in read-only context (e.g. RSC) — safe to skip
           }
         }
       },
     },
-    ...(supabaseToken
-      ? { global: { headers: { Authorization: `Bearer ${supabaseToken}` } } }
-      : {}),
   });
 }

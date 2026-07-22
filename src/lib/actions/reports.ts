@@ -2,7 +2,6 @@
 import "server-only";
 
 import { z } from "zod";
-import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
@@ -18,10 +17,10 @@ export async function getReportData(): Promise<{
   data: ReportData | null;
   error: string | null;
 }> {
-  const { userId } = await auth();
-  if (!userId) return { data: null, error: "Unauthorized" };
-
   const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
+  if (!userId) return { data: null, error: "Unauthorized" };
 
   const { data: user, error: userErr } = await supabase
     .from("users")
@@ -194,10 +193,10 @@ export async function createReport(
   reportUrl: string | null,
   snapshot: ReportData,
 ): Promise<{ id: string | null; error: string | null }> {
-  const { userId } = await auth();
-  if (!userId) return { id: null, error: "Unauthorized" };
-
   const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
+  if (!userId) return { id: null, error: "Unauthorized" };
 
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
@@ -259,10 +258,10 @@ export async function getReportHistory(): Promise<{
   error: string | null;
   clinicId: string | null;
 }> {
-  const { userId } = await auth();
-  if (!userId) return { reports: [], error: "Unauthorized", clinicId: null };
-
   const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
+  if (!userId) return { reports: [], error: "Unauthorized", clinicId: null };
 
   const { data: user, error: userErr } = await supabase
     .from("users")

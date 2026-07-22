@@ -1,136 +1,104 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/pricing",
-  "/api/polar/webhook",
-  "/api/resend/webhook",
-]);
-
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/onboarding",
-]);
-
-const soloForbidden = createRouteMatcher([
-  "/dashboard/settings/users(.*)",
-]);
+import type { Database } from "@/types/database";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error(
-    "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set in environment",
-  );
+  throw new Error("NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set");
 }
 
-async function getPlan(
-  userId: string,
-  getToken: (opts?: { template?: string }) => Promise<string | null>,
-): Promise<{ plan: string | null; hasClinic: boolean; error: boolean }> {
-  const supabaseToken = await getToken({ template: "supabase" });
-  if (!supabaseToken) {
-    Sentry.captureMessage("Middleware: Clerk JWT template 'supabase' returned null", "warning");
-    return { plan: null, hasClinic: false, error: true };
+export async function proxy(req: NextRequest) {
+  const res = NextResponse.next();
+  res.headers.set("x-pathname", req.nextUrl.pathname);
+
+  const supabase = createServerClient<Database>(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll() {
+        return req.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        for (const { name, value, options } of cookiesToSet) {
+          req.cookies.set(name, value);
+          res.cookies.set(name, value, options);
+        }
+      },
+    },
+  });
+
+  const pathname = req.nextUrl.pathname;
+
+  const isPublic =
+    pathname === "/" ||
+    pathname.startsWith("/sign-in") ||
+    pathname.startsWith("/sign-up") ||
+    pathname === "/pricing" ||
+    pathname.startsWith("/api/polar/webhook") ||
+    pathname.startsWith("/api/resend/webhook");
+
+  if (isPublic) return res;
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")) {
+    if (!user) return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${supabaseToken}`,
-    apikey: SUPABASE_ANON_KEY!,
-  };
+  if (!user) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return res;
+  }
 
   const userRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/users?clerk_user_id=eq.${encodeURIComponent(userId)}&select=clinic_id`,
-    { headers },
+    `${SUPABASE_URL}/rest/v1/users?clerk_user_id=eq.${encodeURIComponent(user.id)}&select=clinic_id`,
+    { headers: { apikey: SUPABASE_ANON_KEY! } },
   );
 
   if (!userRes.ok) {
-    Sentry.captureMessage("Middleware: users fetch failed", { extra: { userId, status: userRes.status } });
-    return { plan: null, hasClinic: false, error: true };
+    Sentry.captureMessage("Middleware: users fetch failed", { extra: { userId: user.id, status: userRes.status } });
+    if (pathname === "/onboarding") return res;
+    return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
   const users = (await userRes.json()) as Array<{ clinic_id: string }>;
-  const firstUser = users?.[0];
-  if (!firstUser) {
-    return { plan: null, hasClinic: false, error: false };
-  }
 
-  const clinicRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/clinics?id=eq.${encodeURIComponent(firstUser.clinic_id)}&select=plan`,
-    { headers },
-  );
-
-  if (!clinicRes.ok) {
-    Sentry.captureMessage("Middleware: clinics fetch failed", { extra: { userId, clinicId: firstUser.clinic_id, status: clinicRes.status } });
-    return { plan: null, hasClinic: true, error: true };
-  }
-
-  const clinics = (await clinicRes.json()) as Array<{ plan: string }>;
-  return { plan: clinics?.[0]?.plan ?? null, hasClinic: true, error: false };
-}
-
-function nextWithPathname(pathname: string): NextResponse {
-  const res = NextResponse.next();
-  res.headers.set("x-pathname", pathname);
-  return res;
-}
-
-export default clerkMiddleware(async (auth, req) => {
-  const { userId, redirectToSignIn, getToken } = await auth();
-
-  if (isPublicRoute(req)) {
-    return nextWithPathname(req.nextUrl.pathname);
-  }
-
-  if (isProtectedRoute(req) && !userId) {
-    return redirectToSignIn({ returnBackUrl: req.url });
-  }
-
-  if (!userId) {
-    if (req.nextUrl.pathname.startsWith("/api/")) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return nextWithPathname(req.nextUrl.pathname);
-  }
-
-  const { plan, hasClinic, error } = await getPlan(userId, getToken);
-
-  if (error) {
-    if (req.nextUrl.pathname === "/onboarding" || isPublicRoute(req)) {
-      return nextWithPathname(req.nextUrl.pathname);
-    }
-    return redirectToSignIn({ returnBackUrl: req.url });
-  }
-
-  if (!hasClinic) {
-    if (req.nextUrl.pathname === "/onboarding") {
-      return nextWithPathname(req.nextUrl.pathname);
-    }
+  if (!users?.[0]) {
+    if (pathname === "/onboarding") return res;
     return NextResponse.redirect(new URL("/onboarding", req.url));
   }
 
-  if (hasClinic && req.nextUrl.pathname === "/onboarding") {
+  if (pathname === "/onboarding") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
+
+  const clinicRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/clinics?id=eq.${encodeURIComponent(users[0].clinic_id)}&select=plan`,
+    { headers: { apikey: SUPABASE_ANON_KEY! } },
+  );
+
+  if (!clinicRes.ok) {
+    Sentry.captureMessage("Middleware: clinics fetch failed", { extra: { userId: user.id, clinicId: users[0].clinic_id, status: clinicRes.status } });
+    return res;
+  }
+
+  const clinics = (await clinicRes.json()) as Array<{ plan: string }>;
+  const plan = clinics?.[0]?.plan;
 
   if (plan === "expired_trial" || plan === "inactive") {
     return NextResponse.redirect(new URL("/pricing", req.url));
   }
 
-  if (plan === "solo" && soloForbidden(req)) {
+  if (plan === "solo" && pathname.startsWith("/dashboard/settings/users")) {
     return NextResponse.redirect(new URL("/pricing?reason=plan_upgrade_required", req.url));
   }
 
-  return nextWithPathname(req.nextUrl.pathname);
-});
+  return res;
+}
 
 export const config = {
   matcher: [

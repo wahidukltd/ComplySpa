@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
-import { shadcn } from "@clerk/ui/themes";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -52,32 +50,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <ClerkProvider
-        signInFallbackRedirectUrl="/dashboard"
-        signUpFallbackRedirectUrl="/onboarding"
-        afterSignOutUrl="/sign-in"
-        appearance={{
-          theme: shadcn,
-          options: {
-            socialButtonsPlacement: "bottom",
-            socialButtonsVariant: "blockButton",
-          },
-        }}
-      >
-        <body className="min-h-full bg-background text-foreground">
-          {children}
-          <Toaster
-            position="bottom-right"
-            toastOptions={{
-              style: {
-                background: "var(--card)",
-                color: "var(--foreground)",
-                border: "1px solid var(--border)",
-              },
-            }}
-          />
-        </body>
-      </ClerkProvider>
+      <body className="min-h-full bg-background text-foreground">
+        {children}
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: "var(--card)",
+              color: "var(--foreground)",
+              border: "1px solid var(--border)",
+            },
+          }}
+        />
+      </body>
     </html>
   );
 }

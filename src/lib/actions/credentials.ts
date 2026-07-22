@@ -1,7 +1,6 @@
 "use server";
 
 import "server-only";
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { credentialSchema, type CredentialInput } from "@/lib/validations/staff";
@@ -88,7 +87,9 @@ export async function addCredential(input: CredentialInput & { document_url?: st
 }
 
 export async function updateCredential(id: string, input: CredentialInput & { document_url?: string }) {
-  const { userId } = await auth();
+  const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
   if (!userId) return { error: "Unauthorized" };
 
   const { document_url, ...credInput } = input;
@@ -96,8 +97,6 @@ export async function updateCredential(id: string, input: CredentialInput & { do
   if (!parsed.success) {
     return { error: "Validation failed", fieldErrors: parsed.error.flatten().fieldErrors };
   }
-
-  const supabase = await createClient();
 
   const { data: user } = await supabase
     .from("users")
@@ -135,10 +134,10 @@ export async function updateCredential(id: string, input: CredentialInput & { do
 }
 
 export async function deleteCredential(id: string, staffMemberId: string) {
-  const { userId } = await auth();
-  if (!userId) return { error: "Unauthorized" };
-
   const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
+  if (!userId) return { error: "Unauthorized" };
 
   const { data: user } = await supabase
     .from("users")
@@ -177,10 +176,10 @@ export async function deleteCredential(id: string, staffMemberId: string) {
 }
 
 export async function verifyCredentialNow(credentialId: string) {
-  const { userId } = await auth();
-  if (!userId) return { error: "Unauthorized" };
-
   const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
+  if (!userId) return { error: "Unauthorized" };
 
   const { data: user } = await supabase
     .from("users")

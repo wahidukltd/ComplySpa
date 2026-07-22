@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
@@ -13,12 +12,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await auth();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id;
   if (!userId) {
     redirect("/sign-in");
   }
-
-  const supabase = await createClient();
 
   const { data: userRecord, error: userErr } = await supabase
     .from("users")

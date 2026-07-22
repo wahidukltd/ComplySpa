@@ -1,7 +1,6 @@
 "use server";
 import "server-only";
 
-import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createClinicSchema, type CreateClinicInput } from "@/lib/validations/clinic";
@@ -10,7 +9,9 @@ import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 
 async function createClinicInternal(input: CreateClinicInput) {
-  const { userId } = await auth();
+  const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
   if (!userId) return { clinicId: null, error: "Unauthorized. Please sign in and try again.", fieldErrors: undefined as Record<string, string[]> | undefined };
 
   const parsed = createClinicSchema.safeParse(input);
@@ -21,26 +22,14 @@ async function createClinicInternal(input: CreateClinicInput) {
 
   const { name, address, state } = parsed.data;
 
-  const clerk = await clerkClient();
-  let userEmail: string | undefined;
-  try {
-    const clerkUser = await clerk.users.getUser(userId);
-    userEmail = clerkUser.emailAddresses[0]?.emailAddress;
-    const primaryEmail = clerkUser.emailAddresses.find(
-      e => e.id === clerkUser.primaryEmailAddressId,
-    );
-    if (!primaryEmail?.verification?.status || primaryEmail.verification.status !== "verified") {
-      return { clinicId: null, error: "Please verify your email address before setting up your clinic.", fieldErrors: undefined };
-    }
-  } catch {
-    return { clinicId: null, error: "Unable to verify your account. Please try again or contact support.", fieldErrors: undefined };
+  const userEmail = authUser?.email ?? null;
+  if (!authUser?.email_confirmed_at) {
+    return { clinicId: null, error: "Please verify your email address before setting up your clinic.", fieldErrors: undefined };
   }
 
   if (!userEmail) {
     return { clinicId: null, error: "Your account must have a verified email address to continue.", fieldErrors: undefined };
   }
-
-  const supabase = await createClient();
 
   const { data: clinicId, error: rpcError } = await supabase.rpc(
     "create_clinic_for_user",
@@ -60,14 +49,6 @@ async function createClinicInternal(input: CreateClinicInput) {
 
   if (!clinicId) {
     return { clinicId: null, error: "Unable to create clinic. Please try again.", fieldErrors: undefined };
-  }
-
-  try {
-    await clerk.users.updateUser(userId, {
-      publicMetadata: { clinic_id: clinicId },
-    });
-  } catch (err) {
-    Sentry.captureException(err);
   }
 
   try {
@@ -100,58 +81,29 @@ export async function createClinicOnboarding(input: CreateClinicInput) {
   return { clinicId: result.clinicId, error: null };
 }
 
-export async function completeInvitationSignup(clerkUserId: string, clinicId: string, role: string): Promise<{ error: string | null }> {
+export async function completeInvitationSignup(clerkUserId: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
 
-  const { data: clinic } = await supabase
-    .from("clinics")
-    .select("id")
-    .eq("id", clinicId)
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (!authUser?.email) return { error: "No email found for user" };
+
+  const { data: pending } = await supabase
+    .from("users")
+    .select("id, clinic_id, role")
+    .eq("email", authUser.email)
+    .eq("clerk_user_id", "")
     .maybeSingle();
 
-  if (!clinic) return { error: "Clinic not found" };
-
-  const { data: existing } = await supabase
-    .from("users")
-    .select("id")
-    .eq("clerk_user_id", clerkUserId)
-    .maybeSingle();
-
-  if (existing) return { error: null };
-
-  const { data: planData } = await supabase
-    .from("clinics")
-    .select("plan")
-    .eq("id", clinicId)
-    .single();
-  const limits = getPlanLimits(planData?.plan ?? "trial");
-
-  const { count } = await supabase
-    .from("users")
-    .select("id", { count: "exact", head: true })
-    .eq("clinic_id", clinicId);
-
-  if ((count ?? 0) >= limits.maxUsers) {
-    return { error: "User limit reached for this clinic plan." };
-  }
-
-  const clerk = await clerkClient();
-  const clerkUser = await clerk.users.getUser(clerkUserId);
-  const email = clerkUser.emailAddresses[0]?.emailAddress;
-  if (!email) return { error: "No email found in Clerk account" };
+  if (!pending) return { error: "No invitation pending" };
 
   const { error } = await supabase
     .from("users")
-    .insert({
-      clinic_id: clinicId,
-      email,
-      role,
-      clerk_user_id: clerkUserId,
-    });
+    .update({ clerk_user_id: clerkUserId })
+    .eq("id", pending.id);
 
   if (error) {
     Sentry.captureException(error);
-    return { error: "Failed to create user record" };
+    return { error: "Failed to claim invitation" };
   }
 
   return { error: null };

@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
@@ -13,10 +12,10 @@ import { getAlertRecipients, getCredentialTypes, getClinicUsers } from "@/lib/ac
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id;
+  if (!userId) redirect("/sign-in");
 
   const { data: userRecord } = await supabase
     .from("users")

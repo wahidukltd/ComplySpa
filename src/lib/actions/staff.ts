@@ -1,7 +1,6 @@
 "use server";
 
 import "server-only";
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { staffMemberSchema, type StaffMemberInput } from "@/lib/validations/staff";
@@ -70,15 +69,15 @@ export async function addStaffMember(input: StaffMemberInput) {
 }
 
 export async function updateStaffMember(id: string, input: StaffMemberInput) {
-  const { userId } = await auth();
+  const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
   if (!userId) return { error: "Unauthorized" };
 
   const parsed = staffMemberSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Validation failed", fieldErrors: parsed.error.flatten().fieldErrors };
   }
-
-  const supabase = await createClient();
 
   const { data: user } = await supabase
     .from("users")
@@ -112,10 +111,10 @@ export async function updateStaffMember(id: string, input: StaffMemberInput) {
 }
 
 export async function deleteStaffMember(id: string) {
-  const { userId } = await auth();
-  if (!userId) return { error: "Unauthorized" };
-
   const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
+  if (!userId) return { error: "Unauthorized" };
 
   const { data: user } = await supabase
     .from("users")

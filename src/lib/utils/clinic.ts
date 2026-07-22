@@ -1,11 +1,11 @@
-import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import * as Sentry from "@sentry/nextjs";
 
 export async function getClinicId(): Promise<string | null> {
-  const { userId } = await auth();
-  if (!userId) return null;
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id;
+  if (!userId) return null;
   const { data } = await supabase
     .from("users")
     .select("clinic_id")
@@ -19,16 +19,16 @@ export async function getClinicIdAndUser(): Promise<{
   userId: string;
   internalUserId: string | null;
 } | null> {
-  const authResult = await auth();
-  if (!authResult.userId) return null;
   const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (!authUser?.id) return null;
   const { data } = await supabase
     .from("users")
     .select("id, clinic_id")
-    .eq("clerk_user_id", authResult.userId)
+    .eq("clerk_user_id", authUser.id)
     .single();
   if (!data) return null;
-  return { clinicId: data.clinic_id, userId: authResult.userId, internalUserId: data.id };
+  return { clinicId: data.clinic_id, userId: authUser.id, internalUserId: data.id };
 }
 
 export async function getClinicIdAndPlan(): Promise<{
@@ -36,13 +36,13 @@ export async function getClinicIdAndPlan(): Promise<{
   plan: string;
   userId: string;
 } | null> {
-  const authResult = await auth();
-  if (!authResult.userId) return null;
   const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (!authUser?.id) return null;
   const { data, error } = await supabase
     .from("users")
     .select("clinic_id, clinics:clinics(plan)")
-    .eq("clerk_user_id", authResult.userId)
+    .eq("clerk_user_id", authUser.id)
     .single();
   if (error) {
     Sentry.captureException(error);
@@ -50,5 +50,5 @@ export async function getClinicIdAndPlan(): Promise<{
   }
   if (!data) return null;
   const plan = ((data.clinics as unknown) as { plan: string } | null)?.plan ?? "trial";
-  return { clinicId: data.clinic_id, plan, userId: authResult.userId };
+  return { clinicId: data.clinic_id, plan, userId: authUser.id };
 }

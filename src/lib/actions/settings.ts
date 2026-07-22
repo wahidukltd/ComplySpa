@@ -1,7 +1,6 @@
 "use server";
 
 import "server-only";
-import { clerkClient } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getClinicIdAndUser } from "@/lib/utils/clinic";
@@ -235,12 +234,6 @@ export async function inviteUser(input: InviteUserInput) {
   const parsed = inviteUserSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Validation failed" };
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!appUrl) {
-    Sentry.captureMessage("NEXT_PUBLIC_APP_URL is not set");
-    return { success: false, error: "Server configuration error. Contact support." };
-  }
-
   const supabase = await createClient();
 
   const [countResult, clinicResult] = await Promise.all([
@@ -266,16 +259,15 @@ export async function inviteUser(input: InviteUserInput) {
     return { success: false, error: "User limit reached for your plan. Upgrade to add more users." };
   }
 
-  const clerk = await clerkClient();
-  try {
-    await clerk.invitations.createInvitation({
-      emailAddress: parsed.data.email,
-      redirectUrl: `${appUrl}/sign-up`,
-      publicMetadata: { clinic_id: user.clinic_id, role: parsed.data.role },
-    });
-  } catch (err) {
-    Sentry.captureException(err);
-    return { success: false, error: "Failed to send invitation" };
+  const { error: inviteErr } = await supabase.from("users").insert({
+    clerk_user_id: "",
+    clinic_id: user.clinic_id,
+    email: parsed.data.email,
+    role: parsed.data.role,
+  });
+  if (inviteErr) {
+    Sentry.captureException(inviteErr);
+    return { success: false, error: "Failed to create invitation" };
   }
 
   revalidatePath("/dashboard/settings");
@@ -291,7 +283,7 @@ export async function removeUser(id: string) {
 
   const { data: target } = await supabase
     .from("users")
-    .select("id, clerk_user_id")
+    .select("id")
     .eq("id", id)
     .eq("clinic_id", user.clinic_id)
     .maybeSingle();
@@ -310,19 +302,6 @@ export async function removeUser(id: string) {
     return { success: false, error: "Failed to remove user" };
   }
 
-  try {
-    const clerk = await clerkClient();
-    await clerk.users.updateUser(target.clerk_user_id, {
-      publicMetadata: { clinic_id: null, role: null },
-    });
-    const sessions = await clerk.sessions.getSessionList({ userId: target.clerk_user_id });
-    for (const session of sessions.data) {
-      await clerk.sessions.revokeSession(session.id);
-    }
-  } catch (err) {
-    Sentry.captureException(err);
-  }
-
   revalidatePath("/dashboard/settings");
   return { success: true, error: null };
 }
@@ -336,7 +315,7 @@ export async function updateUserRole(id: string, role: "manager" | "viewer") {
 
   const { data: target } = await supabase
     .from("users")
-    .select("id, clerk_user_id")
+    .select("id")
     .eq("id", id)
     .eq("clinic_id", user.clinic_id)
     .maybeSingle();
@@ -352,13 +331,6 @@ export async function updateUserRole(id: string, role: "manager" | "viewer") {
   if (error) {
     Sentry.captureException(error);
     return { success: false, error: "Failed to update role" };
-  }
-
-  try {
-    const clerk = await clerkClient();
-    await clerk.users.updateUser(target.clerk_user_id, { publicMetadata: { role } });
-  } catch (err) {
-    Sentry.captureException(err);
   }
 
   revalidatePath("/dashboard/settings");

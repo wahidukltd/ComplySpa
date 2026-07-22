@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ReportGenerator } from "@/components/reports/report-generator";
@@ -11,13 +10,13 @@ export const dynamic = "force-dynamic";
 const SIGNED_URL_EXPIRY = 3600;
 
 export default async function ReportsPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
 
   const history = await getReportHistory();
   const clinicId = history.clinicId ?? "";
 
-  const supabase = await createClient();
   const reportsWithUrls = await Promise.all(
     (history.reports ?? []).map(async (r) => {
       if (r.reportUrl && !r.reportUrl.includes("://")) {
