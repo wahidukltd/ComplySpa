@@ -6,18 +6,16 @@ import { useState } from "react";
 export default function SentryExamplePage() {
   const [error, setError] = useState<string | null>(null);
 
-  async function throwError() {
-    setError(null);
+  function throwError() {
     try {
-      (window as any).myUndefinedFunction();
+      throw new Error("This is a test error for Sentry");
     } catch (e) {
       Sentry.captureException(e);
-      setError("Error sent to Sentry. Check your Sentry Issues dashboard.");
+      setError("Error sent to Sentry! Check your issues dashboard.");
     }
   }
 
   async function throwApiError() {
-    setError(null);
     const res = await fetch("/api/sentry-example-api");
     const data = await res.json();
     setError(data.message || "API error sent to Sentry.");
