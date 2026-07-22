@@ -81,7 +81,7 @@ export function CredentialsTable({ credentials }: { credentials: CredentialRow[]
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-3">
+      <div className="flex gap-3 xl:gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
           <Input

@@ -71,7 +71,7 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight xl:text-3xl">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
             Overview of your clinic&apos;s compliance status.
           </p>
@@ -88,14 +88,14 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:gap-6 2xl:gap-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
             <Users className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{s}</div>
+            <div className="text-2xl font-bold xl:text-3xl">{s}</div>
           </CardContent>
         </Card>
 
@@ -105,7 +105,7 @@ export default async function DashboardPage() {
             <ShieldCheck className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{c}</div>
+            <div className="text-2xl font-bold xl:text-3xl">{c}</div>
           </CardContent>
         </Card>
 
@@ -115,7 +115,7 @@ export default async function DashboardPage() {
             <Clock className="size-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">{expiringCount ?? 0}</div>
+            <div className="text-2xl font-bold xl:text-3xl text-warning">{expiringCount ?? 0}</div>
             <p className="text-xs text-muted-foreground">Within 90 days</p>
           </CardContent>
         </Card>
@@ -126,7 +126,7 @@ export default async function DashboardPage() {
             <AlertTriangle className="size-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{expiredCount ?? 0}</div>
+            <div className="text-2xl font-bold xl:text-3xl text-destructive">{expiredCount ?? 0}</div>
             <p className="text-xs text-muted-foreground">Requires immediate action</p>
           </CardContent>
         </Card>

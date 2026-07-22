@@ -69,7 +69,7 @@ export default async function AuditPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold" style={{ color: "#3D2A25" }}>
+        <h1 className="text-2xl font-semibold xl:text-3xl" style={{ color: "#3D2A25" }}>
           Inspection Readiness
         </h1>
         <p className="text-sm" style={{ color: "#8B7D78" }}>

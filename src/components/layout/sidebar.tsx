@@ -65,7 +65,7 @@ export function Sidebar({
 
   return (
     <>
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card md:flex xl:w-72 2xl:w-80">
         <div className="flex h-16 items-center gap-2 border-b border-border px-6">
           <ShieldCheck className="size-5 text-primary" />
           <span className="font-heading text-base font-semibold">Compliance</span>

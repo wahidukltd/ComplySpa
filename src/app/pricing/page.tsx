@@ -10,7 +10,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Plans & Pricing — Simple, Transparent Compliance Pricing",
   description:
-    "Solo $29/mo, Practice $79/mo, Multi-Location $149/mo. 14-day free trial, no credit card required.",
+    "Solo $29/mo, Practice $49/mo, Multi-Location $79/mo. 14-day free trial, no credit card required.",
   alternates: { canonical: "/pricing" },
   openGraph: {
     title: "Med Spa Compliance Pricing — $29/mo and up",
@@ -49,9 +49,9 @@ const pricingJsonLd = {
 
 export default function PricingPage() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-16">
+    <div className="mx-auto max-w-5xl px-4 py-16 xl:max-w-6xl xl:px-8 xl:py-20 2xl:max-w-7xl 2xl:px-12">
       <div className="mb-12 text-center">
-        <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#000000" }}>
+        <h1 className="text-3xl font-bold tracking-tight xl:text-4xl 2xl:text-5xl" style={{ color: "#000000" }}>
           Simple, transparent pricing.
         </h1>
         <p className="mt-2" style={{ color: "rgba(0,0,0,0.55)" }}>
@@ -68,7 +68,7 @@ export default function PricingPage() {
         <ComparisonTable />
       </div>
 
-      <div className="mt-16 max-w-2xl mx-auto">
+      <div className="mt-16 max-w-2xl mx-auto xl:max-w-3xl 2xl:max-w-4xl">
         <h2 className="mb-6 text-center text-2xl font-semibold" style={{ color: "#000000" }}>
           Frequently asked questions
         </h2>

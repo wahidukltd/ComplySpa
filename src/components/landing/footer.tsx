@@ -26,8 +26,8 @@ const COLUMNS = [
 export function Footer() {
   return (
     <footer className="border-t" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
-      <div className="mx-auto max-w-5xl px-4 py-12">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+      <div className="mx-auto max-w-5xl px-4 py-12 xl:max-w-6xl xl:px-8 xl:py-16 2xl:max-w-7xl 2xl:px-12">
+        <div className="grid grid-cols-2 gap-8 md:grid-cols-4 xl:gap-12 2xl:gap-16">
           {COLUMNS.map((col) => (
             <div key={col.title}>
               <h4 className="text-sm font-semibold" style={{ color: "#000000" }}>

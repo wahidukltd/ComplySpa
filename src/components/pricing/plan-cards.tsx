@@ -25,8 +25,8 @@ const PLANS = [
   },
   {
     name: "Practice",
-    monthly: 79,
-    annual: 790,
+    monthly: 49,
+    annual: 490,
     description: "For growing med spas",
     features: [
       "15 staff members",
@@ -40,8 +40,8 @@ const PLANS = [
   },
   {
     name: "Multi-Location",
-    monthly: 149,
-    annual: 1490,
+    monthly: 79,
+    annual: 790,
     description: "For multi-location operations",
     features: [
       "50 staff members",
@@ -106,8 +106,8 @@ export function PlanCards() {
                 </Badge>
               )}
               <CardHeader>
-                <CardTitle className="text-xl">{plan.name}</CardTitle>
-                <p className="text-sm text-muted-foreground">{plan.description}</p>
+                <CardTitle className="text-xl xl:text-2xl">{plan.name}</CardTitle>
+                <p className="text-sm text-muted-foreground xl:text-base">{plan.description}</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-baseline gap-1" aria-live="polite" aria-atomic="true">
@@ -116,7 +116,7 @@ export function PlanCards() {
                     initial={shouldReduceMotion ? false : { opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="text-4xl font-bold"
+                    className="text-4xl font-bold xl:text-5xl"
                   >
                     ${annual ? plan.annual : plan.monthly}
                   </motion.span>
