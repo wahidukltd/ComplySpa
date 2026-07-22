@@ -6,12 +6,12 @@ const supabaseHost = supabaseUrl ? new URL(supabaseUrl).hostname : "supabase.co"
 
 const cspValue = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.com https://clerk.com https://*.clerk.accounts.dev",
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.com https://clerk.com https://*.clerk.accounts.dev https://clerk.complyspa.com https://accounts.complyspa.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https: blob:",
   "font-src 'self'",
-  `connect-src 'self' https://*.${supabaseHost} wss://*.${supabaseHost} https://*.clerk.com https://clerk.com https://*.clerk.accounts.dev`,
-  "frame-src https://*.clerk.com https://clerk.com https://*.clerk.accounts.dev",
+  `connect-src 'self' https://*.${supabaseHost} wss://*.${supabaseHost} https://*.clerk.com https://clerk.com https://*.clerk.accounts.dev https://clerk.complyspa.com https://accounts.complyspa.com`,
+  "frame-src https://*.clerk.com https://clerk.com https://*.clerk.accounts.dev https://clerk.complyspa.com https://accounts.complyspa.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
