@@ -86,23 +86,61 @@ function isAuthorizedCaller(req: Request): boolean {
 Deno.serve(async (req: Request): Promise<Response> => {
   const startTime = Date.now();
 
+  const MONITOR_SLUG = "credential-alert";
+
+  // Sentry cron check-in: in_progress
+  const checkInId = SENTRY_DSN ? Sentry.captureCheckIn({
+    monitorSlug: MONITOR_SLUG,
+    status: "in_progress",
+  }) : null;
+
   try {
     if (!isAuthorizedCaller(req)) {
-      return json({ success: false, error: "Unauthorized" }, 401);
+      const res = json({ success: false, error: "Unauthorized" }, 401);
+      if (checkInId) {
+        Sentry.captureCheckIn({
+          monitorSlug: MONITOR_SLUG,
+          status: "error",
+          checkInId,
+          duration: Date.now() - startTime,
+        });
+      }
+      await Sentry.flush(2000);
+      return res;
     }
 
     let body: unknown;
     try {
       body = await req.json();
     } catch {
-      return json({ success: false, error: "Invalid JSON body" }, 400);
+      const res = json({ success: false, error: "Invalid JSON body" }, 400);
+      if (checkInId) {
+        Sentry.captureCheckIn({
+          monitorSlug: MONITOR_SLUG,
+          status: "error",
+          checkInId,
+          duration: Date.now() - startTime,
+        });
+      }
+      await Sentry.flush(2000);
+      return res;
     }
 
     if (!validateBody(body)) {
-      return json({
+      const res = json({
         success: false,
         error: "Missing required fields: credential_id (string), clinic_id (string), days_before (number)",
       }, 400);
+      if (checkInId) {
+        Sentry.captureCheckIn({
+          monitorSlug: MONITOR_SLUG,
+          status: "error",
+          checkInId,
+          duration: Date.now() - startTime,
+        });
+      }
+      await Sentry.flush(2000);
+      return res;
     }
 
     const { credential_id, clinic_id, days_before } = body;
@@ -121,11 +159,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
         level: "warning",
         extra: { credential_id, clinic_id },
       });
+      if (checkInId) {
+        Sentry.captureCheckIn({
+          monitorSlug: MONITOR_SLUG,
+          status: "ok",
+          checkInId,
+          duration: Date.now() - startTime,
+        });
+      }
       await Sentry.flush(2000);
       return json({ success: false, error: "Credential not found" }, 404);
     }
 
     if (credential.staff_member?.deleted_at) {
+      if (checkInId) {
+        Sentry.captureCheckIn({
+          monitorSlug: MONITOR_SLUG,
+          status: "ok",
+          checkInId,
+          duration: Date.now() - startTime,
+        });
+      }
       return json({ success: true, data: { email_sent: false } }, 200);
     }
 
@@ -141,6 +195,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         level: "warning",
         extra: { clinic_id },
       });
+      if (checkInId) {
+        Sentry.captureCheckIn({
+          monitorSlug: MONITOR_SLUG,
+          status: "ok",
+          checkInId,
+          duration: Date.now() - startTime,
+        });
+      }
       await Sentry.flush(2000);
       return json({ success: false, error: "No clinic owner found" }, 404);
     }
@@ -159,6 +221,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     if (!ACTIVE_PLANS.has(clinic.plan)) {
       Sentry.captureMessage("send-credential-alert: Skipping inactive clinic", { level: "info", extra: { clinic_id, plan: clinic.plan } });
+      if (checkInId) {
+        Sentry.captureCheckIn({
+          monitorSlug: MONITOR_SLUG,
+          status: "ok",
+          checkInId,
+          duration: Date.now() - startTime,
+        });
+      }
       return json({ success: true, data: { email_sent: false } }, 200);
     }
 
@@ -205,6 +275,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const duration = Date.now() - startTime;
     Sentry.captureMessage("send-credential-alert: OK", { level: "info", extra: { credential_id, clinic_id, duration_ms: duration } });
 
+    if (checkInId) {
+      Sentry.captureCheckIn({
+        monitorSlug: MONITOR_SLUG,
+        status: "ok",
+        checkInId,
+        duration,
+      });
+    }
+
     return json({
       success: true,
       data: {
@@ -216,6 +295,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const errorMsg = err instanceof Error ? err.message : String(err);
     Sentry.captureException(err instanceof Error ? err : new Error(errorMsg));
     Sentry.captureMessage("send-credential-alert: Unhandled error", { level: "error", extra: { error: errorMsg } });
+
+    if (checkInId) {
+      Sentry.captureCheckIn({
+        monitorSlug: MONITOR_SLUG,
+        status: "error",
+        checkInId,
+        duration: Date.now() - startTime,
+      });
+    }
+
     await Sentry.flush(2000);
     return json({ success: false, error: "Internal server error" }, 500);
   }

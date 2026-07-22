@@ -455,6 +455,10 @@ export type Database = {
         }
         Returns: string
       }
+      check_cron_health: {
+        Args: { p_jobname: string; p_max_stale_hours?: number }
+        Returns: boolean
+      }
       scan_audit_overdue: { Args: never; Returns: undefined }
       scan_escalation_alerts: { Args: never; Returns: undefined }
       scan_expiring_credentials: { Args: never; Returns: undefined }
