@@ -63,8 +63,10 @@ export default function RootLayout({
           variables: {
             colorPrimary: "#6E97A7",
             colorBackground: "#FFFFFF",
+            colorForeground: "#000000",
+            colorNeutral: "#FFFFFF",
             borderRadius: "0.5rem",
-          },
+          } as Record<string, string>,
         }}
       >
         <body className="min-h-full bg-background text-foreground">
