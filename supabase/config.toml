@@ -359,7 +359,7 @@ enabled = false
 # Use Clerk as a third-party provider alongside Supabase Auth.
 [auth.third_party.clerk]
 enabled = true
-domain = "moving-sheepdog-44.clerk.accounts.dev"
+domain = "clerk.complyspa.com"
 
 # OAuth server configuration
 [auth.oauth_server]
