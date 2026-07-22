@@ -12,14 +12,23 @@ The following are configured at Claude Code **user scope** and shape how code ge
 - **Exa** (`mcp__exa__web_search_exa`, `mcp__exa__web_fetch_exa`) — web search / URL content extraction. Use for general web lookups (competitor research, market context).
 - **Context7** (`context7` MCP, auto-triggers on library/framework questions) — fetches current, version-specific library docs (Next.js, Supabase, Clerk, Tailwind, Prisma, etc.) instead of relying on training data. **Prefer Context7 over Exa for library API / framework questions.**
 - **skill-creator** skill (project-scoped, `.agents/skills/skill-creator`) — use when creating, editing, or benchmarking custom skills.
+- **Deployment MCPs** — the following MCP servers are available for Phase 7.8+ deployment automation. Use them instead of manual dashboard steps wherever possible:
+  - **Cloudflare MCP** — DNS record CRUD, zone settings (DNSSEC, SSL/TLS, HSTS, security level, bot fight mode, speed/network optimization)
+  - **Vercel MCP** — project creation, environment variables, domain management, deployments
+  - **Clerk MCP** — JWT templates, instance configuration, redirect URLs
+  - **GitHub MCP** — repository settings, branch protection, secret scanning
+  - **Resend MCP** — sending domains, DKIM records, domain verification, webhooks, verified emails
+  - **Supabase MCP** — SQL execution, database management, migration verification
 
-**Tool selection rule:** Context7 for library/framework docs, Exa for general web search, Ponytail to keep code minimal, Impeccable for UI design/quality, Psychological Copywriting for public-facing copy. No overlap — pick the one matching the task.
+**Tool selection rule:** Context7 for library/framework docs, Exa for general web search, deployment MCPs for Phase 7.8+ infrastructure, Ponytail to keep code minimal, Impeccable for UI design/quality, Psychological Copywriting for public-facing copy. No overlap — pick the one matching the task.
 
 ## Project Overview
 
-ComplySpa is a vertical SaaS product for medical spas globally, launching in the US market. It tracks staff credentials, sends automated expiration alerts, and generates audit-ready compliance reports.
+ComplySpa is a vertical SaaS product for medical spas globally, launching in the US market. It tracks staff credentials, sends automated expiration alerts, and generates audit-ready compliance reports. **3 features** — credential tracker, expiration alerts, audit-ready PDF reports. Feature 4 (inspection-readiness engine) was removed in July 2026 to keep MVP scope tight.
 
-**Stack:** Next.js 14+ (App Router) · TypeScript · Tailwind CSS · shadcn/ui (component library) · Framer Motion (micro-interactions + page transitions) · React Three Fiber + Three.js (landing page hero 3D only) · Supabase (PostgreSQL, Edge Functions, Storage, pg_cron) · Clerk (Auth) · Vercel (Hosting) · Resend (Email) · Polar.sh (Payments) · Sentry (Errors)
+**Stack:** Next.js 14+ (App Router) · TypeScript · Tailwind CSS · shadcn/ui (component library) · Framer Motion (micro-interactions + page transitions) · React Three Fiber + Three.js (landing page hero 3D only) · Supabase (PostgreSQL, Edge Functions, Storage, pg_cron) · Clerk (Auth) · Vercel (Hosting) · Resend (Transactional Email) · Zoho Mail (Business Email — support@, hello@) · Polar.sh (Payments) · Sentry (Errors)
+
+**Domain:** complyspa.com — purchased on Cloudflare Registrar. DNS managed in Cloudflare. Deployed directly to the domain via Vercel MCP.
 
 **Alert channel:** Email-only via Resend. SMS (Twilio) was removed — founder is non-US citizen, Twilio requires US business tax ID for upgrade beyond trial. Email handles all alert use cases (detailed info, paper trail, attachments) at $0 cost. SMS can be reintroduced later via Vonage or MessageBird if needed.
 
@@ -100,7 +109,7 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
         staff.ts                  # Zod schemas for staff + credential forms
         webhook.ts                # Zod schemas for webhook payloads
       /email/
-        templates.tsx             # Email templates (alert, quarterly audit reminder)
+        templates.tsx             # Email templates (alert, welcome, trial reminders)
         send.ts                   # Resend API wrapper
       /pdf/
         report-template.tsx       # react-pdf template for audit report
@@ -166,7 +175,7 @@ ComplySpa is a vertical SaaS product for medical spas globally, launching in the
 - `/dashboard/settings/billing` — Current plan, manage subscription via Polar portal
 - `/dashboard/settings/users` — Invite manager/viewer, manage roles
 
-Total: 14 pages (2 public, 2 auth, 1 onboarding, 9 dashboard).
+Total: 13 pages (2 public, 2 auth, 1 onboarding, 8 dashboard). `/dashboard/audit` was removed with Feature 4 (July 2026).
 
 ## Naming Conventions
 
@@ -175,7 +184,7 @@ Total: 14 pages (2 public, 2 auth, 1 onboarding, 9 dashboard).
 | Files (components)  | PascalCase           | StaffForm.tsx          |
 | Files (utilities)   | camelCase            | dateUtils.ts           |
 | Files (pages)       | Next.js convention   | page.tsx, layout.tsx   |
-| Directories         | lowercase-hyphenated | audit/                 |
+| Directories         | lowercase-hyphenated | settings/               |
 | TypeScript types    | PascalCase           | CredentialRecord       |
 | Variables/functions | camelCase            | getExpiringCredentials |
 | Constants           | UPPER_SNAKE_CASE     | ALERT_INTERVAL_DAYS    |
@@ -204,7 +213,7 @@ Total: 14 pages (2 public, 2 auth, 1 onboarding, 9 dashboard).
 - Never edit an applied migration. Create a new migration instead
 - Test migrations locally: `supabase migration up`
 - Push to production: `supabase db push`
-- Seed data (credential types, audit checklist defaults) goes in the initial migration
+- Seed data (credential types) goes in the initial migration
 
 ### Row Level Security
 - RLS is enabled on EVERY table that contains clinic-specific data
@@ -376,7 +385,7 @@ Dark-mode toggle is OUT of MVP scope — do not add `dark:` classes to UI surfac
 #### React Three Fiber + Three.js — LANDING PAGE ONLY
 - Install: `npm install three @react-three/fiber @react-three/drei`
 - Use for: landing page (`/`) hero section 3D background ONLY
-- DO NOT use Three.js in the dashboard, settings, reports, or audit pages
+- DO NOT use Three.js in the dashboard, settings, or reports pages
 - The 3D hero must lazy-load: use `next/dynamic` with `ssr: false`, show static gradient fallback
 - Max 50KB gzipped for Three.js payload. Simple geometry only. No GLTF, no textures.
 - Respect `prefers-reduced-motion`: render a static gradient instead
@@ -516,7 +525,7 @@ ships:
 - Pricing page copy: no dark patterns. No countdown timers. No fake urgency.
   The trial is real — honor it.
 - Email templates (Resend): same rules apply. Alert emails, trial reminders,
-  and quarterly audit nudges must match the product's voice — direct, helpful,
+  and onboarding emails must match the product's voice — direct, helpful,
   never salesy.
 
 ## Backend Conventions
@@ -620,6 +629,12 @@ Layer 3 — DATABASE (data-level):
 
 ## Email Responsibilities
 
+### Zoho Mail Handles (free, up to 5 users, 5GB/user)
+- Business email: support@complyspa.com (manual — customer support), hello@complyspa.com (full mailbox, receives replies to automated emails)
+- alerts@complyspa.com — free alias forwarding to hello@ (no user slot consumed)
+- DMARC aggregate reports (rua=mailto:hello@complyspa.com)
+- These are accessed via Zoho webmail — no SMTP/IMAP on free tier
+
 ### Clerk Handles (free, included in 10K MAU)
 - Email verification (signup confirmation)
 - Password reset emails
@@ -627,14 +642,14 @@ Layer 3 — DATABASE (data-level):
 - These are sent from Clerk's infrastructure — no Resend needed
 
 ### Resend Handles (free, 3,000 emails/month)
-- Credential expiration alerts (90/60/30/7 days)
-- Escalation alerts (credential expired 7+ days)
-- Welcome email (after onboarding completes)
-- Trial ending reminder (day 12 of 14-day trial)
-- Trial expired notification (day 14)
-- Subscription canceled confirmation
-- Quarterly audit reminder email (when audit is overdue >90 days)
+- Credential expiration alerts (90/60/30/7 days) — FROM: alerts@complyspa.com
+- Escalation alerts (credential expired 7+ days) — FROM: alerts@complyspa.com
+- Welcome email (after onboarding completes) — FROM: hello@complyspa.com
+- Trial ending reminder (day 12 of 14-day trial) — FROM: hello@complyspa.com
+- Trial expired notification (day 14) — FROM: hello@complyspa.com
+- Subscription canceled confirmation — FROM: hello@complyspa.com
 - These are sent from Edge Functions via the Resend API
+- FROM addresses: alerts@ (alerts) and hello@ (essential) — both verified under complyspa.com
 
 ## Testing Philosophy
 
@@ -718,6 +733,8 @@ Before merging any PR:
 - **Vercel Analytics:** page load performance and traffic. Free.
 - **Supabase Dashboard:** database health, Edge Function logs, storage usage. Check weekly.
 - **Resend Dashboard:** email delivery logs, bounce rate. Check weekly.
+- **Zoho Mail:** business email (support@, hello@). Check weekly for customer inquiries.
+- **Cloudflare Dashboard:** DNS health, security events, analytics. Check weekly.
 - **Polar Dashboard:** subscription status, failed payments.
 - No `console.log` in production code. Use `Sentry.captureException()` for errors, `Sentry.captureMessage()` for info.
 - In development, `console.log` is acceptable for debugging but must be removed before commit.
@@ -733,10 +750,14 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 RESEND_API_KEY=
+RESEND_WEBHOOK_SECRET=
+FROM_EMAIL_ALERTS=ComplySpa Alerts <alerts@complyspa.com>
+FROM_EMAIL_ESSENTIAL=ComplySpa <hello@complyspa.com>
 POLAR_ACCESS_TOKEN=
 POLAR_WEBHOOK_SECRET=
 SENTRY_DSN=
-NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_APP_URL=https://complyspa.com
+CRON_SECRET=
 ```
 
 Rules:
@@ -819,226 +840,70 @@ supabase functions serve # Start Edge Functions on localhost:8000
 
 ## Production Deployment Checklist
 
-Provisioning items only — code-quality pre-checks (tests, tsc, lint, types, secrets, RLS, Zod, states, mobile, a11y) are covered by the PR Self-Review Checklist and are not repeated here.
+Code-quality pre-checks (tests, tsc, lint, types, secrets, RLS, Zod, states, mobile, a11y) are covered by the PR Self-Review Checklist and are not repeated here.
 
-- [ ] Environment variables set in Vercel production
-- [ ] Environment variables set in Supabase production
-- [ ] Database migrations applied to production Supabase
-- [ ] Edge Functions deployed to production Supabase
-- [ ] pg_cron jobs created in production Supabase
-- [ ] Polar webhook URL points to production domain
-- [ ] Resend sending domain verified (DKIM, SPF, DMARC)
-- [ ] Clerk production URLs configured
-- [ ] Clerk third-party auth configured in Supabase Dashboard: Authentication → Third-Party Auth → Clerk → paste domain (`moving-sheepdog-44.clerk.accounts.dev`)
-- [ ] DNS configured (A record + CNAME to Vercel)
+- [ ] All env vars set in Vercel via MCP (read from env-production.txt)
+- [ ] All env vars set in Supabase Edge Functions secrets via CLI
+- [ ] Database migrations applied to production Supabase via CLI
+- [ ] Edge Functions deployed to production Supabase (`send-credential-alert`)
+- [ ] pg_cron enabled, 5 jobs verified (no daily-audit-overdue-check — Feature 4 removed)
+- [ ] Code pushed to GitHub + repo verified (private, branch protection, secret scanning)
+- [ ] ALL DNS records in Cloudflare via MCP: Vercel (A+CNAME) + Zoho (MX+SPF+DKIM) + Resend (DKIM+SPF) + DMARC
+- [ ] Cloudflare optimized via MCP: DNSSEC, SSL Full (strict), HSTS, Always HTTPS, Security Medium, Bot Fight ON
+- [ ] Vercel project created via MCP, domain added, primary set, SSL provisioned, deployed
+- [ ] Clerk JWT template + Instance URL + redirect URLs configured via Clerk MCP
+- [ ] Supabase third-party auth: Clerk → Supabase (manual — no API)
+- [ ] Zoho Mail: domain verified, support@ + hello@ created, alerts@ alias → hello@
+- [ ] Resend: domain added via MCP, DKIM in Cloudflare, domain verified, webhook set, hello@ added
+- [ ] FROM_EMAIL_ALERTS and FROM_EMAIL_ESSENTIAL set in Vercel env vars
+- [ ] All DNS verified: nslookup checks pass for MX, SPF, DKIM, DMARC
+- [ ] All curl checks return 200 on complyspa.com
+- [ ] Founder confirms sign-up → onboarding → dashboard works
 
-## Deploy Without Domain (Vercel First, Domain Later)
+## Deployment
 
-The founder's PC is not strong enough for full local testing. Deploy on Vercel immediately using the free `*.vercel.app` subdomain for STAGING/TESTING ONLY. Clerk, Resend, and Supabase work out of the box on the free tier — no domain configuration needed. Buy a domain later for the real production launch. The vercel.app URL never becomes the production URL — it stays as a staging environment.
+Deployment is fully automated via MCP. See `C:\Users\PMLS\Desktop\Prompts\PHASE_7.8_PROMPT.md` for the complete step-by-step deployment procedure. The domain complyspa.com is purchased on Cloudflare Registrar. Deploy directly to the domain — no vercel.app staging.
 
-**IMPORTANT**: Do NOT configure Clerk production instance URL, Resend sending domain, DNS records, or any service-specific domain settings on the vercel.app URL. Everything gets configured on the real domain only. The vercel.app deployment is for testing your code, not for configuring external services.
+### Complete Cloudflare DNS Table — complyspa.com
 
-### Step 1: Supabase Production Project (Already Exists)
-
-The founder has already created the `ComplaSpa` Supabase project and connected it via CLI + MCP. Skip project creation. Use the existing project:
-
-1. Verify connection: `supabase projects list`
-2. Re-link if needed: `supabase link --project-ref YOUR_EXISTING_REF`
-3. Verify migrations are pushed: `supabase db push` (idempotent — safe to re-run)
-4. Run in SQL Editor: `CREATE EXTENSION IF NOT EXISTS pg_cron; CREATE EXTENSION IF NOT EXISTS pg_net;`
-5. Verify 5 pg_cron jobs exist: `SELECT cron.jobname FROM cron.job;`
-
-### Step 2: Set Environment Variables (Vercel Only)
-
-Vercel Dashboard (vercel.com → project → Settings → Environment Variables):
+All records: **proxied = false (DNS only / gray cloud)**. Proxy breaks email DNS and Clerk auth.
 
 ```
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
-CLERK_SECRET_KEY=sk_live_...
-NEXT_PUBLIC_SUPABASE_URL=https://[ref].supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
-SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
-RESEND_API_KEY=re_...
-RESEND_WEBHOOK_SECRET=...
-FROM_EMAIL=Compliance Alerts <onboarding@resend.dev>
-POLAR_ACCESS_TOKEN=                    (LEAVE EMPTY — Phase 9)
-POLAR_WEBHOOK_SECRET=                  (LEAVE EMPTY — Phase 9)
-SENTRY_DSN=https://...@...ingest.sentry.io/...
-NEXT_PUBLIC_APP_URL=https://your-project.vercel.app
-CRON_SECRET=(generate: openssl rand -hex 32)
+SECTION A — VERCEL HOSTING
+Type    Name    Value                       Proxied
+A       @       76.76.21.21                false
+CNAME   www     cname.vercel-dns.com       false
+
+SECTION B — ZOHO MAIL (MX + SPF)
+Type    Name    Value                                          Priority  Proxied
+MX      @       mx.zoho.com                                   10        false
+MX      @       mx2.zoho.com                                  20        false
+MX      @       mx3.zoho.com                                  50        false
+TXT     @       "v=spf1 include:zoho.com include:amazonses.com ~all"  —   false
+
+SECTION C — ZOHO MAIL (DKIM — generated in Zoho Admin Console)
+Type    Name            Value                    Proxied
+TXT     (from Zoho)     (from Zoho — DKIM key)   false
+
+SECTION D — RESEND (DKIM — 3 CNAME records, from Resend MCP)
+Type    Name                          Value                       Proxied
+CNAME   (from Resend)._domainkey      (from Resend).dkim.amazonses.com  false
+CNAME   (from Resend)._domainkey      (from Resend).dkim.amazonses.com  false
+CNAME   (from Resend)._domainkey      (from Resend).dkim.amazonses.com  false
+
+SECTION E — RESEND (SPF)
+Type    Name    Value                                     Priority  Proxied
+MX      send    feedback-smtp.us-east-1.amazonses.com     10        false
+TXT     send    "v=spf1 include:amazonses.com ~all"       —         false
+
+SECTION F — DMARC (covers all email — Zoho + Resend)
+Type    Name     Value                                                    Proxied
+TXT     _dmarc   "v=DMARC1; p=none; rua=mailto:hello@complyspa.com"      false
 ```
-
-### Step 3: Deploy Edge Functions to Supabase + Set Secrets
-
-```bash
-# Deploy Edge Functions
-supabase functions deploy send-credential-alert --project-ref YOUR_PROJECT_REF
-supabase functions list --project-ref YOUR_PROJECT_REF
-```
-
-Supabase Dashboard → Settings → Edge Functions → Secrets:
-
-```
-SUPABASE_URL=https://[ref].supabase.co
-SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
-RESEND_API_KEY=re_...
-SENTRY_DSN=https://...@...ingest.sentry.io/...
-APP_URL=https://your-project.vercel.app
-CRON_SECRET=(same value as Vercel)
-```
-
-### Step 4: Configure Clerk + Supabase Auth
-
-1. Clerk Dashboard → Configure:
-   - Clerk handles the URLs automatically — no manual Instance URL change needed
-   - The app already uses relative redirects (`/sign-in`, `/sign-up`, `/dashboard`, `/onboarding`) which work on any domain
-2. Clerk Dashboard → JWT Templates → supabase template: `{"sub": "{{user.id}}"}`, HS256
-3. Supabase Dashboard → Authentication → Third-Party Auth → Clerk → paste Frontend API domain
-4. On `https://your-project.vercel.app`, test sign-in flow works
-
-### Step 5: First Deploy to Vercel
-
-- Push to GitHub (private repo: `gh repo create complyspa --private --source=. --push`)
-- vercel.com → New Project → import repo → auto-detects Next.js → set env vars from Step 2 → Deploy
-- Gets `https://your-project.vercel.app` automatically
-- Every `git push` to main auto-deploys
-
-### Step 6: Post-Deploy Verification (staging)
-
-- [ ] `/` landing page loads, 3D renders on desktop, no console errors
-- [ ] `/pricing` loads, all 3 cards, toggle, FAQ accordion work
-- [ ] `/sitemap.xml` returns valid XML
-- [ ] `/robots.txt` disallows `/dashboard/`, `/api/`, `/onboarding/`
-- [ ] Sign-up → 4-step onboarding wizard → dashboard with correct counts
-- [ ] Sign-in with same credentials works
-- [ ] Add staff/credential (verifies Supabase production RLS + write path)
-- [ ] Settings: edit profile, manage recipients, toast notifications appear
-- [ ] Resend dashboard: welcome email delivered (may go to spam — onboarding@resend.dev, expected for staging)
-- [ ] Sentry: error captured on production
-- [ ] Solo plan: redirects to `/pricing` from `/dashboard/settings/users`
-- [ ] Mobile: landing page responsive at 375px, 3D becomes gradient
-
-### Step 7: Known Staging Limitations
-
-These are expected and OK for a staging environment:
-
-- `FROM_EMAIL` uses `onboarding@resend.dev` — no sending domain verified. Emails may go to spam. OK for staging.
-- No Polar checkout — `POLAR_ACCESS_TOKEN` is empty. Trial CTA goes to `/sign-up`.
-- URL is `your-project.vercel.app` — not branded. OK for staging. This URL is never shared publicly.
-- Clerk uses the default `clerk.accounts.dev` domain for auth — no custom domain needed for Clerk to work.
-
-### Step 8: Buy a Domain (When Ready for Real Launch)
-
-When you're ready to go live publicly:
-
-1. Buy `complyspa.com` on Cloudflare Registrar (~$12/year, cost price, includes WHOIS privacy)
-2. Domain auto-added to Cloudflare with DNS management ready
-
-### Step 9: Add Domain to Vercel
-
-1. Vercel → Settings → Domains → Add `yourdomain.com`
-2. Vercel shows required DNS: `A @ 76.76.21.21` + `CNAME www cname.vercel-dns.com`
-3. Add both records in Cloudflare DNS → Proxy: DNS only (gray cloud)
-4. Wait 5-15 min → Vercel auto-verifies + provisions SSL
-5. Set as Primary domain → `vercel.app` URL auto-redirects to custom domain
-
-### Step 10: Update Environment Variables for Domain
-
-After domain is live on Vercel:
-
-```
-Vercel Dashboard → Settings → Environment Variables:
-- Update: NEXT_PUBLIC_APP_URL=https://yourdomain.com
-- Update: FROM_EMAIL=Compliance Alerts <alerts@yourdomain.com>
-```
-
-```
-Supabase Dashboard → Edge Functions → Secrets:
-- Update: APP_URL=https://yourdomain.com
-- Re-deploy Edge Functions (Step 3)
-```
-
-### Step 11: Configure Clerk for Custom Domain
-
-1. Clerk Dashboard → Configure → Domain → Change Instance URL from auto to `https://yourdomain.com`
-2. Update redirect URLs to use `yourdomain.com` (sign-in, sign-up, after-sign-in, after-sign-up)
-3. Both vercel.app and yourdomain.com work during propagation — Clerk handles the transition
-4. Clerk JWT template and Supabase third-party auth DO NOT change — they work independently of domain
-
-### Step 12: Verify Resend Sending Domain + Add DNS Records
-
-Resend requires a verified sending domain for production email deliverability.
-
-1. Resend Dashboard → Domains → Add `yourdomain.com` → Region: us-east-1
-2. Resend generates DNS records. Add ALL of them to Cloudflare (Proxy: DNS only — gray cloud):
-
-   **DKIM** (3 CNAME records — Resend provides unique name/value pairs per domain):
-   ```
-   xxx._domainkey → CNAME → xxx.dkim.amazonses.com
-   ```
-   Copy exactly from Resend. Do NOT use example values.
-
-   **SPF** (MX + TXT):
-   ```
-   send → MX → feedback-smtp.us-east-1.amazonses.com (priority 10)
-   send → TXT → "v=spf1 include:amazonses.com ~all"
-   ```
-
-   **DMARC** (TXT — add manually, Resend does not provide this):
-   ```
-   _dmarc → TXT → "v=DMARC1; p=none; rua=mailto:admin@yourdomain.com"
-   ```
-   Start with `p=none`. Change to `p=reject` after 2-4 weeks of monitoring.
-
-3. Click Verify in Resend Dashboard → wait 15 min (up to 72 hours globally)
-4. Verify: `nslookup -type=TXT send.yourdomain.com`
-5. Update Resend Webhook endpoint: `https://yourdomain.com/api/resend/webhook`
-
-### Step 13: Post-Domain Launch
-
-- Google Search Console: add `yourdomain.com`, verify via DNS, submit `/sitemap.xml`
-- Add `admin@yourdomain.com` in Resend as reply-to address
-- Wait 1-2 weeks, then vercel.app auto-redirects to custom domain
-- **The vercel.app URL stays alive** — use it for staging/testing new features before pushing to `main`
-
-### Domain Migration Reference — What Points Where
-
-The vercel.app URL is STAGING ONLY. Nothing external is configured on it. When the real domain is purchased, configure everything ONCE on the domain.
-
-| Service | Staging (vercel.app) | Production (yourdomain.com) | Where to update |
-|---|---|---|---|
-| Vercel hosting | `your-project.vercel.app` | `yourdomain.com` + `www` | Vercel → Settings → Domains |
-| Clerk Instance URL | Auto (relative redirects work) | `https://yourdomain.com` | Clerk Dashboard → Configure |
-| Clerk redirect URLs | Auto (relative: `/sign-in`, etc.) | Absolute: `https://yourdomain.com/sign-in` | Clerk Dashboard → Configure |
-| Clerk JWT template | Supabase template (unchanged) | Unchanged | Clerk Dashboard → JWT Templates |
-| Clerk → Supabase auth | Frontend API domain (unchanged) | Unchanged | Supabase → Auth → Third-Party Auth |
-| Supabase URL | `https://[ref].supabase.co` | Unchanged | N/A |
-| Supabase Edge Functions | `https://[ref].supabase.co/functions/v1/...` | Unchanged | N/A |
-| Resend FROM_EMAIL | `onboarding@resend.dev` | `alerts@yourdomain.com` | Vercel env var `FROM_EMAIL` |
-| Resend sending domain | NOT verified | `yourdomain.com` verified | Resend Dashboard → Domains |
-| Resend webhook | NOT configured | `https://yourdomain.com/api/resend/webhook` | Resend Dashboard → Webhooks |
-| Vercel `NEXT_PUBLIC_APP_URL` | `https://your-project.vercel.app` | `https://yourdomain.com` | Vercel → Settings → Env Vars |
-| Supabase `APP_URL` secret | `https://your-project.vercel.app` | `https://yourdomain.com` | Supabase → Edge Functions → Secrets |
-| Cloudflare DNS | Nothing | A, CNAME, MX, TXT records | Cloudflare → DNS → Records |
-
-**Cloudflare DNS records (only added when domain is purchased):**
-
-| Type | Name | Value | Proxy |
-|---|---|---|---|
-| A | @ | `76.76.21.21` | DNS only (gray) |
-| CNAME | www | `cname.vercel-dns.com` | DNS only (gray) |
-| CNAME | `xxx._domainkey` | `xxx.dkim.amazonses.com` | DNS only (gray) |
-| CNAME | `xxx._domainkey` | `xxx.dkim.amazonses.com` | DNS only (gray) |
-| CNAME | `xxx._domainkey` | `xxx.dkim.amazonses.com` | DNS only (gray) |
-| MX | send | `feedback-smtp.us-east-1.amazonses.com` | DNS only (gray) |
-| TXT | send | `"v=spf1 include:amazonses.com ~all"` | DNS only (gray) |
-| TXT | _dmarc | `"v=DMARC1; p=none; rua=mailto:admin@yourdomain.com"` | DNS only (gray) |
-
-The three DKIM CNAME records are generated by Resend when you add the domain — copy them exactly from the Resend dashboard. Do NOT use any example values.
 
 ### Cloudflare Proxy Warning
 
-Do NOT enable Cloudflare proxy (orange cloud) on Vercel or Resend DNS records. Cloudflare proxy interferes with:
+Do NOT enable Cloudflare proxy (orange cloud) on any DNS records. Cloudflare proxy interferes with:
 - Clerk authentication (JWT cookies may not pass through)
 - Vercel edge functions (double-proxying)
 - Resend email DNS (MX/TXT must not be proxied)

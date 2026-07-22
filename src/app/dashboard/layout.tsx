@@ -61,7 +61,7 @@ export default async function DashboardLayout({
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "";
   if (clinic.plan === "solo") {
-    const soloRestricted = pathname.startsWith("/dashboard/audit") || pathname.startsWith("/dashboard/settings/users");
+    const soloRestricted = pathname.startsWith("/dashboard/settings/users");
     if (soloRestricted) {
       redirect("/pricing?reason=plan_upgrade_required");
     }

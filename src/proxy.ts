@@ -17,7 +17,6 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 const soloForbidden = createRouteMatcher([
-  "/dashboard/audit(.*)",
   "/dashboard/settings/users(.*)",
 ]);
 

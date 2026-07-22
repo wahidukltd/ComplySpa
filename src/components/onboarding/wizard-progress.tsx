@@ -4,9 +4,7 @@ const STEPS = [
   { step: 1, label: "Clinic" },
   { step: 2, label: "Staff" },
   { step: 3, label: "Credentials" },
-  { step: 4, label: "Checklist" },
-  { step: 5, label: "Scan" },
-  { step: 6, label: "Done" },
+  { step: 4, label: "Done" },
 ];
 
 export function WizardProgress({ currentStep }: { currentStep: number }) {

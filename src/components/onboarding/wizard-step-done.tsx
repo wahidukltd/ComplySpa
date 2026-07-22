@@ -56,7 +56,7 @@ export function WizardStepDone({
           </li>
           <li className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#5B8A6A]" />
-            <span>Inspection readiness tracking</span>
+            <span>Full audit-ready compliance reports</span>
           </li>
         </ul>
 

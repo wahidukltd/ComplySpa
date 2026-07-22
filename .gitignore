@@ -30,6 +30,7 @@ dev-server.log
 .env*.local
 !.env.local.example
 .env.example
+env-production.txt
 
 # Supabase
 supabase/.branches

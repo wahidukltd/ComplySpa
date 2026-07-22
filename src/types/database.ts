@@ -101,56 +101,6 @@ export type Database = {
           },
         ]
       }
-      audit_findings: {
-        Row: {
-          audit_run_id: string
-          auto_filled: boolean
-          checklist_item: string
-          created_at: string
-          id: string
-          notes: string | null
-          remediation_closed_at: string | null
-          remediation_due_date: string | null
-          remediation_status: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          audit_run_id: string
-          auto_filled?: boolean
-          checklist_item: string
-          created_at?: string
-          id?: string
-          notes?: string | null
-          remediation_closed_at?: string | null
-          remediation_due_date?: string | null
-          remediation_status?: string | null
-          status: string
-          updated_at?: string
-        }
-        Update: {
-          audit_run_id?: string
-          auto_filled?: boolean
-          checklist_item?: string
-          created_at?: string
-          id?: string
-          notes?: string | null
-          remediation_closed_at?: string | null
-          remediation_due_date?: string | null
-          remediation_status?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_findings_audit_run_id_fkey"
-            columns: ["audit_run_id"]
-            isOneToOne: false
-            referencedRelation: "audit_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       audit_reports: {
         Row: {
           clinic_id: string
@@ -190,60 +140,6 @@ export type Database = {
           {
             foreignKeyName: "audit_reports_generated_by_user_id_fkey"
             columns: ["generated_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      audit_runs: {
-        Row: {
-          clinic_id: string
-          completed_at: string | null
-          created_at: string
-          created_by_user_id: string | null
-          id: string
-          readiness_score: number | null
-          run_type: string
-          started_at: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          clinic_id: string
-          completed_at?: string | null
-          created_at?: string
-          created_by_user_id?: string | null
-          id?: string
-          readiness_score?: number | null
-          run_type?: string
-          started_at?: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          clinic_id?: string
-          completed_at?: string | null
-          created_at?: string
-          created_by_user_id?: string | null
-          id?: string
-          readiness_score?: number | null
-          run_type?: string
-          started_at?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_runs_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_runs_created_by_user_id_fkey"
-            columns: ["created_by_user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
