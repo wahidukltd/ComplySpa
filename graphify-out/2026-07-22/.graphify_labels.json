@@ -16,8 +16,6 @@
   "14": "class-variance-authority",
   "15": "send-audit-reminder/index.ts",
   "16": "dashboard-shell.tsx",
-  "17": "dashboard/page.tsx",
-  "18": "topbar.tsx",
   "19": "types/index.ts",
   "20": "dependencies",
   "21": "proxy.ts",
@@ -68,10 +66,12 @@
   "78": "sentry.server.config.ts",
   "79": "polar/client.ts",
   "80": "polar/webhook.ts",
+  "81": "credential-form.tsx",
   "86": "server-only.ts",
   "87": "vitest.config.ts",
   "88": "AGENTS.md",
   "89": "Frontend Conventions",
   "91": "Database Conventions",
-  "103": "credentials.ts"
+  "103": "credentials.ts",
+  "107": "badge.tsx"
 }

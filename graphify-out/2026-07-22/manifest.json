@@ -430,8 +430,8 @@
     "semantic_hash": "cac56ba1e844173922e3f00ce87ff2df"
   },
   "src/components/pricing/comparison-table.tsx": {
-    "mtime": 1784697922.5934467,
-    "ast_hash": "940773d17e1f34c7144f139af6676144",
+    "mtime": 1784650724.1888566,
+    "ast_hash": "ef24a9fa961869a6c5693fe3c4b3aa98",
     "semantic_hash": ""
   },
   "src/components/pricing/faq-accordion.tsx": {
