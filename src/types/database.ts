@@ -397,7 +397,7 @@ export type Database = {
       }
       users: {
         Row: {
-          clerk_user_id: string
+          auth_user_id: string | null
           clinic_id: string
           created_at: string
           deleted_at: string | null
@@ -407,7 +407,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          clerk_user_id: string
+          auth_user_id?: string | null
           clinic_id: string
           created_at?: string
           deleted_at?: string | null
@@ -417,7 +417,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          clerk_user_id?: string
+          auth_user_id?: string | null
           clinic_id?: string
           created_at?: string
           deleted_at?: string | null
@@ -448,7 +448,7 @@ export type Database = {
       create_clinic_for_user: {
         Args: {
           p_address?: string
-          p_clerk_sub: string
+          p_user_id: string
           p_email: string
           p_name: string
           p_state?: string

@@ -79,11 +79,11 @@ const serviceKeyJwt = createJwt({ role: "service_role" });
 
 /** Fetch a PostgREST resource as a specific Clerk user (RLS-enforced) */
 export async function fetchAsUser(
-  clerkUserId: string,
+  authUserId: string,
   table: string,
   options: { method?: string; body?: object } = {},
 ): Promise<Response> {
-  const jwt = createJwt({ sub: clerkUserId, role: "authenticated" });
+  const jwt = createJwt({ sub: authUserId, role: "authenticated" });
   return fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: options.method ?? "GET",
     headers: {
@@ -98,12 +98,12 @@ export async function fetchAsUser(
 
 /** PATCH a PostgREST resource as a specific Clerk user with a filter */
 export async function patchAsUser(
-  clerkUserId: string,
+  authUserId: string,
   table: string,
   filter: string,
   body: object,
 ): Promise<Response> {
-  const jwt = createJwt({ sub: clerkUserId, role: "authenticated" });
+  const jwt = createJwt({ sub: authUserId, role: "authenticated" });
   return fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
     method: "PATCH",
     headers: {

@@ -20,10 +20,10 @@ beforeAll(async () => {
   if (clinicError) throw new Error(`Failed to insert clinics: ${clinicError.message}`);
 
   const { error: userError } = await serviceClient.from("users").upsert([
-    { clinic_id: clinicAId, email: "a@rls-test.com", clerk_user_id: clerkUserA, role: "owner" },
-    { clinic_id: clinicBId, email: "b@rls-test.com", clerk_user_id: clerkUserB, role: "owner" },
-    { clinic_id: clinicAId, email: "viewer@rls-test.com", clerk_user_id: clerkViewerA, role: "viewer" },
-    { clinic_id: clinicAId, email: "manager@rls-test.com", clerk_user_id: clerkManagerA, role: "manager" },
+    { clinic_id: clinicAId, email: "a@rls-test.com", auth_user_id: clerkUserA, role: "owner" },
+    { clinic_id: clinicBId, email: "b@rls-test.com", auth_user_id: clerkUserB, role: "owner" },
+    { clinic_id: clinicAId, email: "viewer@rls-test.com", auth_user_id: clerkViewerA, role: "viewer" },
+    { clinic_id: clinicAId, email: "manager@rls-test.com", auth_user_id: clerkManagerA, role: "manager" },
   ]);
   if (userError) throw new Error(`Failed to insert users: ${userError.message}`);
 
@@ -129,7 +129,7 @@ describe("Role enforcement (C3 fix)", () => {
   it("viewer cannot INSERT users", async () => {
     const res = await fetchAsUser(clerkViewerA, "users", {
       method: "POST",
-      body: { clinic_id: clinicAId, email: "new@rls-test.com", clerk_user_id: "clerk_new", role: "viewer" },
+      body: { clinic_id: clinicAId, email: "new@rls-test.com", auth_user_id: "clerk_new", role: "viewer" },
     });
     expect(res.status).toBe(403);
   });
@@ -137,7 +137,7 @@ describe("Role enforcement (C3 fix)", () => {
   it("manager cannot INSERT users (owner only)", async () => {
     const res = await fetchAsUser(clerkManagerA, "users", {
       method: "POST",
-      body: { clinic_id: clinicAId, email: "new@rls-test.com", clerk_user_id: "clerk_new2", role: "viewer" },
+      body: { clinic_id: clinicAId, email: "new@rls-test.com", auth_user_id: "clerk_new2", role: "viewer" },
     });
     expect(res.status).toBe(403);
   });
@@ -331,11 +331,11 @@ describe("Owner can manage users", () => {
       body: {
         clinic_id: clinicAId,
         email: "newowner@rls-test.com",
-        clerk_user_id: "clerk_new_owner_test",
+        auth_user_id: "clerk_new_owner_test",
         role: "viewer",
       },
     });
     expect(res.status).toBe(201);
-    await serviceClient.from("users").delete().eq("clerk_user_id", "clerk_new_owner_test");
+    await serviceClient.from("users").delete().eq("auth_user_id", "clerk_new_owner_test");
   });
 });

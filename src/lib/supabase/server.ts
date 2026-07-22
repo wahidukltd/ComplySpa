@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import * as Sentry from "@sentry/nextjs";
 import type { Database } from "@/types/database";
 
 export async function createClient() {
@@ -20,9 +21,9 @@ export async function createClient() {
       setAll(cookiesToSet) {
         for (const { name, value, options } of cookiesToSet) {
           try {
-            cookieStore.set(name, value, options);
+            cookieStore.set(name, value, { ...options, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
           } catch {
-            // ponytail: cookie mutation in read-only context (e.g. RSC) — safe to skip
+            Sentry.captureMessage("RSC cookie mutation skipped", { extra: { cookieName: name } });
           }
         }
       },

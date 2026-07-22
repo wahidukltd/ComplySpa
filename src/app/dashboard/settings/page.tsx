@@ -20,7 +20,7 @@ export default async function SettingsPage() {
   const { data: userRecord } = await supabase
     .from("users")
     .select("id, role, clinic_id")
-    .eq("clerk_user_id", userId)
+    .eq("auth_user_id", userId)
     .maybeSingle();
 
   if (!userRecord) redirect("/onboarding");
@@ -95,3 +95,4 @@ export default async function SettingsPage() {
     </div>
   );
 }
+

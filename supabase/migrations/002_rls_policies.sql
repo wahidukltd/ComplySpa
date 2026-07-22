@@ -3,26 +3,27 @@
 
 -- ============================================================================
 -- HELPER FUNCTION: auth_clinic_id()
--- Returns the clinic_id for the current Clerk user from their JWT sub claim.
--- SECURITY DEFINER: runs as postgres, bypasses RLS on users table to look up
--- the caller's clinic_id. Without this, RLS on users would create a circular
--- dependency (policy on users calls auth_clinic_id() which reads users).
+-- Returns the clinic_id for the current authenticated user from their JWT sub
+-- claim. SECURITY DEFINER: runs as postgres, bypasses RLS on users table to
+-- look up the caller's clinic_id. Without this, RLS on users would create a
+-- circular dependency (policy on users calls auth_clinic_id() which reads
+-- users).
 -- ============================================================================
 CREATE OR REPLACE FUNCTION auth_clinic_id()
 RETURNS UUID AS $$
 DECLARE
-  clerk_sub TEXT;
+  auth_sub TEXT;
   result_clinic_id UUID;
 BEGIN
-  clerk_sub := auth.jwt() ->> 'sub';
+  auth_sub := auth.jwt() ->> 'sub';
 
-  IF clerk_sub IS NULL THEN
+  IF auth_sub IS NULL THEN
     RETURN NULL;
   END IF;
 
   SELECT clinic_id INTO result_clinic_id
   FROM users
-  WHERE clerk_user_id = clerk_sub
+  WHERE clerk_user_id = auth_sub
   LIMIT 1;
 
   RETURN result_clinic_id;

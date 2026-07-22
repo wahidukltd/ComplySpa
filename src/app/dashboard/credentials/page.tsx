@@ -17,7 +17,7 @@ export default async function CredentialsListPage() {
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
     .select("clinic_id")
-    .eq("clerk_user_id", userId)
+    .eq("auth_user_id", userId)
     .maybeSingle();
 
   if (userErr || !userRecord) redirect("/onboarding");
@@ -59,3 +59,4 @@ export default async function CredentialsListPage() {
     </div>
   );
 }
+

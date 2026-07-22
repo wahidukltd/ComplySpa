@@ -25,7 +25,7 @@ export async function getReportData(): Promise<{
   const { data: user, error: userErr } = await supabase
     .from("users")
     .select("id, email, clinic_id")
-    .eq("clerk_user_id", userId)
+    .eq("auth_user_id", userId)
     .single();
 
   if (userErr || !user) {
@@ -201,7 +201,7 @@ export async function createReport(
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
     .select("id, clinic_id, role")
-    .eq("clerk_user_id", userId)
+    .eq("auth_user_id", userId)
     .single();
 
   if (userErr || !userRecord) {
@@ -266,7 +266,7 @@ export async function getReportHistory(): Promise<{
   const { data: user, error: userErr } = await supabase
     .from("users")
     .select("clinic_id")
-    .eq("clerk_user_id", userId)
+    .eq("auth_user_id", userId)
     .single();
 
   if (userErr || !user) {
@@ -301,3 +301,4 @@ export async function getReportHistory(): Promise<{
 
   return { reports, error: null, clinicId: user.clinic_id };
 }
+

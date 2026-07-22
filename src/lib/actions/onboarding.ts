@@ -3,6 +3,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClinicSchema, type CreateClinicInput } from "@/lib/validations/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
 import { revalidatePath } from "next/cache";
@@ -34,7 +35,7 @@ async function createClinicInternal(input: CreateClinicInput) {
   const { data: clinicId, error: rpcError } = await supabase.rpc(
     "create_clinic_for_user",
     {
-      p_clerk_sub: userId,
+      p_user_id: userId,
       p_email: userEmail,
       p_name: name,
       p_address: address || undefined,
@@ -81,24 +82,23 @@ export async function createClinicOnboarding(input: CreateClinicInput) {
   return { clinicId: result.clinicId, error: null };
 }
 
-export async function completeInvitationSignup(clerkUserId: string): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+export async function completeInvitationSignup(authUserId: string): Promise<{ error: string | null }> {
+  const { data: { user: authUser } } = await (await createClient()).auth.getUser();
   if (!authUser?.email) return { error: "No email found for user" };
 
-  const { data: pending } = await supabase
+  const admin = createAdminClient();
+  const { data: pending } = await admin
     .from("users")
     .select("id, clinic_id, role")
     .eq("email", authUser.email)
-    .eq("clerk_user_id", "")
+    .is("auth_user_id", null)
     .maybeSingle();
 
   if (!pending) return { error: "No invitation pending" };
 
-  const { error } = await supabase
+  const { error } = await admin
     .from("users")
-    .update({ clerk_user_id: clerkUserId })
+    .update({ auth_user_id: authUserId })
     .eq("id", pending.id);
 
   if (error) {

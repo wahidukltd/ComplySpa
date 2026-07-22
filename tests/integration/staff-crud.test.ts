@@ -20,7 +20,7 @@ describe("staff CRUD", () => {
         clinic_id: clinic.id,
         email: `${testUserId}@test.com`,
         role: "owner",
-        clerk_user_id: testUserId,
+        auth_user_id: testUserId,
       });
     expect(userErr).toBeNull();
 
@@ -30,7 +30,7 @@ describe("staff CRUD", () => {
   async function teardown(clinicId: string) {
     await admin.from("credentials").delete().eq("clinic_id", clinicId);
     await admin.from("staff_members").delete().eq("clinic_id", clinicId);
-    await admin.from("users").delete().eq("clerk_user_id", testUserId);
+    await admin.from("users").delete().eq("auth_user_id", testUserId);
     await admin.from("clinics").delete().eq("id", clinicId);
   }
 

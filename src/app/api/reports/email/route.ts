@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const { data: userRecord } = await supabase
       .from("users")
       .select("email, role")
-      .eq("clerk_user_id", userId)
+      .eq("auth_user_id", userId)
       .single();
 
     if (!userRecord) {
@@ -125,3 +125,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+

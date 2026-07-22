@@ -11,7 +11,7 @@ describe("onboarding flow", () => {
   const createdClinicIds: string[] = [];
 
   afterAll(async () => {
-    await adminClient.from("users").delete().eq("clerk_user_id", testUserId);
+    await adminClient.from("users").delete().eq("auth_user_id", testUserId);
     for (const id of createdClinicIds) {
       await adminClient.from("clinics").delete().eq("id", id);
     }
@@ -36,7 +36,7 @@ describe("onboarding flow", () => {
         clinic_id: "00000000-0000-0000-0000-000000000000",
         email: "new@test.com",
         role: "owner",
-        clerk_user_id: "never_onboarded_2",
+        auth_user_id: "never_onboarded_2",
       },
     });
     expect(res.status).toBe(403);
@@ -58,7 +58,7 @@ describe("onboarding flow", () => {
       clinic_id: clinic!.id,
       email: `${testUserId}@test.com`,
       role: "owner",
-      clerk_user_id: testUserId,
+      auth_user_id: testUserId,
     });
 
     expect(userError).toBeNull();
@@ -66,7 +66,7 @@ describe("onboarding flow", () => {
     const { data: userRecord } = await adminClient
       .from("users")
       .select("clinic_id, role")
-      .eq("clerk_user_id", testUserId)
+      .eq("auth_user_id", testUserId)
       .single();
 
     expect(userRecord).not.toBeNull();
@@ -74,7 +74,7 @@ describe("onboarding flow", () => {
     expect(userRecord!.role).toBe("owner");
   });
 
-  it("clerk_user_id UNIQUE rejects duplicate insert", async () => {
+  it("auth_user_id UNIQUE rejects duplicate insert", async () => {
     const { data: clinic } = await adminClient
       .from("clinics")
       .insert({ name: `Duplicate Test ${Date.now()}` })
@@ -86,7 +86,7 @@ describe("onboarding flow", () => {
       clinic_id: clinic!.id,
       email: "dup@test.com",
       role: "owner",
-      clerk_user_id: "dup_clerk_test",
+      auth_user_id: "dup_clerk_test",
     });
     expect(firstInsert).toBeNull();
 
@@ -94,12 +94,12 @@ describe("onboarding flow", () => {
       clinic_id: clinic!.id,
       email: "dup2@test.com",
       role: "owner",
-      clerk_user_id: "dup_clerk_test",
+      auth_user_id: "dup_clerk_test",
     });
     expect(secondInsert).not.toBeNull();
     expect(secondInsert!.code).toBe("23505");
 
-    await serviceClient.from("users").delete().eq("clerk_user_id", "dup_clerk_test");
+    await serviceClient.from("users").delete().eq("auth_user_id", "dup_clerk_test");
     await adminClient.from("clinics").delete().eq("id", clinic!.id);
   });
 
@@ -136,14 +136,14 @@ describe("onboarding flow", () => {
     const { data: userRecord } = await adminClient
       .from("users")
       .select("clinic_id, role, email")
-      .eq("clerk_user_id", rpcUserId)
+      .eq("auth_user_id", rpcUserId)
       .single();
     expect(userRecord).not.toBeNull();
     expect(userRecord!.clinic_id).toBe(clinicId);
     expect(userRecord!.role).toBe("owner");
     expect(userRecord!.email).toBe(rpcEmail);
 
-    // Second call with same clerk_user_id returns existing clinic_id (idempotent)
+    // Second call with same auth_user_id returns existing clinic_id (idempotent)
     const { data: existingClinicId, error: secondErr } = await adminClient.rpc(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       "create_clinic_for_user" as any,
@@ -160,11 +160,11 @@ describe("onboarding flow", () => {
     const { count: userCount } = await adminClient
       .from("users")
       .select("id", { count: "exact", head: true })
-      .eq("clerk_user_id", rpcUserId);
+      .eq("auth_user_id", rpcUserId);
     expect(userCount).toBe(1);
 
     // Cleanup
-    await adminClient.from("users").delete().eq("clerk_user_id", rpcUserId);
+    await adminClient.from("users").delete().eq("auth_user_id", rpcUserId);
     await adminClient.from("clinics").delete().eq("id", clinicId);
   });
 });

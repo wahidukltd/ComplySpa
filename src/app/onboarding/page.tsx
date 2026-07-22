@@ -18,7 +18,7 @@ export default async function OnboardingPage() {
   const { data: existingUser } = await supabase
     .from("users")
     .select("clinic_id")
-    .eq("clerk_user_id", userId)
+    .eq("auth_user_id", userId)
     .maybeSingle();
 
   if (existingUser) {
@@ -26,12 +26,10 @@ export default async function OnboardingPage() {
   }
 
   try {
-    if (userId) {
-      const result = await completeInvitationSignup(userId);
-      if (!result.error) redirect("/dashboard");
-      if (result.error !== "No invitation pending") {
-        Sentry.captureMessage("Invitation signup failed", { extra: { userId, error: result.error } });
-      }
+    const result = await completeInvitationSignup(userId);
+    if (!result.error) redirect("/dashboard");
+    if (result.error !== "No invitation pending") {
+      Sentry.captureMessage("Invitation signup failed", { extra: { userId, error: result.error } });
     }
   } catch (err) {
     Sentry.captureException(err);
@@ -39,3 +37,4 @@ export default async function OnboardingPage() {
 
   return <OnboardingForm />;
 }
+

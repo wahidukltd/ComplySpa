@@ -23,7 +23,7 @@ export async function proxy(req: NextRequest) {
       setAll(cookiesToSet) {
         for (const { name, value, options } of cookiesToSet) {
           req.cookies.set(name, value);
-          res.cookies.set(name, value, options);
+          res.cookies.set(name, value, { ...options, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
         }
       },
     },
@@ -54,18 +54,16 @@ export async function proxy(req: NextRequest) {
     return res;
   }
 
-  const userRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/users?clerk_user_id=eq.${encodeURIComponent(user.id)}&select=clinic_id`,
-    { headers: { apikey: SUPABASE_ANON_KEY! } },
-  );
+  const { data: users, error: userError } = await supabase
+    .from("users")
+    .select("clinic_id")
+    .eq("auth_user_id", user.id);
 
-  if (!userRes.ok) {
-    Sentry.captureMessage("Middleware: users fetch failed", { extra: { userId: user.id, status: userRes.status } });
+  if (userError) {
+    Sentry.captureMessage("Middleware: users query failed", { extra: { userId: user.id, error: userError } });
     if (pathname === "/onboarding") return res;
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
-
-  const users = (await userRes.json()) as Array<{ clinic_id: string }>;
 
   if (!users?.[0]) {
     if (pathname === "/onboarding") return res;
@@ -76,17 +74,16 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  const clinicRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/clinics?id=eq.${encodeURIComponent(users[0].clinic_id)}&select=plan`,
-    { headers: { apikey: SUPABASE_ANON_KEY! } },
-  );
+  const { data: clinics, error: clinicError } = await supabase
+    .from("clinics")
+    .select("plan")
+    .eq("id", users[0].clinic_id);
 
-  if (!clinicRes.ok) {
-    Sentry.captureMessage("Middleware: clinics fetch failed", { extra: { userId: user.id, clinicId: users[0].clinic_id, status: clinicRes.status } });
+  if (clinicError) {
+    Sentry.captureMessage("Middleware: clinics query failed", { extra: { userId: user.id, clinicId: users[0].clinic_id, error: clinicError } });
     return res;
   }
 
-  const clinics = (await clinicRes.json()) as Array<{ plan: string }>;
   const plan = clinics?.[0]?.plan;
 
   if (plan === "expired_trial" || plan === "inactive") {
@@ -105,3 +102,5 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
+
+

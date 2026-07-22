@@ -16,7 +16,7 @@ const SEED_CREDENTIAL_TYPE_COUNT = 12;
 
 const EXPECTED_IMMUTABILITY_TRIGGERS = [
   "trigger_users_clinic_id_immutable",
-  "trigger_users_clerk_user_id_immutable",
+  "trigger_users_auth_user_id_immutable",
   "trigger_staff_members_clinic_id_immutable",
   "trigger_credentials_clinic_id_immutable",
   "trigger_credential_types_clinic_id_immutable",
@@ -137,9 +137,9 @@ describe("Migration integrity", () => {
     expect(parseInt(result, 10)).toBe(0);
   });
 
-  it("clerk_user_id immutability trigger exists (L4 regression guard)", () => {
+  it("auth_user_id immutability trigger exists (L4 regression guard)", () => {
     const result = execSql(
-      "SELECT count(*) FROM pg_trigger WHERE tgname = 'trigger_users_clerk_user_id_immutable'",
+      "SELECT count(*) FROM pg_trigger WHERE tgname = 'trigger_users_auth_user_id_immutable'",
     );
     expect(parseInt(result, 10)).toBe(1);
   });

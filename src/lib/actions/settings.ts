@@ -24,7 +24,7 @@ async function getAuth() {
   const { data: user, error } = await supabase
     .from("users")
     .select("id, role, clinic_id")
-    .eq("clerk_user_id", ctx.userId)
+    .eq("auth_user_id", ctx.userId)
     .maybeSingle();
   if (error || !user) {
     if (error) Sentry.captureException(error);
@@ -260,7 +260,7 @@ export async function inviteUser(input: InviteUserInput) {
   }
 
   const { error: inviteErr } = await supabase.from("users").insert({
-    clerk_user_id: "",
+    auth_user_id: null,
     clinic_id: user.clinic_id,
     email: parsed.data.email,
     role: parsed.data.role,

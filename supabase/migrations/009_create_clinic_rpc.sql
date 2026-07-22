@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION create_clinic_for_user(
-  p_clerk_sub TEXT,
+  p_user_id TEXT,
   p_email TEXT,
   p_name TEXT,
   p_address TEXT DEFAULT NULL,
@@ -11,9 +11,9 @@ DECLARE
   v_clinic_id UUID;
   v_existing_id UUID;
 BEGIN
-  PERFORM pg_advisory_xact_lock(hashtext('create_clinic_' || p_clerk_sub));
+  PERFORM pg_advisory_xact_lock(hashtext('create_clinic_' || p_user_id));
 
-  SELECT clinic_id INTO v_existing_id FROM users WHERE clerk_user_id = p_clerk_sub;
+  SELECT clinic_id INTO v_existing_id FROM users WHERE clerk_user_id = p_user_id;
   IF FOUND THEN
     RETURN v_existing_id;
   END IF;
@@ -23,12 +23,12 @@ BEGIN
   RETURNING id INTO v_clinic_id;
 
   INSERT INTO users (clinic_id, email, role, clerk_user_id)
-  VALUES (v_clinic_id, p_email, 'owner', p_clerk_sub)
+  VALUES (v_clinic_id, p_email, 'owner', p_user_id)
   ON CONFLICT (clerk_user_id) DO NOTHING;
 
   IF NOT FOUND THEN
     DELETE FROM clinics WHERE id = v_clinic_id;
-    SELECT clinic_id INTO v_clinic_id FROM users WHERE clerk_user_id = p_clerk_sub;
+    SELECT clinic_id INTO v_clinic_id FROM users WHERE clerk_user_id = p_user_id;
   END IF;
 
   RETURN v_clinic_id;

@@ -24,7 +24,7 @@ export async function addStaffMember(input: StaffMemberInput) {
   const { data: user } = await supabase
     .from("users")
     .select("role")
-    .eq("clerk_user_id", userId)
+    .eq("auth_user_id", userId)
     .maybeSingle();
   if (!user) return { success: false, error: "Unauthorized" };
   if (user.role === "viewer") return { success: false, error: "Insufficient permissions" };
@@ -82,7 +82,7 @@ export async function updateStaffMember(id: string, input: StaffMemberInput) {
   const { data: user } = await supabase
     .from("users")
     .select("clinic_id, role")
-    .eq("clerk_user_id", userId)
+    .eq("auth_user_id", userId)
     .maybeSingle();
   if (!user) return { error: "Unauthorized" };
   if (user.role === "viewer") return { error: "Insufficient permissions" };
@@ -119,7 +119,7 @@ export async function deleteStaffMember(id: string) {
   const { data: user } = await supabase
     .from("users")
     .select("clinic_id, role")
-    .eq("clerk_user_id", userId)
+    .eq("auth_user_id", userId)
     .maybeSingle();
   if (!user) return { error: "Unauthorized" };
   if (user.role === "viewer") return { error: "Insufficient permissions" };
@@ -140,3 +140,4 @@ export async function deleteStaffMember(id: string) {
   revalidatePath("/dashboard");
   return { success: true };
 }
+

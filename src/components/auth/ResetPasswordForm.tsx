@@ -5,6 +5,16 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AuthCard } from "./AuthCard";
 
+const AUTH_ERRORS: Record<string, string | undefined> = {
+  invalid_credentials: "Invalid email or password.",
+  same_password: "New password must be different from your current password.",
+};
+
+function mapAuthError(err: { message?: string; code?: string }): string {
+  if (err.code && AUTH_ERRORS[err.code]) return AUTH_ERRORS[err.code]!;
+  return err.message || "Authentication failed. Please try again.";
+}
+
 export function ResetPasswordForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,45 +24,37 @@ export function ResetPasswordForm() {
   const [sent, setSent] = useState(false);
   const [isRecovery, setIsRecovery] = useState(false);
   const router = useRouter();
+  const supabase = createClient();
 
   useEffect(() => {
-    // Detect if we arrived via a password recovery link (hash has access_token)
-    if (typeof window !== "undefined") {
-      const hash = window.location.hash;
-      if (hash && hash.includes("type=recovery")) {
-        setIsRecovery(true);
-        // Set the session from the hash so updateUser can use it
-        const supabase = createClient();
-        supabase.auth.getSession().then(({ data }) => {
-          if (!data.session) {
-            // Try to recover from URL hash
-            const params = new URLSearchParams(hash.replace("#", "?"));
-            const accessToken = params.get("access_token");
-            const refreshToken = params.get("refresh_token");
-            if (accessToken && refreshToken) {
-              supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-            }
-          }
-        });
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (!hash || !hash.includes("type=recovery")) return;
+
+    setIsRecovery(true);
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) return;
+      const params = new URLSearchParams(hash.replace("#", "?"));
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
+      if (accessToken && refreshToken) {
+        supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          .catch(() => setError("Session expired. Please request a new reset link."));
       }
-    }
-  }, []);
+    }).catch(() => setError("Session expired. Please request a new reset link."));
+  }, [supabase]);
 
   async function handleSendReset(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     });
 
     if (resetError) {
-      setError(resetError.message);
+      setError(mapAuthError(resetError));
       setLoading(false);
       return;
     }
@@ -77,11 +79,10 @@ export function ResetPasswordForm() {
 
     setLoading(true);
 
-    const supabase = createClient();
     const { error: updateError } = await supabase.auth.updateUser({ password });
 
     if (updateError) {
-      setError(updateError.message);
+      setError(mapAuthError(updateError));
       setLoading(false);
       return;
     }

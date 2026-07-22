@@ -17,7 +17,7 @@ beforeAll(async () => {
   clinicId = clinic!.id;
 
   await service.from("users").insert({
-    clerk_user_id: TEST_CLERK_ID,
+    auth_user_id: TEST_CLERK_ID,
     clinic_id: clinicId,
     email: TEST_EMAIL,
     role: "owner",
@@ -55,7 +55,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await service.from("credentials").delete().eq("staff_member_id", mdStaffId);
   await service.from("staff_members").delete().eq("id", mdStaffId);
-  await service.from("users").delete().eq("clerk_user_id", TEST_CLERK_ID);
+  await service.from("users").delete().eq("auth_user_id", TEST_CLERK_ID);
   await service.from("clinics").delete().eq("id", clinicId);
   await service.from("credential_types").delete().eq("id", ctId);
 });
