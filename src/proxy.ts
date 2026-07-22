@@ -36,10 +36,8 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith("/sign-in") ||
     pathname.startsWith("/sign-up") ||
     pathname === "/pricing" ||
-    pathname.startsWith("/sentry-example-page") ||
     pathname.startsWith("/api/polar/webhook") ||
     pathname.startsWith("/api/resend/webhook") ||
-    pathname.startsWith("/api/sentry-example-api") ||
     pathname.startsWith("/api/health") ||
     pathname.startsWith("/sentry-tunnel");
 
