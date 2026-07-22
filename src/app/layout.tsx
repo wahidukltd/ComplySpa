@@ -55,6 +55,21 @@ export default function RootLayout({
         signInFallbackRedirectUrl="/dashboard"
         signUpFallbackRedirectUrl="/onboarding"
         afterSignOutUrl="/sign-in"
+        appearance={{
+          layout: {
+            logoPlacement: "none",
+            socialButtonsPlacement: "bottom",
+          },
+          variables: {
+            colorPrimary: "#6E97A7",
+            colorBackground: "#FFFFFF",
+            colorText: "#000000",
+            colorTextSecondary: "rgba(0,0,0,0.55)",
+            colorInputBackground: "#FFFFFF",
+            colorInputText: "#000000",
+            borderRadius: "0.5rem",
+          },
+        }}
       >
         <body className="min-h-full bg-background text-foreground">
           {children}
