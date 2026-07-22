@@ -11,24 +11,12 @@ declare global {
   interface Window {
     google?: {
       accounts: {
-        id: {
-          initialize: (config: {
+        oauth2: {
+          initTokenClient: (config: {
             client_id: string;
-            callback: (response: { credential: string }) => void;
-            nonce?: string;
-            use_fedcm_for_prompt?: boolean;
-          }) => void;
-          renderButton: (parent: HTMLElement, options: {
-            type?: "standard" | "icon";
-            theme?: "outline" | "filled_blue" | "filled_black";
-            size?: "small" | "medium" | "large";
-            text?: "signin_with" | "signup_with" | "continue_with" | "signin";
-            shape?: "rectangular" | "pill" | "circle" | "square";
-            logo_alignment?: "left" | "center";
-            width?: number;
-          }) => void;
-          prompt: (momentListener?: (notification: { getMomentType: () => string }) => void) => void;
-          cancel: () => void;
+            scope: string;
+            callback: (response: { access_token?: string; id_token?: string; error?: string }) => void;
+          }) => { requestAccessToken: () => void };
         };
       };
     };
@@ -40,30 +28,9 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const googleBtnRef = useRef<HTMLDivElement>(null);
-  const googleNonceRef = useRef<string>("");
+  const googleClientRef = useRef<{ requestAccessToken: () => void } | null>(null);
   const router = useRouter();
   const supabase = createClient();
-
-  async function onGoogleCredential(response: { credential: string }) {
-    setLoading(true);
-    setError(null);
-
-    const { error: signInError } = await supabase.auth.signInWithIdToken({
-      provider: "google",
-      token: response.credential,
-      nonce: googleNonceRef.current || undefined,
-    });
-
-    if (signInError) {
-      setError(signInError.message);
-      setLoading(false);
-      return;
-    }
-
-    router.push("/dashboard");
-    router.refresh();
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -82,16 +49,13 @@ export function LoginForm() {
     router.refresh();
   }
 
-  async function handleGoogleLogin() {
-    if (googleBtnRef.current) {
-      const btn = googleBtnRef.current.querySelector("div[role=button]") as HTMLElement | null;
-      if (btn) {
-        btn.click();
-        return;
-      }
-    }
-    if (typeof window !== "undefined" && window.google?.accounts?.id) {
-      window.google.accounts.id.prompt();
+  function handleGoogleLogin() {
+    setError(null);
+
+    if (googleClientRef.current) {
+      googleClientRef.current.requestAccessToken();
+    } else {
+      setError("Google Sign-In is still loading. Please try again.");
     }
   }
 
@@ -100,29 +64,35 @@ export function LoginForm() {
       <Script
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
-        onLoad={async () => {
-          if (window.google?.accounts?.id) {
-            const raw = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
-            const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw))))
-              .map((b) => b.toString(16).padStart(2, "0")).join("");
-            googleNonceRef.current = raw;
-
-            window.google.accounts.id.initialize({
+        onLoad={() => {
+          if (window.google?.accounts?.oauth2) {
+            googleClientRef.current = window.google.accounts.oauth2.initTokenClient({
               client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
-              callback: onGoogleCredential,
-              nonce: hash,
-              use_fedcm_for_prompt: true,
+              scope: "openid email profile",
+              callback: async (response) => {
+                if (response.error) {
+                  setError("Google sign-in was cancelled or failed.");
+                  return;
+                }
+                if (response.id_token) {
+                  setLoading(true);
+
+                  const { error: signInError } = await supabase.auth.signInWithIdToken({
+                    provider: "google",
+                    token: response.id_token,
+                  });
+
+                  if (signInError) {
+                    setError(signInError.message);
+                    setLoading(false);
+                    return;
+                  }
+
+                  router.push("/dashboard");
+                  router.refresh();
+                }
+              },
             });
-            if (googleBtnRef.current) {
-              window.google.accounts.id.renderButton(googleBtnRef.current, {
-                type: "standard",
-                theme: "outline",
-                size: "large",
-                text: "signin_with",
-                shape: "rectangular",
-                width: 0,
-              });
-            }
           }
         }}
       />
@@ -153,8 +123,6 @@ export function LoginForm() {
             </svg>
             {loading ? "Connecting..." : "Continue with Google"}
           </button>
-
-          <div ref={googleBtnRef} className="hidden" aria-hidden="true" />
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
