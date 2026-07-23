@@ -69,7 +69,8 @@ export async function getReportData(): Promise<{
       credential_type_id,
       credential_types ( name, category )
     `)
-    .eq("clinic_id", clinicId);
+    .eq("clinic_id", clinicId)
+    .is("deleted_at", null);
 
   if (credErr) {
     Sentry.captureException(credErr);
@@ -226,6 +227,10 @@ export async function createReport(
 
   if (!clinic || clinic.plan === "expired_trial" || clinic.plan === "inactive") {
     return { id: null, error: "Your plan does not support report generation." };
+  }
+
+  if (clinic.plan === "solo") {
+    return { id: null, error: "Audit-ready reports with email delivery require Practice plan or higher. Upgrade to generate and email full reports." };
   }
 
   const { data: report, error } = await supabase

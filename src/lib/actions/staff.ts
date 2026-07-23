@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { staffMemberSchema, type StaffMemberInput } from "@/lib/validations/staff";
 import { getClinicIdAndPlan } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
+import { PlanLimitError } from "@/lib/utils/errors";
 import * as Sentry from "@sentry/nextjs";
 
 export async function addStaffMember(input: StaffMemberInput) {
@@ -40,10 +41,14 @@ export async function addStaffMember(input: StaffMemberInput) {
     .is("deleted_at", null);
 
   if ((count ?? 0) >= limits.maxStaff) {
-    return {
-      success: false,
-      error: `Your plan allows up to ${limits.maxStaff} staff members. You currently have ${count ?? 0}. Upgrade to add more.`,
-    };
+    const err = new PlanLimitError(
+      "Your plan has reached its staff limit. Upgrade to add more.",
+      "STAFF_LIMIT",
+      count ?? 0,
+      limits.maxStaff,
+    );
+    Sentry.captureException(err);
+    return { success: false, error: err.message };
   }
 
   const { data: staff, error } = await supabase

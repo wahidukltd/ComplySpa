@@ -209,6 +209,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const ownerEmail = owners[0].email;
 
+    const { data: alertRecipients } = await supabase
+      .from("alert_recipients")
+      .select("email")
+      .eq("clinic_id", clinic_id)
+      .eq("is_active", true);
+
+    const allRecipients = [...new Set([ownerEmail, ...(alertRecipients?.map((r) => r.email) ?? [])])].filter(Boolean);
+
     const { data: clinic } = await supabase
       .from("clinics")
       .select("plan, name")
@@ -253,23 +261,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ? buildEscalationEmailHtml(staffName, credentialType, licenseLabel, expDate, days_before, dashboardLink)
       : buildAlertEmailHtml(staffName, credentialType, licenseLabel, expDate, days_before, dashboardLink);
 
-    const emailResult = await sendEmailWithRetry(ownerEmail, subject, emailHtml);
+    let anySuccess = false;
 
-    const { error: emailLogError } = await supabase.from("alert_logs").insert({
-      credential_id,
-      clinic_id,
-      alert_type: "email",
-      days_before_expiration: days_before,
-      recipient: ownerEmail,
-      delivery_status: emailResult.success ? "pending" : "failed",
-      resend_webhook_id: emailResult.messageId ?? null,
-    });
+    for (const recipient of allRecipients) {
+      const result = await sendEmailWithRetry(recipient, subject, emailHtml);
+      if (result.success) anySuccess = true;
 
-    if (emailLogError) {
-      Sentry.captureMessage("Edge Function: failed to log email alert to alert_logs", {
-        level: "error",
-        extra: { credential_id, error: emailLogError.message },
+      const { error: emailLogError } = await supabase.from("alert_logs").insert({
+        credential_id,
+        clinic_id,
+        alert_type: "email",
+        days_before_expiration: days_before,
+        recipient,
+        delivery_status: result.success ? "pending" : "failed",
+        resend_webhook_id: result.messageId ?? null,
       });
+
+      if (emailLogError) {
+        Sentry.captureMessage("Edge Function: failed to log email alert to alert_logs", {
+          level: "error",
+          extra: { credential_id, recipient, error: emailLogError.message },
+        });
+      }
     }
 
     const duration = Date.now() - startTime;
@@ -287,8 +300,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({
       success: true,
       data: {
-        email_sent: emailResult.success,
-        email_message_id: emailResult.messageId,
+        email_sent: anySuccess,
+        email_message_id: null,
       },
     }, 200);
   } catch (err) {

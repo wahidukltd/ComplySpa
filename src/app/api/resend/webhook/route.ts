@@ -66,13 +66,27 @@ export async function POST(req: NextRequest) {
 
     const { type, data } = parsed.data;
 
+    const supabase = createAdminClient();
+
+    if (type === "email.complained") {
+      Sentry.captureMessage("Resend webhook: spam complaint received", {
+        level: "warning",
+        extra: { email_id: data.email_id, to: data.to },
+      });
+      await supabase
+        .from("alert_logs")
+        .update({ delivery_status: "failed" })
+        .eq("resend_webhook_id", data.email_id)
+        .eq("delivery_status", "pending");
+      return NextResponse.json({ received: true });
+    }
+
     if (type !== "email.delivered" && type !== "email.bounced") {
       return NextResponse.json({ received: true });
     }
 
     const deliveryStatus = type === "email.delivered" ? "delivered" : "failed";
 
-    const supabase = createAdminClient();
     const { error } = await supabase
       .from("alert_logs")
       .update({ delivery_status: deliveryStatus })

@@ -37,22 +37,20 @@ export default async function DashboardPage() {
     supabase
       .from("credentials")
       .select("id", { count: "exact", head: true })
-      .eq("clinic_id", clinicId),
+      .eq("clinic_id", clinicId)
+      .is("deleted_at", null),
     supabase
       .from("credentials")
       .select("id", { count: "exact", head: true })
       .eq("clinic_id", clinicId)
+      .is("deleted_at", null)
       .eq("status", "expired"),
     supabase
       .from("credentials")
       .select("id", { count: "exact", head: true })
       .eq("clinic_id", clinicId)
+      .is("deleted_at", null)
       .eq("status", "expiring"),
-    supabase
-      .from("credentials")
-      .select("id", { count: "exact", head: true })
-      .eq("clinic_id", clinicId)
-      .eq("status", "valid"),
   ]);
 
   const s = staffCount ?? 0;

@@ -5,18 +5,14 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 const emailReportSchema = z.object({
-  reportUrl: z.string().url(),
+  reportUrl: z.string(),
   reportId: z.string().uuid(),
   clinicName: z.string().max(255),
 });
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,18 +28,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const now = Date.now();
-    const rateKey = `email-report:${userId}`;
-    const entry = rateLimitMap.get(rateKey);
-    if (entry && entry.resetAt > now) {
-      if (entry.count >= 5) {
-        return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-      }
-      entry.count++;
-    } else {
-      rateLimitMap.set(rateKey, { count: 1, resetAt: now + 3600000 });
-    }
-
     const body = await req.json();
     const parsed = emailReportSchema.safeParse(body);
     if (!parsed.success) {
@@ -55,13 +39,9 @@ export async function POST(req: NextRequest) {
 
     const { reportUrl, reportId, clinicName } = parsed.data;
 
-    if (!reportUrl.startsWith(`${SUPABASE_URL}/storage/v1/object/sign/`)) {
-      return NextResponse.json({ error: "Invalid report URL origin" }, { status: 400 });
-    }
-
     const { data: userRecord } = await supabase
       .from("users")
-      .select("email, role")
+      .select("email, role, clinic_id")
       .eq("auth_user_id", userId)
       .single();
 
@@ -73,7 +53,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
-    const response = await fetch(reportUrl, { signal: AbortSignal.timeout(15000) });
+    const { count: recentRequests } = await supabase
+      .from("alert_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("recipient", userRecord.email)
+      .gte("sent_at", new Date(Date.now() - 3600000).toISOString());
+
+    if ((recentRequests ?? 0) > 5) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
+    const { data: report } = await supabase
+      .from("audit_reports")
+      .select("clinic_id")
+      .eq("id", reportId)
+      .single();
+
+    if (!report) {
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    }
+
+    if (report.clinic_id !== userRecord.clinic_id) {
+      return NextResponse.json({ error: "Report does not belong to your clinic" }, { status: 403 });
+    }
+
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(reportUrl, 3600);
+
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      Sentry.captureMessage(`Report email: failed to generate signed URL`, {
+        level: "error",
+        extra: { reportUrl, reportId, error: signedUrlError?.message },
+      });
+      return NextResponse.json({ error: "Failed to retrieve report file" }, { status: 500 });
+    }
+
+    const response = await fetch(signedUrlData.signedUrl, { signal: AbortSignal.timeout(15000) });
     if (!response.ok) {
       Sentry.captureMessage(`Report email: failed to download PDF from storage`, {
         level: "error",

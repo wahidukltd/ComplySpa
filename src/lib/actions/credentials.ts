@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { credentialSchema, type CredentialInput } from "@/lib/validations/staff";
 import { getClinicIdAndPlan } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
+import { PlanLimitError } from "@/lib/utils/errors";
 import * as Sentry from "@sentry/nextjs";
 
 export async function addCredential(input: CredentialInput & { document_url?: string }) {
@@ -38,13 +39,18 @@ export async function addCredential(input: CredentialInput & { document_url?: st
   const { count } = await supabase
     .from("credentials")
     .select("id", { count: "exact", head: true })
-    .eq("clinic_id", clinicId);
+    .eq("clinic_id", clinicId)
+    .is("deleted_at", null);
 
   if ((count ?? 0) >= limits.maxCredentials) {
-    return {
-      success: false,
-      error: `Your plan allows up to ${limits.maxCredentials} credentials. You currently have ${count ?? 0}. Upgrade to add more.`,
-    };
+    const err = new PlanLimitError(
+      "Your plan has reached its credential limit. Upgrade to add more.",
+      "CREDENTIAL_LIMIT",
+      count ?? 0,
+      limits.maxCredentials,
+    );
+    Sentry.captureException(err);
+    return { success: false, error: err.message };
   }
 
   const { data: staff } = await supabase
@@ -119,7 +125,8 @@ export async function updateCredential(id: string, input: CredentialInput & { do
       document_url: document_url ?? null,
     })
     .eq("id", id)
-    .eq("clinic_id", user.clinic_id);
+    .eq("clinic_id", user.clinic_id)
+    .is("deleted_at", null);
 
   if (error) {
     Sentry.captureException(error);

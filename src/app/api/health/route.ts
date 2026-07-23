@@ -32,7 +32,7 @@ async function checkSupabase() {
   return checks;
 }
 
-async function checkCronJob(name: string, expectedSchedule: string, maxStaleHours: number): Promise<"ok" | "error"> {
+async function checkCronJob(name: string, maxStaleHours: number): Promise<"ok" | "error"> {
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("check_cron_health", {
@@ -62,13 +62,13 @@ export async function GET() {
   const cronJobs = [
     { slug: "cron-credential-status", jobname: "daily-credential-status-update", maxStale: 26 },
     { slug: "cron-credential-scan", jobname: "daily-credential-scan", maxStale: 26 },
-    { slug: "cron-escalation-scan", jobname: "daily-escalation-scan", maxStale: 26 },
+    { slug: "cron-escalation-scan", jobname: "daily-escalation-scan", maxStale: 25 },
     { slug: "cron-trial-expiry", jobname: "daily-trial-expiry-check", maxStale: 26 },
     { slug: "cron-inactive-cleanup", jobname: "daily-inactive-cleanup", maxStale: 26 },
   ];
 
   for (const job of cronJobs) {
-    const status = await checkCronJob(job.jobname, "0 * * * *", job.maxStale);
+    const status = await checkCronJob(job.jobname, job.maxStale);
     checks[job.slug] = status;
     if (status === "error") overall = "error";
 

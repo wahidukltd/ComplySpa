@@ -40,7 +40,7 @@ export function ReportGenerator({ clinicId }: Props) {
         type: "application/pdf",
       });
       const uploadResult = await uploadDocument(file, clinicId);
-      if (uploadResult.error || !uploadResult.url || !uploadResult.filePath) {
+      if (uploadResult.error || !uploadResult.filePath) {
         throw new Error(uploadResult.error ?? "Upload failed");
       }
 
@@ -53,7 +53,7 @@ export function ReportGenerator({ clinicId }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reportUrl: uploadResult.url,
+          reportUrl: uploadResult.filePath,
           reportId: saveResult.id,
           clinicName: reportData.clinic.name,
         }),

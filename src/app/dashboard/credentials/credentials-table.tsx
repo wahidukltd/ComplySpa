@@ -21,9 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatDate, daysUntil } from "@/lib/utils/date";
-import { getCredentialStatus } from "@/lib/utils/status";
-import { ExternalLink, Search } from "lucide-react";
-import { verifyCredentialNow } from "@/lib/actions/credentials";
+import { ExternalLink, Search, Trash2 } from "lucide-react";
+import { verifyCredentialNow, deleteCredential } from "@/lib/actions/credentials";
 
 interface CredentialRow {
   id: string;
@@ -64,7 +63,7 @@ export function CredentialsTable({ credentials }: { credentials: CredentialRow[]
       !filter ||
       c.staff?.name?.toLowerCase().includes(filter.toLowerCase()) ||
       c.credential_type?.name?.toLowerCase().includes(filter.toLowerCase()) ||
-      c.license_number?.toLowerCase().includes(filter.toLowerCase());
+      (c.license_number ?? "").toLowerCase().includes(filter.toLowerCase());
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
     return matchesText && matchesStatus;
   });
@@ -118,7 +117,7 @@ export function CredentialsTable({ credentials }: { credentials: CredentialRow[]
         </TableHeader>
         <TableBody>
           {filtered.map((cred) => {
-            const status = getCredentialStatus(cred.expiration_date);
+            const status = cred.status;
             return (
               <TableRow key={cred.id}>
                 <TableCell className="font-medium">
@@ -160,6 +159,18 @@ export function CredentialsTable({ credentials }: { credentials: CredentialRow[]
                         Verify
                       </Button>
                     )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        if (confirm("Delete this credential? This action cannot be undone.")) {
+                          await deleteCredential(cred.id, cred.staff_member_id);
+                          router.refresh();
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-3 text-destructive" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>

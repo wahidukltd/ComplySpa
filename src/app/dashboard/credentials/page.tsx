@@ -41,6 +41,7 @@ export default async function CredentialsListPage() {
       credential_type:credential_types!credentials_credential_type_id_fkey(name, category)
     `)
     .eq("clinic_id", userRecord.clinic_id)
+    .is("deleted_at", null)
     .order("expiration_date", { ascending: true, nullsFirst: false });
 
   return (

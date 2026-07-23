@@ -118,14 +118,14 @@ export function CredentialForm({
       return;
     }
 
-    const { url, error } = await uploadDocument(file, staff.clinic_id);
+    const { filePath, error } = await uploadDocument(file, staff.clinic_id);
     if (error) {
       setUploadError(error);
       setUploading(false);
       return;
     }
 
-    setDocumentUrl(url);
+    setDocumentUrl(filePath);
     setUploading(false);
   }
 
