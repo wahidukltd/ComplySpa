@@ -73,7 +73,7 @@ export function AlertRecipients({ recipients, ownerEmail, role }: AlertRecipient
           These email addresses receive credential expiration alerts.
         </p>
 
-        <div className="rounded-lg border p-3" style={{ borderColor: "#F0F4F5", backgroundColor: "#FFF8F2" }}>
+        <div className="rounded-lg border p-3" style={{ borderColor: "#F0F4F5", backgroundColor: "#FFFFFF" }}>
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-4" style={{ color: "#6E97A7" }} />
             <span className="text-sm font-medium" style={{ color: "#000000" }}>Owner (always receives alerts)</span>

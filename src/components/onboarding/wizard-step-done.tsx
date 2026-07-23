@@ -29,14 +29,14 @@ export function WizardStepDone({
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg p-4 text-center bg-[#FFF8F2]">
+          <div className="rounded-lg p-4 text-center bg-[#FFFFFF]">
             <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full bg-[#F0F4F5]">
               <Users className="size-5 text-[#6E97A7]" />
             </div>
             <p className="text-2xl font-bold text-black">{staffCount}</p>
             <p className="text-sm text-[rgba(0,0,0,0.55)]">Staff members</p>
           </div>
-          <div className="rounded-lg p-4 text-center bg-[#FFF8F2]">
+          <div className="rounded-lg p-4 text-center bg-[#FFFFFF]">
             <div className="mx-auto mb-2 flex size-10 items-center justify-center rounded-full bg-[#F0F4F5]">
               <ShieldCheck className="size-5 text-[#6E97A7]" />
             </div>

@@ -10,7 +10,7 @@ Tooling, conventions, and auth architecture for this repo.
 - **Context7** — fetch current library docs (Next.js, Supabase, Tailwind, etc.). Prefer over Exa for framework/API questions.
 - **Exa** — web search / URL content extraction.
 - **Deployment MCPs**: Cloudflare, Vercel, GitHub, Resend, Supabase.
-
+- **Graphify MCP
 ## Stack
 
 Next.js 16 (App Router) · TypeScript strict · Tailwind CSS v4 · shadcn/ui · Framer Motion · Supabase (Auth, PostgreSQL, Edge Functions, Storage, pg_cron) · Vercel (Hosting) · Resend (Transactional Email) · Polar.sh (Payments) · Sentry (Errors)

@@ -44,7 +44,7 @@ const C = {
   action: "#6E97A7",
   hairline: "rgba(0,0,0,0.12)",
   surfaceAlt: "#F0F4F5",
-  canvas: "#FFF8F2",
+  canvas: "#FFFFFF",
   muted: "rgba(0,0,0,0.55)",
   valid: "#4A8C5C",
   expiring: "#C2853A",

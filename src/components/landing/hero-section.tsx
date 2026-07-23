@@ -17,7 +17,7 @@ export function HeroSection() {
       {/* Static gradient — mobile only */}
       <div
         className="absolute inset-0 -z-10 md:hidden"
-        style={{ background: "linear-gradient(135deg, #FFF8F2 0%, #B5CED6 50%, #6E97A7 100%)" }}
+        style={{ background: "linear-gradient(135deg, #FFFFFF 0%, #B5CED6 50%, #6E97A7 100%)" }}
         aria-hidden="true"
       />
       {/* Foreground */}

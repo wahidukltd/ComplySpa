@@ -40,7 +40,7 @@ export function Hero3D() {
       <div
         className="absolute inset-0 -z-10"
         style={{
-          background: "linear-gradient(135deg, #FFF8F2 0%, #B5CED6 50%, #6E97A7 100%)",
+          background: "linear-gradient(135deg, #FFFFFF 0%, #B5CED6 50%, #6E97A7 100%)",
         }}
         aria-hidden="true"
         role="presentation"
@@ -56,10 +56,10 @@ export function Hero3D() {
         gl={{ antialias: true, alpha: true }}
       >
         <ambientLight intensity={0.6} />
-        <directionalLight position={[2, 3, 4]} intensity={0.4} color="#FFF8F2" />
+        <directionalLight position={[2, 3, 4]} intensity={0.4} color="#FFFFFF" />
         <OrganicShape position={[-1.5, 0.5, 0]} color="#B5CED6" scale={1.2} />
         <OrganicShape position={[1.5, -0.5, -1]} color="#6E97A7" scale={1.0} />
-        <OrganicShape position={[0, 1.5, -2]} color="#FFF8F2" scale={0.7} />
+        <OrganicShape position={[0, 1.5, -2]} color="#FFFFFF" scale={0.7} />
       </Canvas>
     </div>
   );

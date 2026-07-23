@@ -161,7 +161,7 @@ export default async function DashboardPage() {
       )}
 
       {s > 0 && c === 0 && (
-        <Card style={{ borderColor: "#FBF0E0", backgroundColor: "#FFF8F2" }}>
+        <Card style={{ borderColor: "#FBF0E0", backgroundColor: "#FFFFFF" }}>
           <CardContent className="flex items-center gap-3 py-4">
             <AlertTriangle className="size-5 shrink-0" style={{ color: "#C2853A" }} />
             <div>

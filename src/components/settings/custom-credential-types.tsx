@@ -94,7 +94,7 @@ export function CustomCredentialTypes({ custom, builtin, role }: CustomCredentia
               <div
                 key={t.id}
                 className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-                style={{ borderColor: "#F0F4F5", backgroundColor: "#FFF8F2", color: "rgba(0,0,0,0.55)" }}
+                style={{ borderColor: "#F0F4F5", backgroundColor: "#FFFFFF", color: "rgba(0,0,0,0.55)" }}
               >
                 <ShieldCheck className="size-3.5 shrink-0" style={{ color: "#6E97A7" }} />
                 <span>{t.name}</span>

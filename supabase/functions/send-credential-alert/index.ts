@@ -395,7 +395,7 @@ function buildAlertEmailHtml(
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background-color:#FFF8F2;padding:24px;margin:0;">
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background-color:#FFFFFF;padding:24px;margin:0;">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;">
 <tr><td style="background:#FFFFFF;border:1px solid #D9B7A7;border-radius:8px;padding:32px 24px;">
 <p style="color:#8B7D78;font-size:13px;margin:0 0 8px;">COMPLIANCE ALERT</p>
@@ -419,7 +419,7 @@ function buildEscalationEmailHtml(
 ): string {
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background-color:#FFF8F2;padding:24px;margin:0;">
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background-color:#FFFFFF;padding:24px;margin:0;">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;">
 <tr><td style="background:#FFFFFF;border:1px solid #D9B7A7;border-top:4px solid #B8443A;border-radius:0 0 8px 8px;padding:32px 24px;">
 <p style="color:#B8443A;font-size:13px;font-weight:600;margin:0 0 8px;">ESCALATION — CREDENTIAL EXPIRED</p>

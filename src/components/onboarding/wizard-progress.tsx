@@ -28,7 +28,7 @@ export function WizardProgress({ currentStep }: { currentStep: number }) {
                     isCompleted
                       ? "bg-[#6E97A7] text-white border-2 border-[#6E97A7]"
                       : isCurrent
-                        ? "bg-[#FFF8F2] text-[#6E97A7] border-2 border-[#6E97A7]"
+                        ? "bg-[#FFFFFF] text-[#6E97A7] border-2 border-[#6E97A7]"
                         : "bg-transparent text-[rgba(0,0,0,0.55)] border-2 border-[rgba(0,0,0,0.12)]"
                   }`}
                 >
