@@ -21,7 +21,7 @@ async function checkSupabase() {
   }
 
   try {
-    const { error } = await supabase.auth.getUser();
+    const { error } = await supabase.auth.getSession();
     if (error) throw error;
     checks.auth = "ok";
   } catch (e) {
