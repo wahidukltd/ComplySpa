@@ -100,3 +100,7 @@ Push to `main` → auto-deployed to production.
 - Before commit: `npm run typecheck` → `npm run lint` → `npm run build`
 - All error classes in `src/lib/utils/errors.ts` — single source.
 - Use `{ data, error }` sentinel pattern, never return null.
+
+## Lessons
+
+- **Never change DNS records unless absolutely necessary.** Each change causes propagation delays that take the site down temporarily. The default Cloudflare + Vercel setup (proxied A record → 76.76.21.21) is correct and stable. CNAME flattening at the apex introduces risk for zero benefit.
