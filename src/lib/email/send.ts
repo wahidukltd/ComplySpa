@@ -5,14 +5,14 @@ import * as Sentry from "@sentry/nextjs";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = process.env.NEXT_PUBLIC_APP_URL
-  ? `alerts@${new URL(process.env.NEXT_PUBLIC_APP_URL).hostname}`
-  : "Compliance Alerts <alerts@resend.dev>";
+const ALERTS_FROM = "Compliance Alerts <alerts@complyspa.com>";
+export const HELLO_FROM = "ComplySpa <hello@complyspa.com>";
 
 interface SendEmailParams {
   to: string;
   subject: string;
   html: string;
+  from?: string;
 }
 
 interface SendEmailResult {
@@ -32,7 +32,7 @@ export async function sendEmail(
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const { data, error } = await resend.emails.send({
-        from: FROM_EMAIL,
+        from: params.from ?? ALERTS_FROM,
         to: [params.to],
         subject: params.subject,
         html: params.html,
@@ -86,6 +86,7 @@ interface SendEmailWithAttachmentParams {
   to: string;
   subject: string;
   html: string;
+  from?: string;
   attachment: {
     content: string;
     filename: string;
@@ -100,7 +101,7 @@ export async function sendEmailWithAttachment(
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const { data, error } = await resend.emails.send({
-        from: FROM_EMAIL,
+        from: params.from ?? ALERTS_FROM,
         to: [params.to],
         subject: params.subject,
         html: params.html,

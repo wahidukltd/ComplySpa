@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClinicSchema, type CreateClinicInput } from "@/lib/validations/clinic";
-import { getPlanLimits } from "@/lib/utils/plan";
 import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 
@@ -53,8 +52,9 @@ async function createClinicInternal(input: CreateClinicInput) {
   }
 
   try {
-    const { sendEmail } = await import("@/lib/email/send");
+    const { sendEmail, HELLO_FROM } = await import("@/lib/email/send");
     await sendEmail({
+      from: HELLO_FROM,
       to: userEmail,
       subject: "Welcome to your compliance dashboard",
       html: `<p>Your clinic "${name}" is set up and ready.</p>

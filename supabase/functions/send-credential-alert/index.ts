@@ -17,7 +17,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 const APP_URL = Deno.env.get("APP_URL") || Deno.env.get("NEXT_PUBLIC_APP_URL") || "http://localhost:3000";
-const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Compliance Alerts <onboarding@resend.dev>";
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Compliance Alerts <alerts@complyspa.com>";
 
 const ACTIVE_PLANS = new Set(["trial", "solo", "practice", "multi_location"]);
 

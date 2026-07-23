@@ -31,17 +31,19 @@ export function ResetPasswordForm() {
     const hash = window.location.hash;
     if (!hash || !hash.includes("type=recovery")) return;
 
-    setIsRecovery(true);
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) return;
-      const params = new URLSearchParams(hash.replace("#", "?"));
-      const accessToken = params.get("access_token");
-      const refreshToken = params.get("refresh_token");
-      if (accessToken && refreshToken) {
-        supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-          .catch(() => setError("Session expired. Please request a new reset link."));
+    const sessionPromise = supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        const params = new URLSearchParams(hash.replace("#", "?"));
+        const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+        if (accessToken && refreshToken) {
+          supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+            .catch(() => setError("Session expired. Please request a new reset link."));
+        }
       }
     }).catch(() => setError("Session expired. Please request a new reset link."));
+
+    sessionPromise.then(() => setIsRecovery(true));
   }, [supabase]);
 
   async function handleSendReset(e: React.FormEvent) {

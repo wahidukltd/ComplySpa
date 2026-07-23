@@ -85,3 +85,8 @@ psychological-copywriting.skill
 skills-lock.json
 
 graphify-out/
+
+# Zoho Mail CLI — local tooling, not part of the app
+zmail-cli.jar
+zmail-cli.bat
+zoho-login.ps1

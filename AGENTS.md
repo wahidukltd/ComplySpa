@@ -75,9 +75,30 @@ Required order: `npx tsc --noEmit` → `npm run build` before committing.
 Plan values: `trial`, `expired_trial`, `inactive`, `solo`, `practice`, `multi_location`
 
 ## Email
-- Zoho Mail: support@complyspa.com, hello@complyspa.com (manual, no SMTP/IMAP)
+
+### Zoho Mail (Free tier — 5 users, 5GB/user)
+- **Mailboxes:** support@complyspa.com (Abdul Wahid), hello@complyspa.com (Arthur)
+- **Alias:** alerts@complyspa.com → hello@complyspa.com (free, no extra slot)
+- **Domain:** complyspa.com — verified, mail hosting enabled
+- **DKIM:** `zmail._domainkey.complyspa.com` TXT — verified
+- **SPF:** `v=spf1 include:zoho.com include:amazonses.com ~all` — verified
+- **DMARC:** `_dmarc.complyspa.com` TXT — `p=none; rua=mailto:hello@complyspa.com`
+- **MX:** mx.zoho.com (10), mx2.zoho.com (20), mx3.zoho.com (50)
+- **CLI:** `zmail-cli.jar` authenticated as super admin (support@)
+  - Launcher: `zmail-cli.bat`
+  - Direct: `java -jar zmail-cli.jar -p MyEncPwd123! <command>`
+  - Config: `~/.zmail-cli/` (encrypted tokens)
+- **Webmail:** https://mail.zoho.com
 - Resend: transactional emails (alerts, welcome, trials) — 3,000/month free
 - Supabase Auth sends its own confirmation/recovery emails (configured in Auth → Email Templates)
+- Resend FROM addresses: hello@complyspa.com (welcome/trial), alerts@complyspa.com (credential alerts)
+
+### Resend (Verified)
+- **Domain:** complyspa.com — verified, sending enabled
+- **DKIM:** `resend._domainkey.complyspa.com` TXT — verified
+- **Return-path:** `send.complyspa.com` MX + SPF — verified
+- **Webhook:** `https://complyspa.com/api/resend/webhook` — `email.delivered`, `email.bounced`, `email.complained`, `email.failed`
+- **Signing secret:** `whsec_J+h/k/siRvRB3hn5KjaxlYPina9pjidk` (in `.env.local` as `RESEND_WEBHOOK_SECRET`)
 
 ## Environment variables
 - `NEXT_PUBLIC_*` vars exposed to browser — no secrets

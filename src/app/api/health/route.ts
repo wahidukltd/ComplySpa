@@ -6,20 +6,13 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const MONITOR_SLUG = "app-health";
-const CRON_MONITOR_SLUGS = [
-  "cron-credential-status",
-  "cron-credential-scan",
-  "cron-escalation-scan",
-  "cron-trial-expiry",
-  "cron-inactive-cleanup",
-] as const;
 
 async function checkSupabase() {
   const supabase = await createClient();
   const checks: Record<string, "ok" | "error"> = {};
 
   try {
-    const { data, error } = await supabase.from("clinics").select("id").limit(1).maybeSingle();
+    const { error } = await supabase.from("clinics").select("id").limit(1).maybeSingle();
     if (error) throw error;
     checks.postgres = "ok";
   } catch (e) {

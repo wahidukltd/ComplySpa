@@ -23,7 +23,6 @@ export function SignUpForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isConfirmationSent, setIsConfirmationSent] = useState(false);
-  const router = useRouter();
   const googleEnabled = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
   const supabase = createClient();
 
