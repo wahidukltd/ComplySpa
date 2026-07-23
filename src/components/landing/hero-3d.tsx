@@ -2,9 +2,22 @@
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { MeshDistortMaterial, Float } from "@react-three/drei";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Mesh } from "three";
 import { useReducedMotion } from "motion/react";
+
+function GradientBackground() {
+  return (
+    <div
+      className="absolute inset-0 -z-10"
+      style={{
+        background: "linear-gradient(135deg, #FFFFFF 0%, #B5CED6 50%, #6E97A7 100%)",
+      }}
+      aria-hidden="true"
+      role="presentation"
+    />
+  );
+}
 
 function OrganicShape({ position, color, scale = 1 }: { position: [number, number, number]; color: string; scale?: number }) {
   const meshRef = useRef<Mesh>(null);
@@ -34,18 +47,25 @@ function OrganicShape({ position, color, scale = 1 }: { position: [number, numbe
 
 export function Hero3D() {
   const shouldReduceMotion = useReducedMotion();
+  const [webglFailed, setWebglFailed] = useState(false);
 
-  if (shouldReduceMotion) {
-    return (
-      <div
-        className="absolute inset-0 -z-10"
-        style={{
-          background: "linear-gradient(135deg, #FFFFFF 0%, #B5CED6 50%, #6E97A7 100%)",
-        }}
-        aria-hidden="true"
-        role="presentation"
-      />
-    );
+  useEffect(() => {
+    function onUnhandledRejection(event: PromiseRejectionEvent) {
+      if (typeof event.reason === "string" && event.reason.includes("WebGL")) {
+        event.preventDefault();
+        setWebglFailed(true);
+      }
+      if (event.reason instanceof Error && event.reason.message.includes("WebGL")) {
+        event.preventDefault();
+        setWebglFailed(true);
+      }
+    }
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    return () => window.removeEventListener("unhandledrejection", onUnhandledRejection);
+  }, []);
+
+  if (shouldReduceMotion || webglFailed) {
+    return <GradientBackground />;
   }
 
   return (
