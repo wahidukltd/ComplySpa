@@ -57,23 +57,45 @@ Single source of truth at `src/lib/utils/entitlements.ts`. Every enforcement lay
 - **audit** — practice: full PDF with cover page, executive summary, staff register, status summary + category grid, upcoming renewals, attestation, branded header/footer with page numbers, email enabled
 - **white_label** — multi_location: same content as audit but no "Compliance Audit Report" title, no branded header/footer/page numbers, clinic name as document title, unbranded enterprise output
 
+#### Two Onboarding Paths
+
+1. **14-day free trial** (default): `create_clinic_for_user` RPC sets `plan=trial` + `trial_end_date=NOW()+14d`. User explores all features during trial. Trial expiry cron moves to `expired_trial`.
+2. **Skip trial / subscribe immediately**: Pricing page shows "Subscribe now" links. Click → Polar checkout → pay → `subscription.active` webhook → `update_clinic_subscription()` RPC activates plan immediately. No trial period.
+
+Purchase can happen from: pricing page, billing settings, upgrade prompts on paywalled features, during onboarding, or any day of the trial. Checkout links generated via `src/lib/polar/checkout.ts`.
+
 #### Subscription Lifecycle
 
 | State | Trigger | Destination |
 |-------|---------|-------------|
 | signup | Onboarding → `create_clinic_for_user` RPC | `trial` with 14-day `trial_end_date` |
+| skip trial | Polar checkout → `subscription.active` | Plan activated immediately, no trial |
+| purchase during trial | Polar checkout → `subscription.active` | Trial ends, plan activated via RPC |
 | trial→active | Polar webhook `subscription.active` | `update_clinic_subscription()` RPC maps product metadata to plan |
 | upgrade | Polar webhook `subscription.updated` with new product | Plan updated via RPC |
-| downgrade | Polar webhook `subscription.updated` with new product | Plan updated via RPC (legacy protection prevents expired_trial overwrite) |
-| cancel | Polar webhook `subscription.canceled` | `cancel_at_period_end=true` set, plan unchanged until period ends |
+| downgrade | Polar webhook `subscription.updated` with new product | Plan updated via RPC (RPC prevents expired_trial overwrite) |
+| cancel | Polar webhook `subscription.canceled` | `cancel_at_period_end=true` set, plan unchanged |
 | uncancel | Polar webhook `subscription.uncanceled` | `cancel_at_period_end=false` restored |
-| revoke | Polar webhook `subscription.revoked` | Plan set to `expired_trial` (access revoked immediately) |
+| revoke | Polar webhook `subscription.revoked` | Plan set to `expired_trial` immediately |
 | trial expire | `daily-trial-expiry-check` cron | `trial` → `expired_trial` if `trial_end_date < NOW()` |
 | inactive | `daily-inactive-cleanup` cron | `expired_trial` → `inactive` after 30 days |
 
 Product mapping: Polar product metadata `plan: solo|practice|multi_location` or product name matching.
 
-**Polar.sh status: NOT YET APPROVED.** The webhook handler at `src/app/api/polar/webhook/route.ts` is infrastructure-ready code that compiles and uses the correct SDK types, but has never been tested against real Polar webhook payloads. It returns 501 until `POLAR_WEBHOOK_SECRET` is set in production. All Polar-dependent transitions above (active→paid, upgrade, downgrade, cancel, uncancel, revoke) are blocked until Polar approval is obtained and the webhook is configured. The cron-based transitions (trial expiry, inactive cleanup) work independently.
+Checkout integration: `src/lib/polar/checkout.ts` creates Polar checkout links with `clinic_id` in metadata. Webhook at `src/app/api/polar/webhook/route.ts` looks up clinic by metadata first, then `polar_customer_id`. Customer portal via `src/lib/polar/customer-portal.ts` creates customer sessions.
+
+**Polar.sh status: NOT YET APPROVED.** The webhook handler, checkout link generator, and customer portal session creator are infrastructure-ready code that compiles and uses the correct SDK types, but have never been tested against real Polar APIs. To enable, configure these env vars:
+
+```
+POLAR_ACCESS_TOKEN             # Server-side API access
+POLAR_WEBHOOK_SECRET           # Webhook signature verification
+POLAR_SOLO_PRODUCT_PRICE_ID    # Polar product price IDs
+POLAR_PRACTICE_PRODUCT_PRICE_ID
+POLAR_MULTI_LOCATION_PRODUCT_PRICE_ID
+NEXT_PUBLIC_APP_URL            # Checkout success redirect
+```
+
+Without these, there is no checkout flow, no customer portal, and no subscription state transitions from Polar. Users stay on `trial` forever. The cron-based transitions (trial expiry → `expired_trial` → `inactive`) work independently of Polar.
 
 ## Report Design
 
