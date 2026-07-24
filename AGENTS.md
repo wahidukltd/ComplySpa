@@ -50,9 +50,22 @@ Single source of truth at `src/lib/utils/entitlements.ts`. Every enforcement lay
 ### Report Tiers
 
 - **none** — trial: reports page shows upgrade CTA, server action blocks, no reports ever generated
-- **basic** — solo: simplified PDF (summary + upcoming renewals only, no staff register or attestation), no email delivery
-- **audit** — practice: full PDF (overview, staff register, summary, upcoming, attestation), email enabled
-- **white_label** — multi_location: same as audit but without "Compliance Audit Report" title or page footer branding
+- **basic** — solo: simplified PDF (summary + upcoming renewals only, no staff register, no cover page, no attestation), download only, no email
+- **audit** — practice: full PDF with cover page, executive summary, staff register, status summary + category grid, upcoming renewals, attestation, branded header/footer with page numbers, email enabled
+- **white_label** — multi_location: same content as audit but no "Compliance Audit Report" title, no branded header/footer/page numbers, clinic name as document title, unbranded enterprise output
+
+### Report Design
+
+Colors: ink (#000000), action (#6E97A7), canvas (#FFFFFF).  
+Status: valid (#4A8C5C), expiring (#C2853A), expired (#B8443A).  
+Cover page: decorative accent bar, centered content, divider, meta fields.  
+Executive summary: compliance score (%), staff count, narrative paragraph.  
+Staff register: per-staff credential tables with alternating row backgrounds (#F8FAFB).  
+Summary: metric cards with 4-column layout (total/valid/expiring/expired) for audit, compact list for basic.  
+Category grid: 2-column layout (license, training, insurance, agreement).  
+Attestation: italic statement with report ID and generation timestamp.  
+Email template: branded card-style design with left accent bar, clinic info table.  
+PDF viewer: inline preview via PDFViewer component in report-generator.
 
 ## 3 Colors
 

@@ -159,13 +159,46 @@ export async function POST(req: NextRequest) {
       to: userRecord.email,
       subject: `Compliance Audit Report — ${escapeHtml(clinicName)}`,
       html: `
-        <p>Your compliance audit report is attached.</p>
-        <p>Clinic: ${escapeHtml(clinicName)}</p>
-        <p>Report ID: ${reportId}</p>
-        <p style="color: rgba(0,0,0,0.55); font-size: 12px;">
-          This report was generated from your credential tracking system.
-          Please verify all information before submitting to a regulatory body.
-        </p>
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="margin:0;padding:0;background:#F5F5F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F5F5F5;padding:24px 0;">
+            <tr><td align="center">
+              <table cellpadding="0" cellspacing="0" border="0" style="max-width:540px;width:100%;background:#FFFFFF;border-radius:8px;">
+                <tr>
+                  <td style="padding:32px 32px 0 32px;">
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                      <tr>
+                        <td style="width:4px;height:32px;background:#6E97A7;"></td>
+                        <td style="padding-left:12px;">
+                          <p style="margin:0;font-size:16px;font-weight:600;color:#000000;">Compliance Audit Report</p>
+                          <p style="margin:2px 0 0 0;font-size:13px;color:rgba(0,0,0,0.55);">${escapeHtml(clinicName)}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr><td style="padding:24px 32px 0 32px;border-top:1px solid rgba(0,0,0,0.08);">
+                  <p style="margin:0;font-size:14px;color:#000000;">Hello,</p>
+                  <p style="margin:12px 0 0 0;font-size:14px;color:#000000;line-height:1.5;">
+                    Your compliance audit report has been generated and is attached to this email.
+                  </p>
+                  <table cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;background:#F8FAFB;border-radius:6px;padding:16px;font-size:13px;color:#000000;width:100%;">
+                    <tr><td style="padding:4px 0;color:rgba(0,0,0,0.55);width:100px;">Clinic</td><td style="padding:4px 0;font-weight:500;">${escapeHtml(clinicName)}</td></tr>
+                    <tr><td style="padding:4px 0;color:rgba(0,0,0,0.55);">Report ID</td><td style="padding:4px 0;font-weight:500;font-family:monospace;font-size:12px;">${reportId}</td></tr>
+                  </table>
+                </td></tr>
+                <tr><td style="padding:24px 32px 32px 32px;">
+                  <p style="margin:0;font-size:12px;color:rgba(0,0,0,0.45);line-height:1.5;">
+                    This report was generated from your credential tracking system at ComplySpa.
+                    Please verify all information before submitting to a regulatory body.
+                  </p>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </body>
+        </html>
       `,
       attachment: {
         content: base64Content,

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { BlobProvider, PDFDownloadLink } from "@react-pdf/renderer";
+import { useState, useMemo, useCallback } from "react";
+import { BlobProvider, PDFDownloadLink, PDFViewer } from "@react-pdf/renderer";
 import { ComplianceReport, type ReportData } from "@/lib/pdf/report-template";
 import { getReportData, createReport } from "@/lib/actions/reports";
 import { uploadDocument } from "@/lib/utils/upload";
 import { Button } from "@/components/ui/button";
+import { FileText, Download, Mail, Eye, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 interface Props {
   clinicId: string;
@@ -18,8 +19,9 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [previewOpen, setPreviewOpen] = useState(false);
 
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
     setLoading(true);
     setError(null);
     const result = await getReportData();
@@ -31,9 +33,9 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
     setReportData(result.data);
     setReportTier(result.reportTier ?? "audit");
     setLoading(false);
-  };
+  }, []);
 
-  const handleEmail = async (blob: Blob | null) => {
+  const handleEmail = useCallback(async (blob: Blob | null) => {
     if (!blob || !reportData) return;
     setEmailStatus("sending");
     setError(null);
@@ -72,16 +74,19 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
       setEmailStatus("error");
       setError(err instanceof Error ? err.message : "Email failed");
     }
-  };
+  }, [reportData, clinicId]);
 
   const doc = useMemo(
     () => (reportData && reportTier ? <ComplianceReport data={reportData} tier={reportTier} /> : null),
     [reportData, reportTier],
   );
 
+  const canEmail = reportTier === "audit" || reportTier === "white_label";
+
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 py-3 text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
+        <Loader2 className="h-4 w-4 animate-spin" />
         Loading report data...
       </div>
     );
@@ -89,8 +94,8 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
 
   if (error && !reportData) {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-800">{error}</p>
+      <div className="rounded-md p-4" style={{ backgroundColor: "#FEF2F2", border: "1px solid #FEE2E2" }}>
+        <p className="text-sm" style={{ color: "#B8443A" }}>{error}</p>
         <Button variant="outline" onClick={handleGenerate} className="mt-2">
           Retry
         </Button>
@@ -104,43 +109,56 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
 
   if (!reportData) {
     return (
-      <Button onClick={handleGenerate} disabled={loading}>
+      <Button onClick={handleGenerate} disabled={loading} className="gap-2">
+        <FileText className="h-4 w-4" />
         Generate Report
       </Button>
     );
   }
 
-  const safeName = reportData.clinic.name.replace(/\s+/g, "-");
+  const safeName = reportData.clinic.name.replace(/\s+/g, "-").toLowerCase();
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <PDFDownloadLink
           document={doc!}
           fileName={`compliance-report-${safeName}.pdf`}
         >
           {({ loading: pdfLoading }) => (
-            <Button disabled={pdfLoading}>
-              {pdfLoading ? "Generating PDF..." : "Download PDF"}
+            <Button disabled={pdfLoading} className="gap-2">
+              {pdfLoading ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Generating PDF...</>
+              ) : (
+                <><Download className="h-4 w-4" /> Download PDF</>
+              )}
             </Button>
           )}
         </PDFDownloadLink>
 
-        {reportTier && reportTier !== "basic" && (
+        <Button variant="outline" onClick={() => setPreviewOpen(!previewOpen)} className="gap-2">
+          <Eye className="h-4 w-4" />
+          {previewOpen ? "Close Preview" : "Preview"}
+        </Button>
+
+        {canEmail && (
           <BlobProvider document={doc!}>
             {({ blob, loading: blobLoading }) => (
               <Button
                 variant="outline"
                 disabled={blobLoading || emailStatus === "sending"}
                 onClick={() => handleEmail(blob)}
+                className="gap-2"
               >
-                {blobLoading
-                  ? "Preparing..."
-                  : emailStatus === "sending"
-                    ? "Sending..."
-                    : emailStatus === "sent"
-                      ? "Sent ✓"
-                      : "Email Report"}
+                {blobLoading ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Preparing...</>
+                ) : emailStatus === "sending" ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</>
+                ) : emailStatus === "sent" ? (
+                  <><CheckCircle2 className="h-4 w-4" style={{ color: "#4A8C5C" }} /> Sent</>
+                ) : (
+                  <><Mail className="h-4 w-4" /> Email Report</>
+                )}
               </Button>
             )}
           </BlobProvider>
@@ -148,10 +166,24 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
       </div>
 
       {emailStatus === "error" && error && (
-        <p className="text-sm text-red-600">{error}</p>
+        <div className="flex items-center gap-2 text-sm" style={{ color: "#B8443A" }}>
+          <XCircle className="h-4 w-4" />
+          {error}
+        </div>
       )}
       {emailStatus === "sent" && (
-        <p className="text-sm text-green-600">Report emailed successfully.</p>
+        <div className="flex items-center gap-2 text-sm" style={{ color: "#4A8C5C" }}>
+          <CheckCircle2 className="h-4 w-4" />
+          Report emailed successfully.
+        </div>
+      )}
+
+      {previewOpen && (
+        <div className="rounded-lg border overflow-hidden" style={{ borderColor: "rgba(0,0,0,0.12)", height: 500 }}>
+          <PDFViewer style={{ width: "100%", height: "100%" }} showToolbar>
+            {doc!}
+          </PDFViewer>
+        </div>
       )}
     </div>
   );
