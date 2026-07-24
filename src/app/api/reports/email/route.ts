@@ -109,6 +109,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Emailing reports requires Practice plan or higher" }, { status: 403 });
     }
 
+    const isWhiteLabel = entitlements.reportTier === "white_label";
+    const emailSubject = isWhiteLabel
+      ? `Compliance Report — ${escapeHtml(clinicName)}`
+      : `Compliance Audit Report — ${escapeHtml(clinicName)}`;
+
     if (!checkReportRateLimit(userRecord.email)) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
@@ -155,9 +160,10 @@ export async function POST(req: NextRequest) {
 
     const base64Content = Buffer.from(pdfBuffer).toString("base64");
 
+    const emailHeading = isWhiteLabel ? "Compliance Report" : "Compliance Audit Report";
     const result = await sendEmailWithAttachment({
       to: userRecord.email,
-      subject: `Compliance Audit Report — ${escapeHtml(clinicName)}`,
+      subject: emailSubject,
       html: `
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"></head>
@@ -171,7 +177,7 @@ export async function POST(req: NextRequest) {
                       <tr>
                         <td style="width:4px;height:32px;background:#6E97A7;"></td>
                         <td style="padding-left:12px;">
-                          <p style="margin:0;font-size:16px;font-weight:600;color:#000000;">Compliance Audit Report</p>
+                          <p style="margin:0;font-size:16px;font-weight:600;color:#000000;">${escapeHtml(emailHeading)}</p>
                           <p style="margin:2px 0 0 0;font-size:13px;color:rgba(0,0,0,0.55);">${escapeHtml(clinicName)}</p>
                         </td>
                       </tr>
@@ -181,7 +187,7 @@ export async function POST(req: NextRequest) {
                 <tr><td style="padding:24px 32px 0 32px;border-top:1px solid rgba(0,0,0,0.08);">
                   <p style="margin:0;font-size:14px;color:#000000;">Hello,</p>
                   <p style="margin:12px 0 0 0;font-size:14px;color:#000000;line-height:1.5;">
-                    Your compliance audit report has been generated and is attached to this email.
+                    Your ${isWhiteLabel ? "compliance report" : "compliance audit report"} has been generated and is attached to this email.
                   </p>
                   <table cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;background:#F8FAFB;border-radius:6px;padding:16px;font-size:13px;color:#000000;width:100%;">
                     <tr><td style="padding:4px 0;color:rgba(0,0,0,0.55);width:100px;">Clinic</td><td style="padding:4px 0;font-weight:500;">${escapeHtml(clinicName)}</td></tr>

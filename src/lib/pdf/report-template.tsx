@@ -462,9 +462,7 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
   const overviewContent = (
     <View style={styles.section}>
       {isBasic && <Text style={styles.sectionTitle}>Basic Compliance Report</Text>}
-      {!isBasic && !isWhiteLabel && (
-        <Text style={{ fontSize: 10, color: C.muted, marginBottom: 8 }}>Clinic Overview</Text>
-      )}
+      {!isBasic && <Text style={{ fontSize: 10, color: C.muted, marginBottom: 8 }}>Clinic Overview</Text>}
       <View style={{ marginTop: 4 }}>
         <View style={styles.overviewBlock}>
           <Text style={styles.overviewLabel}>Clinic</Text>

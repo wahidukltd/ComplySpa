@@ -24,6 +24,7 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
   const handleGenerate = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setEmailStatus("idle");
     const result = await getReportData();
     if (result.error) {
       setError(result.error);
@@ -117,14 +118,14 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
   }
 
   const safeName = reportData.clinic.name.replace(/\s+/g, "-").toLowerCase();
+  const fileName = reportTier === "white_label"
+    ? `${safeName}-report.pdf`
+    : `compliance-report-${safeName}.pdf`;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
-        <PDFDownloadLink
-          document={doc!}
-          fileName={`compliance-report-${safeName}.pdf`}
-        >
+        <PDFDownloadLink document={doc!} fileName={fileName}>
           {({ loading: pdfLoading }) => (
             <Button disabled={pdfLoading} className="gap-2">
               {pdfLoading ? (
@@ -135,6 +136,11 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
             </Button>
           )}
         </PDFDownloadLink>
+
+        <Button variant="outline" onClick={handleGenerate} className="gap-2">
+          <FileText className="h-4 w-4" />
+          Generate New
+        </Button>
 
         <Button variant="outline" onClick={() => setPreviewOpen(!previewOpen)} className="gap-2">
           <Eye className="h-4 w-4" />
