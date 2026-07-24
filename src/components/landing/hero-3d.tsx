@@ -2,9 +2,20 @@
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { MeshDistortMaterial, Float } from "@react-three/drei";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { Mesh } from "three";
 import { useReducedMotion } from "motion/react";
+
+function detectWebGL(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    return !!gl;
+  } catch {
+    return false;
+  }
+}
 
 function GradientBackground() {
   return (
@@ -47,24 +58,9 @@ function OrganicShape({ position, color, scale = 1 }: { position: [number, numbe
 
 export function Hero3D() {
   const shouldReduceMotion = useReducedMotion();
-  const [webglFailed, setWebglFailed] = useState(false);
+  const [webglSupported] = useState(detectWebGL);
 
-  useEffect(() => {
-    function onUnhandledRejection(event: PromiseRejectionEvent) {
-      if (typeof event.reason === "string" && event.reason.includes("WebGL")) {
-        event.preventDefault();
-        setWebglFailed(true);
-      }
-      if (event.reason instanceof Error && event.reason.message.includes("WebGL")) {
-        event.preventDefault();
-        setWebglFailed(true);
-      }
-    }
-    window.addEventListener("unhandledrejection", onUnhandledRejection);
-    return () => window.removeEventListener("unhandledrejection", onUnhandledRejection);
-  }, []);
-
-  if (shouldReduceMotion || webglFailed) {
+  if (shouldReduceMotion || !webglSupported) {
     return <GradientBackground />;
   }
 
