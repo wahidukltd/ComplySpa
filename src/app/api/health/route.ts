@@ -75,14 +75,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status: "error", error: "Too many requests" }, { status: 429 });
   }
 
-  const healthSecret = process.env.CRON_SECRET;
-  if (healthSecret) {
-    const provided = req.headers.get("x-health-check-secret");
-    if (!provided || provided !== healthSecret) {
-      return NextResponse.json({ status: "error" }, { status: 403 });
-    }
-  }
-
   const overallCheckInId = Sentry.captureCheckIn?.({ monitorSlug: MONITOR_SLUG, status: "in_progress" }) ?? null;
 
   const checks: Record<string, "ok" | "error"> = {};
