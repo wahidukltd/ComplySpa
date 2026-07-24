@@ -74,6 +74,7 @@ export default async function PricingPage() {
             for (const plan of ["solo", "practice", "multi_location"] as const) {
               const result = await createCheckoutLink(plan, clinic.polar_customer_id ?? undefined, {
                 clinic_id: clinic.id,
+                plan,
               });
               if (result.url) checkoutUrls[plan] = result.url;
             }

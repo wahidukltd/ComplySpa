@@ -28,6 +28,7 @@ export async function getCheckoutUrl(plan: PlanId): Promise<string | null> {
 
     const result = await createCheckoutLink(plan, clinic.polar_customer_id ?? undefined, {
       clinic_id: clinic.id,
+      plan,
     });
 
     return result.url;
