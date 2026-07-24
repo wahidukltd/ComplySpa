@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
                 </td></tr>
                 <tr><td style="padding:24px 32px 32px 32px;">
                   <p style="margin:0;font-size:12px;color:rgba(0,0,0,0.45);line-height:1.5;">
-                    This report was generated from ${isWhiteLabel ? "your credential tracking system." : "your credential tracking system at ComplySpa."}
+                    This report was generated from ${isWhiteLabel ? "your clinic's credential records." : "your credential tracking system at ComplySpa."}
                     ${isWhiteLabel ? "" : "Please verify all information before submitting to a regulatory body."}
                   </p>
                 </td></tr>

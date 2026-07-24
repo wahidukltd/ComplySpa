@@ -49,7 +49,6 @@ const C = {
   valid: "#4A8C5C",
   expiring: "#C2853A",
   expired: "#B8443A",
-  sectionTitle: "#6E97A7",
 };
 
 const styles = StyleSheet.create({
@@ -79,7 +78,6 @@ const styles = StyleSheet.create({
   coverAccent: {
     width: 60,
     height: 3,
-    backgroundColor: C.action,
     marginBottom: 32,
   },
   coverTitle: {
@@ -88,12 +86,6 @@ const styles = StyleSheet.create({
     color: C.ink,
     textAlign: "center",
     marginBottom: 8,
-  },
-  coverSubtitle: {
-    fontSize: 11,
-    color: C.muted,
-    textAlign: "center",
-    marginBottom: 48,
   },
   coverMeta: {
     fontSize: 9,
@@ -161,7 +153,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: "bold",
-    color: C.sectionTitle,
+    color: C.action,
     marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: C.action,
@@ -278,26 +270,11 @@ const styles = StyleSheet.create({
   upcomingColDays: { width: "10%" },
   upcomingColStatus: { width: "16%" },
   upcomingColAlerts: { width: "20%" },
-  statusPill: {
-    fontSize: 7.5,
-    paddingVertical: 2,
-    paddingHorizontal: 5,
-    marginLeft: 5,
-  },
   metricCard: {
     backgroundColor: C.surfaceAlt,
     padding: 10,
     marginBottom: 8,
     borderRadius: 2,
-  },
-  metricCardRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  metricCardLabel: {
-    fontSize: 8,
-    color: C.muted,
   },
   metricCardValue: {
     fontSize: 14,
@@ -307,19 +284,6 @@ const styles = StyleSheet.create({
   metricCardSub: {
     fontSize: 7.5,
     color: C.muted,
-  },
-  complianceScore: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: C.action,
-    textAlign: "center",
-    marginBottom: 2,
-  },
-  complianceLabel: {
-    fontSize: 8,
-    color: C.muted,
-    textAlign: "center",
-    marginBottom: 12,
   },
   categoryGrid: {
     flexDirection: "row",
@@ -350,12 +314,6 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 16,
     borderRadius: 2,
-  },
-  summaryTitle: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: C.action,
-    marginBottom: 8,
   },
   summaryText: {
     fontSize: 8.5,
@@ -398,11 +356,12 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
   const pct = (n: number) => (data.summary.total > 0 ? Math.round((n / data.summary.total) * 100) : 0);
   const complianceScore = data.summary.total > 0 ? pct(data.summary.valid) : 0;
   const sectionTitleColor = isWhiteLabel ? C.ink : C.action;
+  const staffNameColor = isWhiteLabel ? C.ink : C.action;
 
   const coverPage = !isBasic ? (
     <Page size="A4" style={styles.coverPage}>
       <View style={styles.coverInner}>
-        <View style={styles.coverAccent} />
+        <View style={[styles.coverAccent, { backgroundColor: isWhiteLabel ? C.ink : C.action }]} />
         {!isWhiteLabel && <Text style={styles.coverTitle}>Compliance Audit Report</Text>}
         <Text style={[styles.coverTitle, { fontSize: 18 }]}>{data.clinic.name}</Text>
         <View style={styles.coverDivider} />
@@ -445,7 +404,7 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
             <Text style={styles.summaryScoreLabel}>Compliance Score</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={styles.summaryScore}>{data.staffMembers.length}</Text>
+            <Text style={[styles.summaryScore, { color: sectionTitleColor }]}>{data.staffMembers.length}</Text>
             <Text style={styles.summaryScoreLabel}>Active Staff</Text>
           </View>
         </View>
@@ -500,7 +459,7 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
       ) : (
         data.staffMembers.map((staff) => (
           <View key={staff.id} wrap={false}>
-            <Text style={styles.staffName}>{staff.name}</Text>
+            <Text style={[styles.staffName, { color: staffNameColor }]}>{staff.name}</Text>
             <Text style={styles.staffMeta}>
               {[staff.role, staff.hireDate ? `Hired: ${staff.hireDate}` : ""].filter(Boolean).join(" | ")}
             </Text>
@@ -656,7 +615,7 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
       <Text style={[styles.sectionTitle, { color: sectionTitleColor, borderBottomColor: sectionTitleColor }]}>Attestation</Text>
       <View style={{ marginTop: 20 }}>
         <Text style={styles.attestationText}>
-          This compliance audit report was generated on {data.generatedAt} by {data.generatedBy}. The
+          {isWhiteLabel ? "This report was" : "This compliance audit report was"} generated on {data.generatedAt} by {data.generatedBy}. The
           information herein reflects the credential records maintained in the clinic&apos;s compliance
           tracking system as of the generation date. Verification of accuracy and completeness is the
           responsibility of the clinic owner or medical director.
