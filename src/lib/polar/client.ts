@@ -1,1 +1,1 @@
-// Polar SDK client wrapper — initializes with POLAR_ACCESS_TOKEN (Phase 7).
+// Polar SDK client — initialized with POLAR_ACCESS_TOKEN when billing is active.

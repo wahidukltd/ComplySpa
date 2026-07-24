@@ -35,55 +35,52 @@ export async function getReportData(): Promise<{
 
   const clinicId = user.clinic_id;
 
-  const { data: clinic, error: clinicErr } = await supabase
-    .from("clinics")
-    .select("name, address, state")
-    .eq("id", clinicId)
-    .single();
+  const [clinicResult, staffResult] = await Promise.all([
+    supabase.from("clinics").select("name, address, state").eq("id", clinicId).single(),
+    supabase.from("staff_members").select("id, name, role, hire_date").eq("clinic_id", clinicId).is("deleted_at", null).order("name"),
+  ]);
 
-  if (clinicErr || !clinic) {
-    Sentry.captureException(clinicErr ?? new Error("Clinic not found"));
+  if (clinicResult.error || !clinicResult.data) {
+    Sentry.captureException(clinicResult.error ?? new Error("Clinic not found"));
     return { data: null, error: "Clinic not found" };
   }
 
-  const { data: staffRows, error: staffErr } = await supabase
-    .from("staff_members")
-    .select("id, name, role, hire_date")
-    .eq("clinic_id", clinicId)
-    .is("deleted_at", null)
-    .order("name");
-
-  if (staffErr || !staffRows) {
-    Sentry.captureException(staffErr ?? new Error("Staff not found"));
+  if (staffResult.error || !staffResult.data) {
+    Sentry.captureException(staffResult.error ?? new Error("Staff not found"));
     return { data: null, error: "Failed to load staff" };
   }
+
+  const clinic = clinicResult.data;
+  const staffRows = staffResult.data;
 
   // MD is the first staff with role MD or DO — queried from the same set
   const md = staffRows.find((s) => s.role === "MD" || s.role === "DO") ?? null;
 
-  const { data: credRows, error: credErr } = await supabase
-    .from("credentials")
-    .select(`
-      id, staff_member_id, license_number, state,
-      issue_date, expiration_date, status, last_verified_date,
-      credential_type_id,
-      credential_types ( name, category )
-    `)
-    .eq("clinic_id", clinicId)
-    .is("deleted_at", null);
+  const [credResult, alertResult] = await Promise.all([
+    supabase
+      .from("credentials")
+      .select(`id, staff_member_id, license_number, state,
+        issue_date, expiration_date, status, last_verified_date,
+        credential_type_id,
+        credential_types ( name, category )`)
+      .eq("clinic_id", clinicId)
+      .is("deleted_at", null),
+    supabase
+      .from("alert_logs")
+      .select("credential_id, days_before_expiration")
+      .eq("clinic_id", clinicId)
+      .order("sent_at", { ascending: false }),
+  ]);
 
-  if (credErr) {
-    Sentry.captureException(credErr);
+  if (credResult.error) {
+    Sentry.captureException(credResult.error);
     return { data: null, error: "Failed to load credential data" };
   }
 
-  const { data: alertRows, error: alertErr } = await supabase
-    .from("alert_logs")
-    .select("credential_id, days_before_expiration")
-    .eq("clinic_id", clinicId)
-    .order("sent_at", { ascending: false });
+  if (alertResult.error) Sentry.captureException(alertResult.error);
 
-  if (alertErr) Sentry.captureException(alertErr);
+  const credRows = credResult.data ?? [];
+  const alertRows = alertResult.data ?? [];
 
   const alertMap = new Map<string, Set<number>>();
   for (const a of alertRows ?? []) {

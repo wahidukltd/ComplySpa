@@ -1,1 +1,1 @@
-// Polar webhook — signature validation and event handler dispatch (Phase 7).
+// Polar webhook handler — signature validation and event dispatch when billing is active.

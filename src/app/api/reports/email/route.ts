@@ -10,6 +10,28 @@ const emailReportSchema = z.object({
   clinicName: z.string().max(255),
 });
 
+const reportRateLimit = new Map<string, { count: number; resetAt: number }>();
+const REPORT_RATE_LIMIT_MAX = 5;
+const REPORT_RATE_LIMIT_WINDOW_MS = 3600000;
+
+function checkReportRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = reportRateLimit.get(key);
+  if (!entry || now > entry.resetAt) {
+    reportRateLimit.set(key, { count: 1, resetAt: now + REPORT_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= REPORT_RATE_LIMIT_MAX;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of reportRateLimit) {
+    if (now > entry.resetAt) reportRateLimit.delete(key);
+  }
+}, 300000);
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -71,13 +93,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
-    const { count: recentRequests } = await supabase
-      .from("alert_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("recipient", userRecord.email)
-      .gte("sent_at", new Date(Date.now() - 3600000).toISOString());
-
-    if ((recentRequests ?? 0) > 5) {
+    if (!checkReportRateLimit(userRecord.email)) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 

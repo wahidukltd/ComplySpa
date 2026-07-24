@@ -72,15 +72,11 @@ function isAuthorizedCaller(req: Request): boolean {
   if (!CRON_SECRET) return false;
   const header = req.headers.get("x-cron-secret");
   if (!header) return false;
-  try {
-    const enc = new TextEncoder();
-    const a = enc.encode(header);
-    const b = enc.encode(CRON_SECRET);
-    if (a.byteLength !== b.byteLength) return false;
-    return crypto.subtle.timingSafeEqual(a, b);
-  } catch {
-    return header === CRON_SECRET;
-  }
+  const enc = new TextEncoder();
+  const a = enc.encode(header);
+  const b = enc.encode(CRON_SECRET);
+  if (a.byteLength !== b.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(a, b);
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
