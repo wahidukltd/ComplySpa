@@ -91,10 +91,17 @@ export async function getAlertRecipients() {
   return { recipients: data ?? [], error: null };
 }
 
+async function checkAlertRecipientEntitlement(clinicId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data: clinic } = await supabase.from("clinics").select("plan").eq("id", clinicId).maybeSingle();
+  return clinic ? getEntitlements(clinic.plan).canManageAlertRecipients : false;
+}
+
 export async function addAlertRecipient(input: AlertRecipientInput) {
   const user = await getAuth();
   if (!user) return { success: false, error: "Unauthorized" };
   if (!["owner", "manager"].includes(user.role)) return { success: false, error: "Insufficient permissions" };
+  if (!(await checkAlertRecipientEntitlement(user.clinic_id))) return { success: false, error: "Alert recipient management requires Practice plan or higher" };
 
   const parsed = alertRecipientSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Validation failed" };
@@ -120,6 +127,7 @@ export async function removeAlertRecipient(id: string) {
   const user = await getAuth();
   if (!user) return { success: false, error: "Unauthorized" };
   if (!["owner", "manager"].includes(user.role)) return { success: false, error: "Insufficient permissions" };
+  if (!(await checkAlertRecipientEntitlement(user.clinic_id))) return { success: false, error: "Alert recipient management requires Practice plan or higher" };
 
   const supabase = await createClient();
   const { error } = await supabase

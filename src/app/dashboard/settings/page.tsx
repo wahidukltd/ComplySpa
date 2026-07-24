@@ -40,7 +40,7 @@ export default async function SettingsPage() {
     getClinicUsers(),
   ]);
 
-  const { canManageUsers } = getEntitlements(clinic.plan);
+  const { canManageUsers, canManageAlertRecipients } = getEntitlements(clinic.plan);
   const ownerEmail = usersResult.users.find((u) => u.role === "owner")?.email ?? null;
 
   return (
@@ -53,7 +53,7 @@ export default async function SettingsPage() {
       <Tabs defaultValue="profile" className="w-full">
         <TabsList>
           <TabsTrigger value="profile">Clinic Profile</TabsTrigger>
-          <TabsTrigger value="recipients">Alert Recipients</TabsTrigger>
+          {canManageAlertRecipients && <TabsTrigger value="recipients">Alert Recipients</TabsTrigger>}
           <TabsTrigger value="credential-types">Credential Types</TabsTrigger>
           {canManageUsers && <TabsTrigger value="users">Users</TabsTrigger>}
         </TabsList>
@@ -66,6 +66,7 @@ export default async function SettingsPage() {
           />
         </TabsContent>
 
+        {canManageAlertRecipients && (
         <TabsContent value="recipients" className="mt-4">
           <AlertRecipients
             recipients={recipientsResult.recipients}
@@ -73,6 +74,7 @@ export default async function SettingsPage() {
             role={userRecord.role}
           />
         </TabsContent>
+        )}
 
         <TabsContent value="credential-types" className="mt-4">
           <CustomCredentialTypes
