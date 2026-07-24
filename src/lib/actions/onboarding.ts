@@ -123,6 +123,7 @@ export async function restoreExistingAccount(authUserId: string): Promise<{ redi
     .select("id, clinic_id")
     .eq("email", authUser.email)
     .is("deleted_at", null)
+    .is("auth_user_id", null)
     .maybeSingle();
 
   if (!existing) return { redirectTo: null, error: null };

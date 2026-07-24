@@ -97,8 +97,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Clinic not found" }, { status: 404 });
     }
 
-    // On first subscription active, store polar_customer_id if missing
-    if (!clinicIdFromMeta && event.type === "subscription.active") {
+    // On first subscription active, store polar_customer_id for future webhook lookups
+    if (clinicIdFromMeta && event.type === "subscription.active") {
       await supabase.from("clinics").update({ polar_customer_id: data.customerId }).eq("id", clinic.id);
     }
 

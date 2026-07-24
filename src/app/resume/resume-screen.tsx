@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getCheckoutUrl } from "@/lib/actions/billing";
 
@@ -23,6 +24,26 @@ interface Props {
 export function ResumeScreen({ clinicName, staffCount, credentialCount, plan, plans, polarEnabled, userEmail }: Props) {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [subscribed, setSubscribed] = useState(false);
+  const router = useRouter();
+
+  // ponytail: poll for plan change after user opens checkout — webhook may be delayed
+  useEffect(() => {
+    if (!subscribed) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/health/plan-check");
+        const data = await res.json();
+        if (data.blocked === false) {
+          router.refresh();
+        }
+      } catch {
+        // retry on next interval
+      }
+    }, 3000);
+    const timeout = setTimeout(() => clearInterval(interval), 60000);
+    return () => { clearInterval(interval); clearTimeout(timeout); };
+  }, [subscribed, router]);
 
   const isExpired = plan === "expired_trial";
   const hasData = staffCount > 0 || credentialCount > 0;
@@ -34,6 +55,7 @@ export function ResumeScreen({ clinicName, staffCount, credentialCount, plan, pl
       const url = await getCheckoutUrl(planId as "solo" | "practice" | "multi_location");
       if (url) {
         window.open(url, "_blank", "noopener");
+        setSubscribed(true);
       } else {
         window.open("/pricing", "_self");
       }
