@@ -29,7 +29,6 @@ export default async function ReportsPage() {
     .single();
 
   let entitlements: ReturnType<typeof getEntitlements> | null = null;
-  let planName = "";
   if (userRecord) {
     const { data: clinic } = await supabase
       .from("clinics")
@@ -38,7 +37,6 @@ export default async function ReportsPage() {
       .single();
     if (clinic) {
       entitlements = getEntitlements(clinic.plan);
-      planName = clinic.plan;
     }
   }
 

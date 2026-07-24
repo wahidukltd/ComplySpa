@@ -196,8 +196,8 @@ export async function POST(req: NextRequest) {
                 </td></tr>
                 <tr><td style="padding:24px 32px 32px 32px;">
                   <p style="margin:0;font-size:12px;color:rgba(0,0,0,0.45);line-height:1.5;">
-                    This report was generated from your credential tracking system at ComplySpa.
-                    Please verify all information before submitting to a regulatory body.
+                    This report was generated from ${isWhiteLabel ? "your credential tracking system." : "your credential tracking system at ComplySpa."}
+                    ${isWhiteLabel ? "" : "Please verify all information before submitting to a regulatory body."}
                   </p>
                 </td></tr>
               </table>
@@ -208,7 +208,7 @@ export async function POST(req: NextRequest) {
       `,
       attachment: {
         content: base64Content,
-        filename: `compliance-report-${clinicName.replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "-").toLowerCase()}.pdf`,
+        filename: `${isWhiteLabel ? "" : "compliance-"}report-${clinicName.replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "-").toLowerCase()}.pdf`,
       },
     });
 
