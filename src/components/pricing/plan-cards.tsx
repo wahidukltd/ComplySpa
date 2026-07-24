@@ -8,6 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
+interface Props {
+  checkoutUrls?: Record<string, string> | null;
+}
+
 const PLANS = [
   {
     name: "Solo",
@@ -56,7 +60,7 @@ const PLANS = [
   },
 ];
 
-export function PlanCards() {
+export function PlanCards({ checkoutUrls }: Props) {
   const [annual, setAnnual] = useState(false);
   const shouldReduceMotion = useReducedMotion();
 
@@ -132,15 +136,30 @@ export function PlanCards() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/sign-up"
-                  className={cn(
-                    buttonVariants({ variant: plan.popular ? "default" : "outline" }),
-                    "w-full"
+                <div className="flex flex-col gap-2">
+                  <Link
+                    href="/sign-up"
+                    className={cn(
+                      buttonVariants({ variant: plan.popular ? "default" : "outline" }),
+                      "w-full"
+                    )}
+                  >
+                    Start free trial
+                  </Link>
+                  {checkoutUrls?.[plan.name.toLowerCase().replace("-", "_")] && (
+                    <a
+                      href={checkoutUrls[plan.name.toLowerCase().replace("-", "_")]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        buttonVariants({ variant: "ghost" }),
+                        "w-full text-xs"
+                      )}
+                    >
+                      Subscribe now &rarr;
+                    </a>
                   )}
-                >
-                  Start free trial
-                </Link>
+                </div>
               </CardContent>
             </Card>
           </motion.div>

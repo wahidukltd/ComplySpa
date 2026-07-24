@@ -9,10 +9,10 @@ import * as Sentry from "@sentry/nextjs";
 // once POLAR_WEBHOOK_SECRET is set in production env vars. Until then it
 // returns 501. Test checklist when Polar approval comes:
 //   1. Create Polar products with metadata {plan: solo|practice|multi_location}
-//   2. Configure POLAR_WEBHOOK_SECRET in Vercel env vars
+//   2. Set POLAR_WEBHOOK_SECRET, POLAR_ACCESS_TOKEN, and product price IDs
 //   3. Send test webhook events from Polar dashboard for each lifecycle event
 //   4. Verify update_clinic_subscription() RPC fires correctly
-//   5. Test the customer portal link on the billing page
+//   5. Test checkout + customer portal links end-to-end
 const POLAR_WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET;
 
 const PLAN_MAP: Record<string, string> = {
@@ -50,11 +50,19 @@ export async function POST(req: NextRequest) {
       throw err;
     }
 
+    // Only process subscription lifecycle events
     if (!event.type.startsWith("subscription.")) {
       return NextResponse.json({ received: true });
     }
 
-    const data = event.data as { id: string; customerId: string; product: { id: string; name: string; metadata: Record<string, string> }; cancelAtPeriodEnd?: boolean };
+    const data = event.data as {
+      id: string;
+      customerId: string;
+      product: { id: string; name: string; metadata: Record<string, string> };
+      metadata?: Record<string, string>;
+      cancelAtPeriodEnd?: boolean;
+    };
+
     const plan = mapPlan(data.product.name, data.product.metadata);
 
     if (!plan) {
@@ -66,18 +74,32 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    const { data: clinic } = await supabase
-      .from("clinics")
-      .select("id, plan")
-      .eq("polar_customer_id", data.customerId)
-      .maybeSingle();
+
+    // Look up clinic by:
+    // 1. clinic_id in subscription metadata (set during checkout)
+    // 2. polar_customer_id (for returning customers)
+    const clinicIdFromMeta = data.metadata?.clinic_id as string | undefined;
+    let clinic: { id: string; plan: string } | null = null;
+
+    if (clinicIdFromMeta) {
+      clinic = (await supabase.from("clinics").select("id, plan").eq("id", clinicIdFromMeta).maybeSingle()).data;
+    }
+
+    if (!clinic) {
+      clinic = (await supabase.from("clinics").select("id, plan").eq("polar_customer_id", data.customerId).maybeSingle()).data;
+    }
 
     if (!clinic) {
       Sentry.captureMessage("Polar webhook: no clinic found for customer", {
         level: "warning",
-        extra: { customerId: data.customerId, subscriptionId: data.id, plan },
+        extra: { customerId: data.customerId, subscriptionId: data.id, plan, clinicIdFromMeta },
       });
       return NextResponse.json({ error: "Clinic not found" }, { status: 404 });
+    }
+
+    // On first subscription active, store polar_customer_id if missing
+    if (!clinicIdFromMeta && event.type === "subscription.active") {
+      await supabase.from("clinics").update({ polar_customer_id: data.customerId }).eq("id", clinic.id);
     }
 
     switch (event.type) {
@@ -148,7 +170,7 @@ export async function POST(req: NextRequest) {
 
       case "subscription.created":
       case "subscription.past_due":
-        return NextResponse.json({ received: true });
+        break;
     }
 
     return NextResponse.json({ received: true });

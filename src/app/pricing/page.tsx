@@ -6,6 +6,9 @@ import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { createCheckoutLink } from "@/lib/polar/checkout";
+import { polarConfig } from "@/lib/polar/config";
 
 export const metadata: Metadata = {
   title: "Plans & Pricing — Simple, Transparent Compliance Pricing",
@@ -47,7 +50,41 @@ const pricingJsonLd = {
   ],
 };
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  let checkoutUrls: Record<string, string> | null = null;
+
+  if (polarConfig.enabled) {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: userRecord } = await supabase
+          .from("users")
+          .select("id, clinic_id")
+          .eq("auth_user_id", user.id)
+          .single();
+        if (userRecord) {
+          const { data: clinic } = await supabase
+            .from("clinics")
+            .select("id, polar_customer_id")
+            .eq("id", userRecord.clinic_id)
+            .single();
+          if (clinic) {
+            checkoutUrls = {};
+            for (const plan of ["solo", "practice", "multi_location"] as const) {
+              const result = await createCheckoutLink(plan, clinic.polar_customer_id ?? undefined, {
+                clinic_id: clinic.id,
+              });
+              if (result.url) checkoutUrls[plan] = result.url;
+            }
+          }
+        }
+      }
+    } catch {
+      // Not authenticated — checkout URLs not available
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-16 xl:max-w-6xl xl:px-8 xl:py-20 2xl:max-w-7xl 2xl:px-12">
       <div className="mb-12 text-center">
@@ -59,7 +96,7 @@ export default function PricingPage() {
         </p>
       </div>
 
-      <PlanCards />
+      <PlanCards checkoutUrls={checkoutUrls} />
 
       <div className="mt-16">
         <h2 className="mb-6 text-center text-2xl font-semibold" style={{ color: "#000000" }}>
