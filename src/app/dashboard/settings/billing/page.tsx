@@ -5,11 +5,20 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
+// ponytail: Polar.sh billing integration is infrastructure-ready but not yet
+// activated (no Polar approval). The webhook endpoint, DB columns, and RPC
+// exist. Once approved: set POLAR_WEBHOOK_SECRET, create Polar products
+// with metadata plan:solo|practice|multi_location, and replace the pricing
+// page buttons with Polar checkout links. Until then, this page shows plan
+// details only — no payment flow.
+
+const POLAR_ACTIVE = Boolean(process.env.POLAR_WEBHOOK_SECRET);
+
 const PLAN_LOOKUP = {
-  trial: { name: "Free Trial", ends: true },
-  solo: { name: "Solo", ends: false },
-  practice: { name: "Practice", ends: false },
-  multi_location: { name: "Multi-Location", ends: false },
+  trial: { name: "Free Trial" },
+  solo: { name: "Solo" },
+  practice: { name: "Practice" },
+  multi_location: { name: "Multi-Location" },
 } as const;
 
 export default async function BillingSettingsPage() {
@@ -27,7 +36,7 @@ export default async function BillingSettingsPage() {
 
   const { data: clinic } = await supabase
     .from("clinics")
-    .select("id, plan, trial_end_date, polar_customer_id, cancel_at_period_end")
+    .select("id, plan, trial_end_date, cancel_at_period_end")
     .eq("id", userRecord.clinic_id)
     .single();
 
@@ -35,14 +44,23 @@ export default async function BillingSettingsPage() {
 
   const entitlements = getEntitlements(clinic.plan);
   const planName = PLAN_LOOKUP[clinic.plan as keyof typeof PLAN_LOOKUP]?.name ?? clinic.plan;
-  const isPaid = !["trial", "expired_trial", "inactive"].includes(clinic.plan);
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold" style={{ color: "#000000" }}>Billing &amp; Plan</h2>
-        <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>Manage your subscription and billing.</p>
+        <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>Your subscription plan and limits.</p>
       </div>
+
+      {!POLAR_ACTIVE && (
+        <div
+          className="rounded-lg border p-4 text-sm"
+          style={{ borderColor: "#C2853A", backgroundColor: "#FFFBEB", color: "#92400E" }}
+        >
+          Polar billing integration is being configured. Payment processing will be available soon.
+          Your trial includes full feature access — no action needed.
+        </div>
+      )}
 
       <div className="rounded-lg border p-6" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
         <div className="flex items-center justify-between">
@@ -54,49 +72,19 @@ export default async function BillingSettingsPage() {
                 Trial ends {new Date(clinic.trial_end_date).toLocaleDateString()}
               </p>
             )}
-            {clinic.cancel_at_period_end && (
-              <p className="text-sm mt-1" style={{ color: "#C2853A" }}>
-                Subscription will cancel at end of billing period
-              </p>
-            )}
             {entitlements.blocked && (
               <p className="text-sm mt-1" style={{ color: "#B8443A" }}>
                 {entitlements.blockedReason}
               </p>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="rounded-lg border p-6" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
-        <h3 className="text-base font-medium mb-3" style={{ color: "#000000" }}>
-          {isPaid ? "Manage Subscription" : "Choose a Plan"}
-        </h3>
-        <p className="text-sm mb-4" style={{ color: "rgba(0,0,0,0.55)" }}>
-          {isPaid
-            ? "Visit the Polar customer portal to update your payment method, view invoices, or change your plan."
-            : "Select a plan to unlock features for your clinic."}
-        </p>
-        <div className="flex gap-3">
-          {isPaid ? (
-            <Link
-              href={`https://polar.sh/customer-portal?customerId=${clinic.polar_customer_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
-            >
-              Manage in Polar
-            </Link>
-          ) : (
-            <Link
-              href="/pricing"
-              className="inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
-            >
-              View Plans
-            </Link>
-          )}
+          <Link
+            href="/pricing"
+            className="inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium transition-opacity hover:opacity-90"
+            style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
+          >
+            View Plans
+          </Link>
         </div>
       </div>
 

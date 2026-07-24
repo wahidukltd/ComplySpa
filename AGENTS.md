@@ -73,6 +73,8 @@ Single source of truth at `src/lib/utils/entitlements.ts`. Every enforcement lay
 
 Product mapping: Polar product metadata `plan: solo|practice|multi_location` or product name matching.
 
+**Polar.sh status: NOT YET APPROVED.** The webhook handler at `src/app/api/polar/webhook/route.ts` is infrastructure-ready code that compiles and uses the correct SDK types, but has never been tested against real Polar webhook payloads. It returns 501 until `POLAR_WEBHOOK_SECRET` is set in production. All Polar-dependent transitions above (active→paid, upgrade, downgrade, cancel, uncancel, revoke) are blocked until Polar approval is obtained and the webhook is configured. The cron-based transitions (trial expiry, inactive cleanup) work independently.
+
 ## Report Design
 
 Colors: ink (#000000), action (#6E97A7), canvas (#FFFFFF).  

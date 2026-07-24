@@ -3,6 +3,16 @@ import { validateEvent, WebhookVerificationError } from "@polar-sh/sdk/webhooks"
 import { createAdminClient } from "@/lib/supabase/admin";
 import * as Sentry from "@sentry/nextjs";
 
+// ponytail: Polar.sh integration is infrastructure-ready but UNTESTED against
+// real Polar webhook payloads — we don't have Polar approval yet. The code
+// compiles, the schema types match the SDK, and the handler will process events
+// once POLAR_WEBHOOK_SECRET is set in production env vars. Until then it
+// returns 501. Test checklist when Polar approval comes:
+//   1. Create Polar products with metadata {plan: solo|practice|multi_location}
+//   2. Configure POLAR_WEBHOOK_SECRET in Vercel env vars
+//   3. Send test webhook events from Polar dashboard for each lifecycle event
+//   4. Verify update_clinic_subscription() RPC fires correctly
+//   5. Test the customer portal link on the billing page
 const POLAR_WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET;
 
 const PLAN_MAP: Record<string, string> = {
@@ -23,8 +33,10 @@ function mapPlan(productName: string, metadata: Record<string, string>): string 
 export async function POST(req: NextRequest) {
   try {
     if (!POLAR_WEBHOOK_SECRET) {
-      Sentry.captureMessage("Polar webhook: POLAR_WEBHOOK_SECRET not configured", { level: "error" });
-      return NextResponse.json({ error: "Server not configured" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Polar billing integration not configured. Set POLAR_WEBHOOK_SECRET to enable." },
+        { status: 501 },
+      );
     }
 
     const body = await req.text();
