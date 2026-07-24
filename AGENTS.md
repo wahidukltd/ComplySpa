@@ -97,6 +97,12 @@ NEXT_PUBLIC_APP_URL            # Checkout success redirect
 
 Without these, there is no checkout flow, no customer portal, and no subscription state transitions from Polar. Users stay on `trial` forever. The cron-based transitions (trial expiry → `expired_trial` → `inactive`) work independently of Polar.
 
+**Specific untested gaps (documented so re-audit is not needed when Polar approval arrives):**
+1. **No webhook idempotency table** — duplicate `subscription.active` events 30 sec apart hit RPC twice. Advisory lock prevents concurrent races but not duplicates. Add a `processed_webhooks` table keyed by event ID for at-least-once → exactly-once.
+2. **`polar_customer_id` update race** — first subscription sets it outside the advisory lock. Two concurrent webhook events could both see null and both write. Move inside `update_clinic_subscription()` or add a separate locked RPC.
+3. **`as Parameters<...>[0]` in checkout.ts** — the Polar SDK union type is masked by a type assertion. If the SDK types drift on upgrade, the compiler won't catch it. Remove the cast and use the correct union member type.
+4. **8 of 11 transitions are Polar-gated** — only signup→trial, trial→expired_trial, and expired_trial→inactive work today. The other 8 (skip trial, purchase during trial, upgrade, downgrade, cancel, uncancel, revoke, trial→active) all require Polar approval and live webhook payloads to validate.
+
 ## Report Design
 
 Colors: ink (#000000), action (#6E97A7), canvas (#FFFFFF).  
