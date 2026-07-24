@@ -1,20 +1,134 @@
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getEntitlements } from "@/lib/utils/entitlements";
 import Link from "next/link";
 
-export default function BillingSettingsPage() {
+export const dynamic = "force-dynamic";
+
+const PLAN_LOOKUP = {
+  trial: { name: "Free Trial", ends: true },
+  solo: { name: "Solo", ends: false },
+  practice: { name: "Practice", ends: false },
+  multi_location: { name: "Multi-Location", ends: false },
+} as const;
+
+export default async function BillingSettingsPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
+
+  const { data: userRecord } = await supabase
+    .from("users")
+    .select("id, clinic_id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  if (!userRecord) redirect("/onboarding");
+
+  const { data: clinic } = await supabase
+    .from("clinics")
+    .select("id, plan, trial_end_date, polar_customer_id, cancel_at_period_end")
+    .eq("id", userRecord.clinic_id)
+    .single();
+
+  if (!clinic) redirect("/onboarding");
+
+  const entitlements = getEntitlements(clinic.plan);
+  const planName = PLAN_LOOKUP[clinic.plan as keyof typeof PLAN_LOOKUP]?.name ?? clinic.plan;
+  const isPaid = !["trial", "expired_trial", "inactive"].includes(clinic.plan);
+
   return (
-    <div className="mx-auto max-w-md space-y-4 text-center py-12">
-      <h2 className="text-lg font-semibold" style={{ color: "#000000" }}>Billing management</h2>
-      <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
-        Billing management will be available once Polar payment integration is configured.
-        Your 14-day trial includes all Practice plan features.
-      </p>
-      <Link
-        href="/dashboard/settings"
-        className="inline-flex h-8 items-center justify-center rounded-lg border px-2.5 text-sm font-medium whitespace-nowrap"
-        style={{ borderColor: "rgba(0,0,0,0.12)", color: "#000000", backgroundColor: "#FFFFFF" }}
-      >
-        Back to Settings
-      </Link>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold" style={{ color: "#000000" }}>Billing &amp; Plan</h2>
+        <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>Manage your subscription and billing.</p>
+      </div>
+
+      <div className="rounded-lg border p-6" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium" style={{ color: "#000000" }}>Current Plan</p>
+            <p className="text-2xl font-semibold mt-1" style={{ color: "#000000" }}>{planName}</p>
+            {clinic.plan === "trial" && clinic.trial_end_date && (
+              <p className="text-sm mt-1" style={{ color: "rgba(0,0,0,0.55)" }}>
+                Trial ends {new Date(clinic.trial_end_date).toLocaleDateString()}
+              </p>
+            )}
+            {clinic.cancel_at_period_end && (
+              <p className="text-sm mt-1" style={{ color: "#C2853A" }}>
+                Subscription will cancel at end of billing period
+              </p>
+            )}
+            {entitlements.blocked && (
+              <p className="text-sm mt-1" style={{ color: "#B8443A" }}>
+                {entitlements.blockedReason}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-6" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
+        <h3 className="text-base font-medium mb-3" style={{ color: "#000000" }}>
+          {isPaid ? "Manage Subscription" : "Choose a Plan"}
+        </h3>
+        <p className="text-sm mb-4" style={{ color: "rgba(0,0,0,0.55)" }}>
+          {isPaid
+            ? "Visit the Polar customer portal to update your payment method, view invoices, or change your plan."
+            : "Select a plan to unlock features for your clinic."}
+        </p>
+        <div className="flex gap-3">
+          {isPaid ? (
+            <Link
+              href={`https://polar.sh/customer-portal?customerId=${clinic.polar_customer_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
+            >
+              Manage in Polar
+            </Link>
+          ) : (
+            <Link
+              href="/pricing"
+              className="inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
+            >
+              View Plans
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-6" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
+        <h3 className="text-base font-medium mb-3" style={{ color: "#000000" }}>Plan Details</h3>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span style={{ color: "rgba(0,0,0,0.55)" }}>Staff Limit</span>
+            <span style={{ color: "#000000" }}>{entitlements.maxStaff === 1000 ? "Unlimited (trial)" : entitlements.maxStaff}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: "rgba(0,0,0,0.55)" }}>Credential Limit</span>
+            <span style={{ color: "#000000" }}>{entitlements.maxCredentials === 10000 ? "Unlimited (trial)" : entitlements.maxCredentials}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: "rgba(0,0,0,0.55)" }}>User Limit</span>
+            <span style={{ color: "#000000" }}>{entitlements.maxUsers === 100 ? "Unlimited (trial)" : entitlements.maxUsers}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: "rgba(0,0,0,0.55)" }}>Report Tier</span>
+            <span style={{ color: "#000000" }}>{entitlements.reportTier === "none" ? "No reports (trial)" : entitlements.reportTier}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: "rgba(0,0,0,0.55)" }}>Email Reports</span>
+            <span style={{ color: "#000000" }}>{entitlements.canEmailReports ? "Yes" : "No"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: "rgba(0,0,0,0.55)" }}>API Access</span>
+            <span style={{ color: "#000000" }}>{entitlements.canAccessAPI ? "Yes" : "No"}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

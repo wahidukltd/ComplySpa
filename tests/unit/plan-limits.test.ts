@@ -1,70 +1,49 @@
 import { describe, it, expect } from "vitest";
-import { getPlanLimits, PLAN_LIMITS } from "@/lib/utils/plan";
+import { getPlanLimits } from "@/lib/utils/plan";
+import { getEntitlements, getReportTier } from "@/lib/utils/entitlements";
 import { PlanLimitError } from "@/lib/utils/errors";
 
-describe("PLAN_LIMITS", () => {
-  it("solo: 5 staff, 50 credentials, 1 user", () => {
-    expect(PLAN_LIMITS.solo.maxStaff).toBe(5);
-    expect(PLAN_LIMITS.solo.maxCredentials).toBe(50);
-    expect(PLAN_LIMITS.solo.maxUsers).toBe(1);
-  });
-
-  it("practice: 15 staff, 300 credentials, 3 users", () => {
-    expect(PLAN_LIMITS.practice.maxStaff).toBe(15);
-    expect(PLAN_LIMITS.practice.maxCredentials).toBe(300);
-    expect(PLAN_LIMITS.practice.maxUsers).toBe(3);
-  });
-
-  it("multi_location: 50 staff, 1000 credentials, 10 users", () => {
-    expect(PLAN_LIMITS.multi_location.maxStaff).toBe(50);
-    expect(PLAN_LIMITS.multi_location.maxCredentials).toBe(1000);
-    expect(PLAN_LIMITS.multi_location.maxUsers).toBe(10);
-  });
-
-  it("trial: generous limits for trial period", () => {
-    expect(PLAN_LIMITS.trial.maxStaff).toBe(1000);
-    expect(PLAN_LIMITS.trial.maxCredentials).toBe(10000);
-    expect(PLAN_LIMITS.trial.maxUsers).toBe(100);
-  });
-
-  it("expired_trial: all limits zero", () => {
-    expect(PLAN_LIMITS.expired_trial.maxStaff).toBe(0);
-    expect(PLAN_LIMITS.expired_trial.maxCredentials).toBe(0);
-    expect(PLAN_LIMITS.expired_trial.maxUsers).toBe(0);
-  });
-
-  it("inactive: all limits zero", () => {
-    expect(PLAN_LIMITS.inactive.maxStaff).toBe(0);
-    expect(PLAN_LIMITS.inactive.maxCredentials).toBe(0);
-    expect(PLAN_LIMITS.inactive.maxUsers).toBe(0);
-  });
-});
-
 describe("getPlanLimits", () => {
-  it("returns correct limits for 'solo'", () => {
+  it("solo: 5 staff, 50 credentials, 1 user", () => {
     const limits = getPlanLimits("solo");
     expect(limits.maxStaff).toBe(5);
     expect(limits.maxCredentials).toBe(50);
     expect(limits.maxUsers).toBe(1);
   });
 
-  it("returns correct limits for 'practice'", () => {
+  it("practice: 15 staff, 300 credentials, 3 users", () => {
     const limits = getPlanLimits("practice");
     expect(limits.maxStaff).toBe(15);
     expect(limits.maxCredentials).toBe(300);
     expect(limits.maxUsers).toBe(3);
   });
 
-  it("returns correct limits for 'multi_location'", () => {
+  it("multi_location: 50 staff, 1000 credentials, 10 users", () => {
     const limits = getPlanLimits("multi_location");
     expect(limits.maxStaff).toBe(50);
     expect(limits.maxCredentials).toBe(1000);
     expect(limits.maxUsers).toBe(10);
   });
 
-  it("returns correct limits for 'trial'", () => {
+  it("trial: generous limits", () => {
     const limits = getPlanLimits("trial");
     expect(limits.maxStaff).toBe(1000);
+    expect(limits.maxCredentials).toBe(10000);
+    expect(limits.maxUsers).toBe(100);
+  });
+
+  it("expired_trial: all limits zero", () => {
+    const limits = getPlanLimits("expired_trial");
+    expect(limits.maxStaff).toBe(0);
+    expect(limits.maxCredentials).toBe(0);
+    expect(limits.maxUsers).toBe(0);
+  });
+
+  it("inactive: all limits zero", () => {
+    const limits = getPlanLimits("inactive");
+    expect(limits.maxStaff).toBe(0);
+    expect(limits.maxCredentials).toBe(0);
+    expect(limits.maxUsers).toBe(0);
   });
 
   it("falls back to inactive for unknown plan", () => {
@@ -77,6 +56,102 @@ describe("getPlanLimits", () => {
   it("falls back to inactive for empty string", () => {
     const limits = getPlanLimits("");
     expect(limits.maxUsers).toBe(0);
+  });
+});
+
+describe("getEntitlements", () => {
+  it("trial: generous limits, no reports, email, or API", () => {
+    const e = getEntitlements("trial");
+    expect(e.maxStaff).toBe(1000);
+    expect(e.maxCredentials).toBe(10000);
+    expect(e.maxUsers).toBe(100);
+    expect(e.reportTier).toBe("none");
+    expect(e.canEmailReports).toBe(false);
+    expect(e.canAccessAPI).toBe(false);
+    expect(e.canManageUsers).toBe(true);
+    expect(e.blocked).toBe(false);
+  });
+
+  it("solo: capped limits, basic reports, no email, no API", () => {
+    const e = getEntitlements("solo");
+    expect(e.maxStaff).toBe(5);
+    expect(e.maxCredentials).toBe(50);
+    expect(e.maxUsers).toBe(1);
+    expect(e.reportTier).toBe("basic");
+    expect(e.canEmailReports).toBe(false);
+    expect(e.canAccessAPI).toBe(false);
+    expect(e.canManageUsers).toBe(false);
+    expect(e.blocked).toBe(false);
+  });
+
+  it("practice: mid limits, audit reports, email, no API", () => {
+    const e = getEntitlements("practice");
+    expect(e.maxStaff).toBe(15);
+    expect(e.maxCredentials).toBe(300);
+    expect(e.maxUsers).toBe(3);
+    expect(e.reportTier).toBe("audit");
+    expect(e.canEmailReports).toBe(true);
+    expect(e.canAccessAPI).toBe(false);
+    expect(e.canManageUsers).toBe(true);
+    expect(e.blocked).toBe(false);
+  });
+
+  it("multi_location: highest limits, white-label reports, email, API", () => {
+    const e = getEntitlements("multi_location");
+    expect(e.maxStaff).toBe(50);
+    expect(e.maxCredentials).toBe(1000);
+    expect(e.maxUsers).toBe(10);
+    expect(e.reportTier).toBe("white_label");
+    expect(e.canEmailReports).toBe(true);
+    expect(e.canAccessAPI).toBe(true);
+    expect(e.canManageUsers).toBe(true);
+    expect(e.blocked).toBe(false);
+  });
+
+  it("expired_trial: blocked with reason", () => {
+    const e = getEntitlements("expired_trial");
+    expect(e.blocked).toBe(true);
+    expect(e.blockedReason).toContain("trial has expired");
+    expect(e.maxStaff).toBe(0);
+    expect(e.reportTier).toBe("none");
+  });
+
+  it("inactive: blocked with reason", () => {
+    const e = getEntitlements("inactive");
+    expect(e.blocked).toBe(true);
+    expect(e.blockedReason).toContain("inactive");
+    expect(e.maxStaff).toBe(0);
+    expect(e.reportTier).toBe("none");
+  });
+
+  it("unknown plan falls back to inactive", () => {
+    const e = getEntitlements("nonexistent");
+    expect(e.blocked).toBe(true);
+    expect(e.blockedReason).toBe("Unknown plan");
+  });
+});
+
+describe("getReportTier", () => {
+  it("trial returns none", () => {
+    expect(getReportTier("trial")).toBe("none");
+  });
+  it("solo returns basic", () => {
+    expect(getReportTier("solo")).toBe("basic");
+  });
+  it("practice returns audit", () => {
+    expect(getReportTier("practice")).toBe("audit");
+  });
+  it("multi_location returns white_label", () => {
+    expect(getReportTier("multi_location")).toBe("white_label");
+  });
+  it("expired_trial returns none", () => {
+    expect(getReportTier("expired_trial")).toBe("none");
+  });
+  it("inactive returns none", () => {
+    expect(getReportTier("inactive")).toBe("none");
+  });
+  it("unknown plan returns none", () => {
+    expect(getReportTier("garbage")).toBe("none");
   });
 });
 
