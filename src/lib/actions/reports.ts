@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import type { Json } from "@/types/database";
 import type { ReportData } from "@/lib/pdf/report-template";
+import { getEntitlements, getReportTier } from "@/lib/utils/entitlements";
 
 const createReportSchema = z.object({
   reportUrl: z.string().nullable(),
@@ -16,6 +17,7 @@ const createReportSchema = z.object({
 export async function getReportData(): Promise<{
   data: ReportData | null;
   error: string | null;
+  reportTier?: "basic" | "audit" | "white_label";
 }> {
   const supabase = await createClient();
   const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -36,7 +38,7 @@ export async function getReportData(): Promise<{
   const clinicId = user.clinic_id;
 
   const [clinicResult, staffResult] = await Promise.all([
-    supabase.from("clinics").select("name, address, state").eq("id", clinicId).single(),
+    supabase.from("clinics").select("name, address, state, plan").eq("id", clinicId).single(),
     supabase.from("staff_members").select("id, name, role, hire_date").eq("clinic_id", clinicId).is("deleted_at", null).order("name"),
   ]);
 
@@ -184,7 +186,10 @@ export async function getReportData(): Promise<{
     generatedAt: new Date().toISOString(),
   };
 
-  return { data, error: null };
+  const reportTier = getReportTier(clinic.plan);
+  const tier = reportTier !== "none" ? reportTier : undefined;
+
+  return { data, error: null, reportTier: tier };
 }
 
 export async function createReport(
@@ -216,18 +221,17 @@ export async function createReport(
     return { id: null, error: "Invalid report URL" };
   }
 
-  const { data: clinic } = await supabase
+  const { data: clinicRow } = await supabase
     .from("clinics")
     .select("plan")
     .eq("id", userRecord.clinic_id)
     .single();
 
-  if (!clinic || clinic.plan === "expired_trial" || clinic.plan === "inactive") {
-    return { id: null, error: "Your plan does not support report generation." };
-  }
+  const plan = clinicRow?.plan ?? "trial";
+  const entitlements = getEntitlements(plan);
 
-  if (clinic.plan === "solo") {
-    return { id: null, error: "Audit-ready reports with email delivery require Practice plan or higher. Upgrade to generate and email full reports." };
+  if (entitlements.reportTier === "none") {
+    return { id: null, error: "PDF reports are not available during the trial period. Upgrade to generate reports." };
   }
 
   const { data: report, error } = await supabase

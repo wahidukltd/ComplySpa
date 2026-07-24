@@ -24,6 +24,36 @@ npm run test:e2e                     # playwright
 **Security: Never push `.env*`, secrets, API keys, or credentials to GitHub.**  
 Everything sensitive stays in `.env.local` (gitignored) or Vercel/Supabase environment variables.
 
+## Entitlement System
+
+Single source of truth at `src/lib/utils/entitlements.ts`. Every enforcement layer reads from `getEntitlements(plan)`:
+
+| Layer | File | What it enforces |
+|-------|------|-----------------|
+| Middleware | `src/middleware.ts` | Blocks `expired_trial`/`inactive` from dashboard. Solo → redirects users settings. |
+| Dashboard layout | `src/app/dashboard/layout.tsx` | Same blocks as middleware (defense-in-depth) |
+| Server actions | `src/lib/actions/reports.ts` | Gating reports per tier (`none` for trial, `basic` for solo, `audit` for practice, `white_label` for multi) |
+| API routes | `src/app/api/reports/email/route.ts` | Blocks email for plans without `canEmailReports` |
+| Limit checks | `src/lib/actions/staff.ts`, `credentials.ts`, `settings.ts` | Count-based checks via `getPlanLimits()` (derived from entitlements) |
+| DB trigger | `supabase/migrations/020_reconcile_plan_limits.sql` | Defense-in-depth for staff/credential/user count limits |
+| Report template | `src/lib/pdf/report-template.tsx` | Accepts `tier` prop: basic → summary only, audit → full, white_label → unbranded |
+
+### Plan → Feature Mapping (from entitlements.ts)
+
+| Plan | Staff | Creds | Users | Reports | Email | API | Users Mgmt |
+|------|-------|-------|-------|---------|-------|-----|------------|
+| trial | 1000 | 10000 | 100 | ❌ none | ❌ | ❌ | ✅ |
+| solo | 5 | 50 | 1 | ✅ basic | ❌ | ❌ | ❌ |
+| practice | 15 | 300 | 3 | ✅ audit | ✅ | ❌ | ✅ |
+| multi_location | 50 | 1000 | 10 | ✅ white_label | ✅ | ✅ | ✅ |
+
+### Report Tiers
+
+- **none** — trial: reports page shows upgrade CTA, server action blocks, no reports ever generated
+- **basic** — solo: simplified PDF (summary + upcoming renewals only, no staff register or attestation), no email delivery
+- **audit** — practice: full PDF (overview, staff register, summary, upcoming, attestation), email enabled
+- **white_label** — multi_location: same as audit but without "Compliance Audit Report" title or page footer branding
+
 ## 3 Colors
 
 ```

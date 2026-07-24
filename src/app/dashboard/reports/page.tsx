@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ReportGenerator } from "@/components/reports/report-generator";
 import { getReportHistory } from "@/lib/actions/reports";
+import { getEntitlements } from "@/lib/utils/entitlements";
 import { formatDateTime } from "@/lib/utils/date";
-import { FileText } from "lucide-react";
+import { FileText, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,22 @@ export default async function ReportsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
+
+  const { data: userRecord } = await supabase
+    .from("users")
+    .select("clinic_id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  let entitlements: ReturnType<typeof getEntitlements> | null = null;
+  if (userRecord) {
+    const { data: clinic } = await supabase
+      .from("clinics")
+      .select("plan")
+      .eq("id", userRecord.clinic_id)
+      .single();
+    if (clinic) entitlements = getEntitlements(clinic.plan);
+  }
 
   const history = await getReportHistory();
   const clinicId = history.clinicId ?? "";
@@ -32,6 +50,8 @@ export default async function ReportsPage() {
     }),
   );
 
+  const isTrial = entitlements?.reportTier === "none";
+
   return (
     <div className="space-y-8">
       <div>
@@ -48,10 +68,26 @@ export default async function ReportsPage() {
         <h2 className="text-lg font-medium mb-4" style={{ color: "#000000" }}>
           Generate New Report
         </h2>
-        <p className="text-sm mb-4" style={{ color: "rgba(0,0,0,0.55)" }}>
-          Creates a compliance audit report with staff credentials, status summary, upcoming renewals, and alert history. Report data is live — it reflects the current database state.
-        </p>
-        <ReportGenerator clinicId={clinicId} />
+        {isTrial ? (
+          <div className="rounded-md p-6 text-center" style={{ backgroundColor: "#F0F4F5" }}>
+            <h3 className="text-lg font-semibold mb-2" style={{ color: "#000000" }}>Upgrade to Generate Reports</h3>
+            <p className="text-sm mb-4" style={{ color: "rgba(0,0,0,0.55)" }}>
+              PDF reports are available on paid plans. Choose a plan that fits your clinic size.
+            </p>
+            <Link
+              href="/pricing"
+              className="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium"
+              style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
+            >
+              View Plans <ArrowUpRight className="size-4" />
+            </Link>
+          </div>
+        ) : (
+          <p className="text-sm mb-4" style={{ color: "rgba(0,0,0,0.55)" }}>
+            Creates a compliance report with staff credentials, status summary, upcoming renewals, and alert history. Report data is live.
+          </p>
+        )}
+        <ReportGenerator clinicId={clinicId} isTrial={isTrial} />
       </section>
 
       <section className="rounded-lg border p-6" style={{ borderColor: "rgba(0,0,0,0.12)" }}>

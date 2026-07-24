@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 
 interface Props {
   clinicId: string;
+  isTrial?: boolean;
 }
 
-export function ReportGenerator({ clinicId }: Props) {
+export function ReportGenerator({ clinicId, isTrial }: Props) {
   const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [reportTier, setReportTier] = useState<"basic" | "audit" | "white_label" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -27,6 +29,7 @@ export function ReportGenerator({ clinicId }: Props) {
       return;
     }
     setReportData(result.data);
+    setReportTier(result.reportTier ?? "audit");
     setLoading(false);
   };
 
@@ -72,8 +75,8 @@ export function ReportGenerator({ clinicId }: Props) {
   };
 
   const doc = useMemo(
-    () => (reportData ? <ComplianceReport data={reportData} /> : null),
-    [reportData],
+    () => (reportData && reportTier ? <ComplianceReport data={reportData} tier={reportTier} /> : null),
+    [reportData, reportTier],
   );
 
   if (loading) {
@@ -93,6 +96,10 @@ export function ReportGenerator({ clinicId }: Props) {
         </Button>
       </div>
     );
+  }
+
+  if (isTrial) {
+    return null;
   }
 
   if (!reportData) {
@@ -119,23 +126,25 @@ export function ReportGenerator({ clinicId }: Props) {
           )}
         </PDFDownloadLink>
 
-        <BlobProvider document={doc!}>
-          {({ blob, loading: blobLoading }) => (
-            <Button
-              variant="outline"
-              disabled={blobLoading || emailStatus === "sending"}
-              onClick={() => handleEmail(blob)}
-            >
-              {blobLoading
-                ? "Preparing..."
-                : emailStatus === "sending"
-                  ? "Sending..."
-                  : emailStatus === "sent"
-                    ? "Sent ✓"
-                    : "Email Report"}
-            </Button>
-          )}
-        </BlobProvider>
+        {reportTier && reportTier !== "basic" && (
+          <BlobProvider document={doc!}>
+            {({ blob, loading: blobLoading }) => (
+              <Button
+                variant="outline"
+                disabled={blobLoading || emailStatus === "sending"}
+                onClick={() => handleEmail(blob)}
+              >
+                {blobLoading
+                  ? "Preparing..."
+                  : emailStatus === "sending"
+                    ? "Sending..."
+                    : emailStatus === "sent"
+                      ? "Sent ✓"
+                      : "Email Report"}
+              </Button>
+            )}
+          </BlobProvider>
+        )}
       </div>
 
       {emailStatus === "error" && error && (

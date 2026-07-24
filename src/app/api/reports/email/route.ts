@@ -3,6 +3,7 @@ import { sendEmailWithAttachment } from "@/lib/email/send";
 import { createClient } from "@/lib/supabase/server";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import { getEntitlements } from "@/lib/utils/entitlements";
 
 const emailReportSchema = z.object({
   reportUrl: z.string(),
@@ -91,6 +92,21 @@ export async function POST(req: NextRequest) {
 
     if (userRecord.role === "viewer") {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    }
+
+    const { data: clinicRow } = await supabase
+      .from("clinics")
+      .select("plan")
+      .eq("id", userRecord.clinic_id)
+      .single();
+
+    if (!clinicRow) {
+      return NextResponse.json({ error: "Clinic not found" }, { status: 404 });
+    }
+
+    const entitlements = getEntitlements(clinicRow.plan);
+    if (!entitlements.canEmailReports) {
+      return NextResponse.json({ error: "Emailing reports requires Practice plan or higher" }, { status: 403 });
     }
 
     if (!checkReportRateLimit(userRecord.email)) {

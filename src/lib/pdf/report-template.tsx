@@ -245,11 +245,13 @@ function AlertsSummary({ sent }: { sent: string[] }) {
   return <Text style={styles.tableCell}>Yes ({sent.join(", ")} days)</Text>;
 }
 
-export function ComplianceReport({ data }: { data: ReportData }) {
+export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "basic" | "audit" | "white_label" }) {
+  const isWhiteLabel = tier === "white_label";
+
   const overviewContent = (
     <View style={styles.section}>
-      <Text style={styles.title}>Compliance Audit Report</Text>
-      <Text style={styles.clinicName}>{data.clinic.name}</Text>
+      {!isWhiteLabel && <Text style={styles.title}>Compliance Audit Report</Text>}
+      <Text style={isWhiteLabel ? styles.title : styles.clinicName}>{data.clinic.name}</Text>
       {data.clinic.address && (
         <Text style={styles.clinicAddress}>
           {data.clinic.address}{data.clinic.state ? `, ${data.clinic.state}` : ""}
@@ -262,7 +264,7 @@ export function ComplianceReport({ data }: { data: ReportData }) {
     </View>
   );
 
-  const registerContent = (
+  const registerContent = tier !== "basic" ? (
     <View style={styles.section} break>
       <Text style={styles.sectionHeader}>Staff Credential Register</Text>
       {data.staffMembers.length === 0 ? (
@@ -308,7 +310,7 @@ export function ComplianceReport({ data }: { data: ReportData }) {
         ))
       )}
     </View>
-  );
+  ) : null;
 
   const pct = (n: number) => (data.summary.total > 0 ? Math.round((n / data.summary.total) * 100) : 0);
 
@@ -396,7 +398,7 @@ export function ComplianceReport({ data }: { data: ReportData }) {
     </View>
   );
 
-  const attestationContent = (
+  const attestationContent = tier !== "basic" ? (
     <View style={styles.section} break>
       <Text style={styles.attestationText}>
         This compliance audit report was generated on {data.generatedAt} by {data.generatedBy}. The
@@ -406,18 +408,20 @@ export function ComplianceReport({ data }: { data: ReportData }) {
       </Text>
       <Text style={styles.reportIdText}>Report ID: {data.reportId}</Text>
     </View>
-  );
+  ) : null;
 
   return (
     <Document>
       <Page size="A4" style={styles.page} wrap>
-        <Text
-          style={styles.footer}
-          fixed
-          render={({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
-            `Page ${pageNumber} of ${totalPages}`
-          }
-        />
+        {!isWhiteLabel && (
+          <Text
+            style={styles.footer}
+            fixed
+            render={({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+              `Page ${pageNumber} of ${totalPages}`
+            }
+          />
+        )}
         {overviewContent}
         {registerContent}
         {summaryContent}
