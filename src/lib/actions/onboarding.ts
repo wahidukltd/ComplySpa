@@ -85,6 +85,7 @@ export async function createClinicOnboarding(input: CreateClinicInput) {
 export async function completeInvitationSignup(authUserId: string): Promise<{ error: string | null }> {
   const { data: { user: authUser } } = await (await createClient()).auth.getUser();
   if (!authUser?.email) return { error: "No email found for user" };
+  if (!authUser.email_confirmed_at) return { error: "Please verify your email before claiming the invitation." };
 
   const admin = createAdminClient();
   const { data: pending } = await admin

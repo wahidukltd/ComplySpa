@@ -11,7 +11,7 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error("NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set");
 }
 
-export async function proxy(req: NextRequest) {
+export default async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   res.headers.set("x-pathname", req.nextUrl.pathname);
 

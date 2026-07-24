@@ -24,7 +24,15 @@ export const credentialSchema = z.object({
     .or(z.literal("")),
   issue_date: z.string().date("Use YYYY-MM-DD format").optional().or(z.literal("")),
   expiration_date: z.string().date("Use YYYY-MM-DD format").optional().or(z.literal("")),
-  verification_url: z.string().url("Must be a valid URL").refine((u) => u.startsWith("https://") || u.startsWith("http://"), { message: "Only http(s) URLs are allowed" }).optional().or(z.literal("")),
+  verification_url: z.string().refine((u) => {
+    if (u === "") return true;
+    try {
+      const url = new URL(u);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  }, { message: "Must be a valid http(s) URL" }).optional().or(z.literal("")),
   notes: z.string().max(1000).optional().or(z.literal("")),
 });
 

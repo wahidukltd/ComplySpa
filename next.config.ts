@@ -6,7 +6,7 @@ const supabaseHost = supabaseUrl ? new URL(supabaseUrl).hostname : "supabase.co"
 
 const cspValue = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+  "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https: blob:",
   "font-src 'self'",

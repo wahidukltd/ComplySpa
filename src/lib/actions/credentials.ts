@@ -112,6 +112,15 @@ export async function updateCredential(id: string, input: CredentialInput & { do
   if (!user) return { error: "Unauthorized" };
   if (user.role === "viewer") return { error: "Insufficient permissions" };
 
+  const { data: existingCredential } = await supabase
+    .from("credentials")
+    .select("staff_member_id")
+    .eq("id", id)
+    .eq("clinic_id", user.clinic_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!existingCredential) return { error: "Credential not found" };
+
   const { error } = await supabase
     .from("credentials")
     .update({
@@ -124,17 +133,15 @@ export async function updateCredential(id: string, input: CredentialInput & { do
       notes: parsed.data.notes || null,
       document_url: document_url ?? null,
     })
-    .eq("id", id)
-    .eq("clinic_id", user.clinic_id)
-    .is("deleted_at", null);
+    .eq("id", id);
 
   if (error) {
     Sentry.captureException(error);
     return { error: "Failed to update credential. Please try again." };
   }
 
-  revalidatePath(`/dashboard/staff/${parsed.data.staff_member_id}`);
-  revalidatePath(`/dashboard/staff/${parsed.data.staff_member_id}/credentials`);
+  revalidatePath(`/dashboard/staff/${existingCredential.staff_member_id}`);
+  revalidatePath(`/dashboard/staff/${existingCredential.staff_member_id}/credentials`);
   revalidatePath("/dashboard/credentials");
   revalidatePath("/dashboard");
   return { success: true };
@@ -196,14 +203,21 @@ export async function verifyCredentialNow(credentialId: string) {
   if (!user) return { error: "Unauthorized" };
   if (user.role === "viewer") return { error: "Insufficient permissions" };
 
+  const { data: credential } = await supabase
+    .from("credentials")
+    .select("id")
+    .eq("id", credentialId)
+    .eq("clinic_id", user.clinic_id)
+    .maybeSingle();
+  if (!credential) return { error: "Credential not found" };
+
   const { error } = await supabase
     .from("credentials")
     .update({
       last_verified_date: new Date().toISOString(),
       verified_by_user_id: user.id,
     })
-    .eq("id", credentialId)
-    .eq("clinic_id", user.clinic_id);
+    .eq("id", credentialId);
 
   if (error) {
     Sentry.captureException(error);

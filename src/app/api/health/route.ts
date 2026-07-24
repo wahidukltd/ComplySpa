@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import * as Sentry from "@sentry/nextjs";
 
@@ -6,6 +6,28 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const MONITOR_SLUG = "app-health";
+
+const healthRateLimit = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = healthRateLimit.get(ip);
+  if (!entry || now > entry.resetAt) {
+    healthRateLimit.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= RATE_LIMIT_MAX;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of healthRateLimit) {
+    if (now > entry.resetAt) healthRateLimit.delete(ip);
+  }
+}, 300_000);
 
 async function checkSupabase() {
   const supabase = await createClient();
@@ -47,7 +69,20 @@ async function checkCronJob(name: string, maxStaleHours: number): Promise<"ok" |
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ status: "error", error: "Too many requests" }, { status: 429 });
+  }
+
+  const healthSecret = process.env.CRON_SECRET;
+  if (healthSecret) {
+    const provided = req.headers.get("x-health-check-secret");
+    if (!provided || provided !== healthSecret) {
+      return NextResponse.json({ status: "error" }, { status: 403 });
+    }
+  }
+
   const overallCheckInId = Sentry.captureCheckIn?.({ monitorSlug: MONITOR_SLUG, status: "in_progress" }) ?? null;
 
   const checks: Record<string, "ok" | "error"> = {};

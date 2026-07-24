@@ -61,6 +61,10 @@ export async function getClinicIdAndPlan(): Promise<{
     return null;
   }
 
-  return { clinicId: userData.clinic_id, plan: clinic?.plan ?? "trial", userId: authUser.id };
+  if (!clinic) {
+    Sentry.captureMessage("Clinic not found for user", { extra: { clinicId: userData.clinic_id } });
+    return null;
+  }
+  return { clinicId: userData.clinic_id, plan: clinic.plan, userId: authUser.id };
 }
 

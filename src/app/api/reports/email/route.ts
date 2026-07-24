@@ -16,19 +16,37 @@ function escapeHtml(s: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const contentLength = parseInt(req.headers.get("content-length") ?? "0");
-    if (contentLength > 100 * 1024) {
+    const origin = req.headers.get("origin");
+    const referer = req.headers.get("referer");
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!origin && !referer) {
+      return NextResponse.json({ error: "Missing origin" }, { status: 403 });
+    }
+    if (origin && new URL(origin).origin !== new URL(appUrl ?? "").origin) {
+      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    }
+    if (referer && !origin && new URL(referer).origin !== new URL(appUrl ?? "").origin) {
+      return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+    }
+
+    const bodyText = await req.text();
+    if (bodyText.length > 100 * 1024) {
       return NextResponse.json({ error: "Request too large" }, { status: 413 });
     }
 
     const supabase = await createClient();
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(bodyText);
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
     const { data: { user } } = await supabase.auth.getUser();
     const userId = user?.id;
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
     const parsed = emailReportSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -119,7 +137,7 @@ export async function POST(req: NextRequest) {
       `,
       attachment: {
         content: base64Content,
-        filename: `compliance-report-${clinicName.replace(/\s+/g, "-").toLowerCase()}.pdf`,
+        filename: `compliance-report-${clinicName.replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "-").toLowerCase()}.pdf`,
       },
     });
 
