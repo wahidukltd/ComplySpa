@@ -35,8 +35,7 @@ export default async function DashboardLayout({
   const { blocked, canManageUsers } = getEntitlements(clinic.plan);
 
   if (blocked) {
-    const reason = clinic.plan === "expired_trial" ? "trial_ended" : "account_inactive";
-    redirect(`/pricing?reason=${reason}`);
+    redirect("/resume");
   }
 
   const headersList = await headers();

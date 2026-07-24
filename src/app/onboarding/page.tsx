@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingForm } from "./onboarding-form";
-import { completeInvitationSignup } from "@/lib/actions/onboarding";
+import { completeInvitationSignup, restoreExistingAccount } from "@/lib/actions/onboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +26,11 @@ export default async function OnboardingPage() {
   }
 
   try {
+    const existingAccount = await restoreExistingAccount(userId);
+    if (existingAccount.redirectTo) {
+      redirect(existingAccount.redirectTo);
+    }
+
     const result = await completeInvitationSignup(userId);
     if (!result.error) redirect("/dashboard");
     if (result.error !== "No invitation pending") {

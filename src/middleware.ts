@@ -42,6 +42,8 @@ export default async function middleware(req: NextRequest) {
     pathname.startsWith("/api/health") ||
     pathname.startsWith("/sentry-tunnel");
 
+  // /resume requires auth — handled below in the blocked check
+
   if (isPublic) return res;
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -90,8 +92,8 @@ export default async function middleware(req: NextRequest) {
   const plan = clinics?.[0]?.plan ?? "trial";
   const { blocked, canManageUsers } = getEntitlements(plan);
 
-  if (blocked) {
-    return NextResponse.redirect(new URL("/pricing", req.url));
+  if (blocked && pathname !== "/resume" && !pathname.startsWith("/api/")) {
+    return NextResponse.redirect(new URL("/resume", req.url));
   }
 
   if (!canManageUsers && pathname.startsWith("/dashboard/settings/users")) {

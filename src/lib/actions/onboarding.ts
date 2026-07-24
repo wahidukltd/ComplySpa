@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClinicSchema, type CreateClinicInput } from "@/lib/validations/clinic";
 import { revalidatePath } from "next/cache";
+import { getEntitlements } from "@/lib/utils/entitlements";
 import * as Sentry from "@sentry/nextjs";
 
 async function createClinicInternal(input: CreateClinicInput) {
@@ -108,4 +109,41 @@ export async function completeInvitationSignup(authUserId: string): Promise<{ er
   }
 
   return { error: null };
+}
+
+export async function restoreExistingAccount(authUserId: string): Promise<{ redirectTo: string | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (!authUser?.email) return { redirectTo: null, error: "No email found" };
+
+  const supabaseAdmin = createAdminClient();
+
+  const { data: existing } = await supabaseAdmin
+    .from("users")
+    .select("id, clinic_id")
+    .eq("email", authUser.email)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!existing) return { redirectTo: null, error: null };
+
+  const { data: clinic } = await supabaseAdmin
+    .from("clinics")
+    .select("id, plan")
+    .eq("id", existing.clinic_id)
+    .maybeSingle();
+
+  if (!clinic) return { redirectTo: null, error: null };
+
+  const { error } = await supabaseAdmin
+    .from("users")
+    .update({ auth_user_id: authUserId })
+    .eq("id", existing.id);
+
+  if (error) {
+    Sentry.captureException(error);
+    return { redirectTo: null, error: "Failed to restore account" };
+  }
+
+  return { redirectTo: getEntitlements(clinic.plan).blocked ? "/resume" : "/dashboard", error: null };
 }
