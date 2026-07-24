@@ -110,7 +110,7 @@ When trial expires (cron `daily-trial-expiry-check`), the clinic moves to `expir
 - **All limits go to zero** — blocked from adding/modifying, existing data read-able via DB but app blocks writes via middleware redirect
 - **Returning user flow**: sign in → middleware finds clinic → plan expired_trial → redirects to `/resume` (not `/pricing`)
 - **Resume page** (`/resume`): full-screen premium UI with preserved staff/credential counts, professional copy, CTA to reactivate
-- **Returning customer detection** (`restoreExistingAccount`): when email matches existing `users` record, links new `auth_user_id` and redirects to `/resume` — never duplicates clinic/account
+- **Returning customer detection** (`restoreExistingAccount`): when email matches existing `users` record, links new `auth_user_id` and redirects to `/resume` — never duplicates clinic/account. Works with both email/password and Google OAuth (both expose email in `authUser.email`). Only links when old `auth_user_id IS NULL` to avoid trigger violation.
 - **Reactivation**: subscribe from `/resume`, `/pricing`, or billing settings → Polar checkout → webhook `subscription.active` → RPC restores plan → user continues where they left off
 
 | State | Access | UI |
@@ -208,6 +208,32 @@ Push to `main` → auto-deployed to production.
 - Before commit: `npm run typecheck` → `npm run lint` → `npm run build`
 - All error classes in `src/lib/utils/errors.ts` — single source.
 - Use `{ data, error }` sentinel pattern, never return null.
+
+## Authentication
+
+Supabase Auth handles both providers:
+
+| Provider | Config | Sign-up | Sign-in | Email confirmation |
+|----------|--------|---------|---------|-------------------|
+| Email/password | Built-in | `supabase.auth.signUp()` | `signInWithPassword()` | Required (checked in `createClinicInternal`) |
+| Google OAuth | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | `signInWithOAuth(provider:"google")` via PKCE flow | Same button, Supabase links accounts | Auto-confirmed (no verification needed) |
+
+### auth_user_id Lifecycle
+
+The `auth_user_id` column in `users` table links Supabase Auth accounts to clinic membership:
+
+1. **New sign-up (email/password)**: `create_clinic_for_user` RPC creates clinic + inserts `users` row with the new `auth_user_id` (from `auth.jwt() ->> 'sub'`)
+2. **New sign-up (Google OAuth)**: Same RPC — `auth_user_id` is the Google-linked Supabase Auth UUID
+3. **Invited user** (`auth_user_id IS NULL`): `completeInvitationSignup()` links the new `auth_user_id` to the pending row
+4. **Returning user (same auth method)**: Supabase Auth returns the same `auth_user_id`. Middleware finds the existing `users` row. Plan check follows normal flow.
+5. **Returning user (different auth method)**: If user signed up with Google but tries email/password, Supabase Auth may create a new `auth_user_id`. Middleware won't find the `users` row → redirects to `/onboarding`. `restoreExistingAccount()` detects by email, links the new `auth_user_id` (only when old `auth_user_id IS NULL` to avoid trigger violation), redirects to `/resume`.
+6. **Immutable** (`prevent_auth_user_id_change` trigger): Once set, `auth_user_id` cannot change. `restoreExistingAccount` guards with `.is("auth_user_id", null)` to avoid triggering this.
+
+### Session Handling
+
+- Middleware uses `@supabase/ssr` `createServerClient` with `getAll()`/`setAll()` cookies — works identically for both auth methods
+- All server actions call `createClient()` → `supabase.auth.getUser()` (not `getSession()`) — verifies JWT against Supabase Auth server, cannot be bypassed with stale tokens
+- `auth/callback/route.ts` handles both PKCE OAuth exchange and password-reset flows. Redirect path validated against allowlist (`/onboarding`, `/dashboard`, `/reset-password`).
 
 ## Lessons
 
