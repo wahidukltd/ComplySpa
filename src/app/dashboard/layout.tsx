@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Toaster } from "sonner";
+import { getEntitlements } from "@/lib/utils/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +32,16 @@ export default async function DashboardLayout({
 
   if (!clinic) redirect("/onboarding");
 
-  if (clinic.plan === "expired_trial") redirect("/pricing?reason=trial_ended");
-  if (clinic.plan === "inactive") redirect("/pricing?reason=account_inactive");
+  const { blocked, canManageUsers } = getEntitlements(clinic.plan);
+
+  if (blocked) {
+    const reason = clinic.plan === "expired_trial" ? "trial_ended" : "account_inactive";
+    redirect(`/pricing?reason=${reason}`);
+  }
 
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "";
-  if (clinic.plan === "solo" && pathname.startsWith("/dashboard/settings/users")) {
+  if (!canManageUsers && pathname.startsWith("/dashboard/settings/users")) {
     redirect("/pricing?reason=plan_upgrade_required");
   }
 

@@ -8,6 +8,7 @@ import { CustomCredentialTypes } from "@/components/settings/custom-credential-t
 import { UserInviteForm } from "@/components/settings/user-invite-form";
 import { UserList } from "@/components/settings/user-list";
 import { getAlertRecipients, getCredentialTypes, getClinicUsers } from "@/lib/actions/settings";
+import { getEntitlements } from "@/lib/utils/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +40,8 @@ export default async function SettingsPage() {
     getClinicUsers(),
   ]);
 
+  const { canManageUsers } = getEntitlements(clinic.plan);
   const ownerEmail = usersResult.users.find((u) => u.role === "owner")?.email ?? null;
-  const showUsersTab = clinic.plan !== "solo";
 
   return (
     <div className="space-y-6">
@@ -54,7 +55,7 @@ export default async function SettingsPage() {
           <TabsTrigger value="profile">Clinic Profile</TabsTrigger>
           <TabsTrigger value="recipients">Alert Recipients</TabsTrigger>
           <TabsTrigger value="credential-types">Credential Types</TabsTrigger>
-          {showUsersTab && <TabsTrigger value="users">Users</TabsTrigger>}
+          {canManageUsers && <TabsTrigger value="users">Users</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-4">
@@ -81,7 +82,7 @@ export default async function SettingsPage() {
           />
         </TabsContent>
 
-        {showUsersTab && (
+        {canManageUsers && (
           <TabsContent value="users" className="mt-4 space-y-4">
             {userRecord.role === "owner" && <UserInviteForm />}
             <UserList

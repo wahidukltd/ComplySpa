@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getClinicIdAndUser } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
+import { getEntitlements } from "@/lib/utils/entitlements";
 import {
   clinicProfileSchema,
   alertRecipientSchema,
@@ -251,7 +252,7 @@ export async function inviteUser(input: InviteUserInput) {
   const plan = clinicResult.data?.plan ?? "trial";
   const limits = getPlanLimits(plan);
 
-  if (plan === "inactive" || plan === "expired_trial") {
+  if (getEntitlements(plan).blocked) {
     return { success: false, error: "Your plan is inactive. Reactivate to invite users." };
   }
 

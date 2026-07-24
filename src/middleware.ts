@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import type { Database } from "@/types/database";
+import { getEntitlements } from "@/lib/utils/entitlements";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -86,13 +87,14 @@ export default async function middleware(req: NextRequest) {
     return res;
   }
 
-  const plan = clinics?.[0]?.plan;
+  const plan = clinics?.[0]?.plan ?? "trial";
+  const { blocked, canManageUsers } = getEntitlements(plan);
 
-  if (plan === "expired_trial" || plan === "inactive") {
+  if (blocked) {
     return NextResponse.redirect(new URL("/pricing", req.url));
   }
 
-  if (plan === "solo" && pathname.startsWith("/dashboard/settings/users")) {
+  if (!canManageUsers && pathname.startsWith("/dashboard/settings/users")) {
     return NextResponse.redirect(new URL("/pricing?reason=plan_upgrade_required", req.url));
   }
 

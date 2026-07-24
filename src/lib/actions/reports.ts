@@ -280,6 +280,17 @@ export async function getReportHistory(): Promise<{
     return { reports: [], error: "Failed to load user", clinicId: null };
   }
 
+  const { data: clinicRow } = await supabase
+    .from("clinics")
+    .select("plan")
+    .eq("id", user.clinic_id)
+    .single();
+
+  const plan = clinicRow?.plan ?? "trial";
+  if (getEntitlements(plan).reportTier === "none") {
+    return { reports: [], error: null, clinicId: user.clinic_id };
+  }
+
   const { data: reportRows, error } = await supabase
     .from("audit_reports")
     .select(`

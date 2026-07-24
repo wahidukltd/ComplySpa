@@ -90,6 +90,7 @@ export default async function ReportsPage() {
         <ReportGenerator clinicId={clinicId} isTrial={isTrial} />
       </section>
 
+      {!isTrial && (
       <section className="rounded-lg border p-6" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
         <h2 className="text-lg font-medium mb-4" style={{ color: "#000000" }}>
           Report History
@@ -145,6 +146,7 @@ export default async function ReportsPage() {
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }

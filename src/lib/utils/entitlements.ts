@@ -1,5 +1,3 @@
-import "server-only";
-
 export type Plan = "trial" | "expired_trial" | "inactive" | "solo" | "practice" | "multi_location";
 export type ReportTier = "none" | "basic" | "audit" | "white_label";
 
