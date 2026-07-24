@@ -25,6 +25,9 @@ export default async function ReportsPage() {
           .createSignedUrl(r.reportUrl, SIGNED_URL_EXPIRY);
         return { ...r, reportUrl: data?.signedUrl ?? null };
       }
+      if (r.reportUrl?.includes("://")) {
+        return { ...r, reportUrl: null };
+      }
       return r;
     }),
   );

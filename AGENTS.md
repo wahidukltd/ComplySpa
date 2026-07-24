@@ -104,3 +104,11 @@ Push to `main` → auto-deployed to production.
 ## Lessons
 
 - **Never change DNS records unless absolutely necessary.** Each change causes propagation delays that take the site down temporarily. The default Cloudflare + Vercel setup (proxied A record → 76.76.21.21) is correct and stable. CNAME flattening at the apex introduces risk for zero benefit.
+
+### Known Technical Debt
+
+These are acknowledged gaps that don't warrant fixing at their current risk level. Revisit if the related code area is being actively developed:
+
+- **Sentinel pattern inconsistency** — `addCredential()` returns `{success, error}`, but `updateCredential()`/`deleteCredential()`/`verifyCredentialNow()` return `{error}` without `success`. Standardize if touching these actions.
+- **Edge Function code duplication** — `send-credential-alert/index.ts` duplicates `htmlEscape`, `sleep`, and retry logic from `src/lib/email/send.ts`. Deno vs Node runtime prevents shared imports. Update both if changing retry behavior.
+- **Webhook rate limiter in-memory** — Resend webhook rate limiter uses a `Map` that resets on Vercel deploy. Resend controls the caller IPs, Svix validates signatures. Add persistent storage if throughput exceeds 100 req/min.
