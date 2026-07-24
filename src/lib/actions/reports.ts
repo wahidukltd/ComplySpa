@@ -39,7 +39,7 @@ export async function getReportData(): Promise<{
 
   const [clinicResult, staffResult] = await Promise.all([
     supabase.from("clinics").select("name, address, state, plan").eq("id", clinicId).single(),
-    supabase.from("staff_members").select("id, name, role, hire_date").eq("clinic_id", clinicId).is("deleted_at", null).order("name"),
+    supabase.from("staff_members").select("id, name, role, hire_date").eq("clinic_id", clinicId).is("deleted_at", null).is("suspended_at", null).order("name"),
   ]);
 
   if (clinicResult.error || !clinicResult.data) {
@@ -66,7 +66,8 @@ export async function getReportData(): Promise<{
         credential_type_id,
         credential_types ( name, category )`)
       .eq("clinic_id", clinicId)
-      .is("deleted_at", null),
+      .is("deleted_at", null)
+      .is("suspended_at", null),
     supabase
       .from("alert_logs")
       .select("credential_id, days_before_expiration")

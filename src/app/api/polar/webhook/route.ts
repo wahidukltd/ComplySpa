@@ -102,6 +102,8 @@ export async function POST(req: NextRequest) {
       await supabase.from("clinics").update({ polar_customer_id: data.customerId }).eq("id", clinic.id);
     }
 
+    const planChanged = ["subscription.active", "subscription.updated", "subscription.revoked", "subscription.uncanceled"].includes(event.type);
+
     switch (event.type) {
       case "subscription.active":
       case "subscription.updated": {
@@ -171,6 +173,22 @@ export async function POST(req: NextRequest) {
       case "subscription.created":
       case "subscription.past_due":
         break;
+    }
+
+    // Reconcile resources after every plan change — suspends excess staff/credentials,
+    // restores previously suspended ones that now fit within the new plan's limits.
+    if (planChanged) {
+      const reconcilePlan = event.type === "subscription.revoked" ? "expired_trial" : plan;
+      const { error: reconcileError } = await supabase.rpc("reconcile_clinic_plan", {
+        p_clinic_id: clinic.id,
+        p_plan: reconcilePlan,
+      });
+      if (reconcileError) {
+        Sentry.captureException(reconcileError, {
+          extra: { clinicId: clinic.id, plan: reconcilePlan, event: event.type },
+        });
+        return NextResponse.json({ error: "Reconciliation failed" }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ received: true });

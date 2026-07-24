@@ -29,6 +29,7 @@ export default async function NewCredentialPage({
     .eq("id", id)
     .eq("clinic_id", userRecord.clinic_id)
     .is("deleted_at", null)
+    .is("suspended_at", null)
     .single();
 
   if (!staff) notFound();

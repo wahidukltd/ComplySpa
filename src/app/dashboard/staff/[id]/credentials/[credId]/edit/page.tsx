@@ -29,15 +29,17 @@ export default async function EditCredentialPage({
     .eq("id", id)
     .eq("clinic_id", userRecord.clinic_id)
     .is("deleted_at", null)
+    .is("suspended_at", null)
     .single();
 
   if (!staff) notFound();
 
   const { data: credential } = await supabase
     .from("credentials")
-    .select("id, clinic_id, staff_member_id, credential_type_id, deleted_at, license_number, state, issue_date, expiration_date, status, verification_url, last_verified_date, document_url, notes, verified_by_user_id, created_at, updated_at")
+    .select("id, clinic_id, staff_member_id, credential_type_id, deleted_at, license_number, state, issue_date, expiration_date, status, verification_url, last_verified_date, document_url, notes, verified_by_user_id, created_at, updated_at, suspended_at, suspended_plan")
     .eq("id", credId)
     .eq("clinic_id", userRecord.clinic_id)
+    .is("suspended_at", null)
     .single();
 
   if (!credential) notFound();

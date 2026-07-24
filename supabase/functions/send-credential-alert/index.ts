@@ -38,7 +38,7 @@ interface CredentialWithRelations {
   clinic_id: string;
   license_number: string | null;
   expiration_date: string;
-  staff_member: { name: string | null; deleted_at: string | null } | null;
+  staff_member: { name: string | null; deleted_at: string | null; suspended_at: string | null } | null;
   credential_type: { name: string | null } | null;
 }
 
@@ -144,10 +144,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { data: credential, error: credError } = await supabase
       .from("credentials")
       .select(
-        "id, staff_member_id, credential_type_id, clinic_id, license_number, state, expiration_date, staff_member:staff_members!credentials_staff_member_id_fkey(name, deleted_at), credential_type:credential_types!credentials_credential_type_id_fkey(name)",
+        "id, staff_member_id, credential_type_id, clinic_id, license_number, state, expiration_date, staff_member:staff_members!credentials_staff_member_id_fkey(name, deleted_at, suspended_at), credential_type:credential_types!credentials_credential_type_id_fkey(name)",
       )
       .eq("id", credential_id)
       .eq("clinic_id", clinic_id)
+      .is("suspended_at", null)
       .single<CredentialWithRelations>();
 
     if (credError || !credential) {
@@ -167,7 +168,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return json({ success: false, error: "Credential not found" }, 404);
     }
 
-    if (credential.staff_member?.deleted_at) {
+    if (credential.staff_member?.deleted_at || credential.staff_member?.suspended_at) {
       if (checkInId) {
         Sentry.captureCheckIn({
           monitorSlug: MONITOR_SLUG,

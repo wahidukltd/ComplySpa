@@ -42,6 +42,7 @@ export default async function CredentialsListPage() {
     `)
     .eq("clinic_id", userRecord.clinic_id)
     .is("deleted_at", null)
+    .is("suspended_at", null)
     .order("expiration_date", { ascending: true, nullsFirst: false });
 
   return (

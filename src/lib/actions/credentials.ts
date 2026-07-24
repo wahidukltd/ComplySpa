@@ -40,7 +40,8 @@ export async function addCredential(input: CredentialInput & { document_url?: st
     .from("credentials")
     .select("id", { count: "exact", head: true })
     .eq("clinic_id", clinicId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .is("suspended_at", null);
 
   if ((count ?? 0) >= limits.maxCredentials) {
     const err = new PlanLimitError(
@@ -118,6 +119,7 @@ export async function updateCredential(id: string, input: CredentialInput & { do
     .eq("id", id)
     .eq("clinic_id", user.clinic_id)
     .is("deleted_at", null)
+    .is("suspended_at", null)
     .maybeSingle();
   if (!existingCredential) return { error: "Credential not found" };
 
@@ -166,6 +168,7 @@ export async function deleteCredential(id: string, staffMemberId: string) {
     .select("staff_member_id")
     .eq("id", id)
     .eq("clinic_id", user.clinic_id)
+    .is("suspended_at", null)
     .maybeSingle();
 
   if (!cred) return { error: "Credential not found." };
@@ -208,6 +211,7 @@ export async function verifyCredentialNow(credentialId: string) {
     .select("id")
     .eq("id", credentialId)
     .eq("clinic_id", user.clinic_id)
+    .is("suspended_at", null)
     .maybeSingle();
   if (!credential) return { error: "Credential not found" };
 

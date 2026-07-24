@@ -22,8 +22,8 @@ export default async function ResumePage() {
 
   const [clinicRes, staffRes, credRes] = await Promise.all([
     supabase.from("clinics").select("name, plan").eq("id", userRecord.clinic_id).single(),
-    supabase.from("staff_members").select("id", { count: "exact", head: true }).eq("clinic_id", userRecord.clinic_id).is("deleted_at", null),
-    supabase.from("credentials").select("id", { count: "exact", head: true }).eq("clinic_id", userRecord.clinic_id).is("deleted_at", null),
+    supabase.from("staff_members").select("id", { count: "exact", head: true }).eq("clinic_id", userRecord.clinic_id).is("deleted_at", null).is("suspended_at", null),
+    supabase.from("credentials").select("id", { count: "exact", head: true }).eq("clinic_id", userRecord.clinic_id).is("deleted_at", null).is("suspended_at", null),
   ]);
 
   if (clinicRes.error) redirect("/onboarding");

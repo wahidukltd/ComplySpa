@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { StaffTableWrapper } from "./staff-table-wrapper";
 import { cn } from "@/lib/utils";
+import type { Tables } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function StaffListPage() {
     .select("id, clinic_id, name, role, hire_date, email, phone, procedures_performed, deleted_at, created_at, updated_at")
     .eq("clinic_id", userRecord.clinic_id)
     .is("deleted_at", null)
+    .is("suspended_at", null)
     .order("name");
 
   return (
@@ -41,7 +43,7 @@ export default async function StaffListPage() {
         </Link>
       </PageHeader>
 
-      <StaffTableWrapper staff={staff ?? []} />
+      <StaffTableWrapper staff={(staff ?? []) as Tables<"staff_members">[]} />
     </div>
   );
 }

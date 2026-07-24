@@ -33,6 +33,7 @@ export default async function StaffCredentialsPage({
     .eq("id", id)
     .eq("clinic_id", userRecord.clinic_id)
     .is("deleted_at", null)
+    .is("suspended_at", null)
     .single();
 
   if (!staff) notFound();
@@ -48,6 +49,7 @@ export default async function StaffCredentialsPage({
     `)
     .eq("staff_member_id", id)
     .eq("clinic_id", userRecord.clinic_id)
+    .is("suspended_at", null)
     .order("expiration_date", { ascending: true, nullsFirst: false });
 
   return (

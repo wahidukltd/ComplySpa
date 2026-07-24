@@ -38,7 +38,8 @@ export async function addStaffMember(input: StaffMemberInput) {
     .from("staff_members")
     .select("id", { count: "exact", head: true })
     .eq("clinic_id", clinicId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .is("suspended_at", null);
 
   if ((count ?? 0) >= limits.maxStaff) {
     const err = new PlanLimitError(
