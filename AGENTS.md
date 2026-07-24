@@ -103,6 +103,22 @@ Without these, there is no checkout flow, no customer portal, and no subscriptio
 3. **`as Parameters<...>[0]` in checkout.ts** — the Polar SDK union type is masked by a type assertion. If the SDK types drift on upgrade, the compiler won't catch it. Remove the cast and use the correct union member type.
 4. **8 of 11 transitions are Polar-gated** — only signup→trial, trial→expired_trial, and expired_trial→inactive work today. The other 8 (skip trial, purchase during trial, upgrade, downgrade, cancel, uncancel, revoke, trial→active) all require Polar approval and live webhook payloads to validate.
 
+### Post-Trial Lifecycle
+
+When trial expires (cron `daily-trial-expiry-check`), the clinic moves to `expired_trial`:
+- **No data is deleted or modified** — staff, credentials, documents, settings, reports all preserved
+- **All limits go to zero** — blocked from adding/modifying, existing data read-able via DB but app blocks writes via middleware redirect
+- **Returning user flow**: sign in → middleware finds clinic → plan expired_trial → redirects to `/resume` (not `/pricing`)
+- **Resume page** (`/resume`): full-screen premium UI with preserved staff/credential counts, professional copy, CTA to reactivate
+- **Returning customer detection** (`restoreExistingAccount`): when email matches existing `users` record, links new `auth_user_id` and redirects to `/resume` — never duplicates clinic/account
+- **Reactivation**: subscribe from `/resume`, `/pricing`, or billing settings → Polar checkout → webhook `subscription.active` → RPC restores plan → user continues where they left off
+
+| State | Access | UI |
+|-------|--------|-----|
+| expired_trial | Blocked (read-only) | `/resume` premium screen |
+| inactive | Blocked (read-only) | `/resume` premium screen |
+| paid (after expired) | Full access | Dashboard as normal |
+
 ## Report Design
 
 Colors: ink (#000000), action (#6E97A7), canvas (#FFFFFF).  
