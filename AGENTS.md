@@ -34,8 +34,11 @@ Single source of truth at `src/lib/utils/entitlements.ts`. Every enforcement lay
 | Dashboard layout | `src/app/dashboard/layout.tsx` | Same blocks as middleware (defense-in-depth) |
 | Server actions | `src/lib/actions/reports.ts` | Gating reports per tier (`none` for trial, `basic` for solo, `audit` for practice, `white_label` for multi) |
 | API routes | `src/app/api/reports/email/route.ts` | Blocks email for plans without `canEmailReports` |
+| Polar webhook | `src/app/api/polar/webhook/route.ts` | Processes subscription lifecycle (active/canceled/revoked/uncanceled/updated). Maps Polar products via metadata. |
 | Limit checks | `src/lib/actions/staff.ts`, `credentials.ts`, `settings.ts` | Count-based checks via `getPlanLimits()` (derived from entitlements) |
-| DB trigger | `supabase/migrations/020_reconcile_plan_limits.sql` | Defense-in-depth for staff/credential/user count limits |
+| DB trigger | `supabase/migrations/030_fix_trigger_race_condition.sql` | Defense-in-depth with `pg_advisory_xact_lock` preventing race conditions on concurrent inserts |
+| DB RPC | `clinics.update_clinic_subscription()` | Advisory-locked atomic subscription changes (prevents downgrade overwrite) |
+| Billing page | `src/app/dashboard/settings/billing/page.tsx` | Live plan details, limits display, Polar customer portal link |
 | Report template | `src/lib/pdf/report-template.tsx` | Accepts `tier` prop: basic → summary only, audit → full, white_label → unbranded |
 
 ### Plan → Feature Mapping (from entitlements.ts)
@@ -54,7 +57,23 @@ Single source of truth at `src/lib/utils/entitlements.ts`. Every enforcement lay
 - **audit** — practice: full PDF with cover page, executive summary, staff register, status summary + category grid, upcoming renewals, attestation, branded header/footer with page numbers, email enabled
 - **white_label** — multi_location: same content as audit but no "Compliance Audit Report" title, no branded header/footer/page numbers, clinic name as document title, unbranded enterprise output
 
-### Report Design
+#### Subscription Lifecycle
+
+| State | Trigger | Destination |
+|-------|---------|-------------|
+| signup | Onboarding → `create_clinic_for_user` RPC | `trial` with 14-day `trial_end_date` |
+| trial→active | Polar webhook `subscription.active` | `update_clinic_subscription()` RPC maps product metadata to plan |
+| upgrade | Polar webhook `subscription.updated` with new product | Plan updated via RPC |
+| downgrade | Polar webhook `subscription.updated` with new product | Plan updated via RPC (legacy protection prevents expired_trial overwrite) |
+| cancel | Polar webhook `subscription.canceled` | `cancel_at_period_end=true` set, plan unchanged until period ends |
+| uncancel | Polar webhook `subscription.uncanceled` | `cancel_at_period_end=false` restored |
+| revoke | Polar webhook `subscription.revoked` | Plan set to `expired_trial` (access revoked immediately) |
+| trial expire | `daily-trial-expiry-check` cron | `trial` → `expired_trial` if `trial_end_date < NOW()` |
+| inactive | `daily-inactive-cleanup` cron | `expired_trial` → `inactive` after 30 days |
+
+Product mapping: Polar product metadata `plan: solo|practice|multi_location` or product name matching.
+
+## Report Design
 
 Colors: ink (#000000), action (#6E97A7), canvas (#FFFFFF).  
 Status: valid (#4A8C5C), expiring (#C2853A), expired (#B8443A).  
@@ -155,3 +174,5 @@ These are acknowledged gaps that don't warrant fixing at their current risk leve
 - **Sentinel pattern inconsistency** — `addCredential()` returns `{success, error}`, but `updateCredential()`/`deleteCredential()`/`verifyCredentialNow()` return `{error}` without `success`. Standardize if touching these actions.
 - **Edge Function code duplication** — `send-credential-alert/index.ts` duplicates `htmlEscape`, `sleep`, and retry logic from `src/lib/email/send.ts`. Deno vs Node runtime prevents shared imports. Update both if changing retry behavior.
 - **Webhook rate limiter in-memory** — Resend webhook rate limiter uses a `Map` that resets on Vercel deploy. Resend controls the caller IPs, Svix validates signatures. Add persistent storage if throughput exceeds 100 req/min.
+- **In-memory rate limits (report email, health)** — Same pattern as resend webhook. Acceptable at current scale. Add persistent storage if throughput grows.
+- **No e2e tests** — `tests/e2e/` has only `.gitkeep`. Add Playwright tests before major UI refactors.
