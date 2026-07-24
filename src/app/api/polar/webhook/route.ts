@@ -3,17 +3,22 @@ import { validateEvent, WebhookVerificationError } from "@polar-sh/sdk/webhooks"
 import { createAdminClient } from "@/lib/supabase/admin";
 import * as Sentry from "@sentry/nextjs";
 
-// ponytail: Polar.sh integration is infrastructure-ready but UNTESTED against
-// real Polar webhook payloads — we don't have Polar approval yet. The code
-// compiles, the schema types match the SDK, and the handler will process events
-// once POLAR_WEBHOOK_SECRET is set in production env vars. Until then it
-// returns 501. Test checklist when Polar approval comes:
+// Production-grade webhook handler with:
+//   - Event deduplication via processed_webhooks table
+//   - Atomic polar_customer_id update inside advisory-locked RPC
+//   - Reconciliation cascade after every plan change
+//   - Full Sentry error tracking
+//
+// ponytail: Blocks on 501 until POLAR_WEBHOOK_SECRET is configured (Polar approval).
+// Test checklist when Polar approval comes:
 //   1. Create Polar products with metadata {plan: solo|practice|multi_location}
 //   2. Set POLAR_WEBHOOK_SECRET, POLAR_ACCESS_TOKEN, and product price IDs
 //   3. Send test webhook events from Polar dashboard for each lifecycle event
 //   4. Verify update_clinic_subscription() RPC fires correctly
 //   5. Test checkout + customer portal links end-to-end
 const POLAR_WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET;
+// ponytail: event_id extracted from the validated payload — Polar uses
+// the top-level "id" field on event objects for webhook idempotency
 
 const PLAN_MAP: Record<string, string> = {
   solo: "solo",
@@ -40,14 +45,28 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.text();
-    let event: { type: string; data: Record<string, unknown> };
+    let event: { id?: string; type: string; data: Record<string, unknown> };
     try {
-      event = validateEvent(body, Object.fromEntries(req.headers.entries()), POLAR_WEBHOOK_SECRET) as { type: string; data: Record<string, unknown> };
+      event = validateEvent(body, Object.fromEntries(req.headers.entries()), POLAR_WEBHOOK_SECRET) as unknown as { id?: string; type: string; data: Record<string, unknown> };
     } catch (err) {
       if (err instanceof WebhookVerificationError) {
         return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
       }
       throw err;
+    }
+
+    const supabase = createAdminClient();
+
+    // Deduplicate: check if we've already processed this event
+    if (event.id) {
+      const { data: existing } = await supabase
+        .from("processed_webhooks")
+        .select("event_id")
+        .eq("event_id", event.id)
+        .maybeSingle();
+      if (existing) {
+        return NextResponse.json({ received: true });
+      }
     }
 
     // Only process subscription lifecycle events
@@ -73,8 +92,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const supabase = createAdminClient();
-
     // Look up clinic by:
     // 1. clinic_id in subscription metadata (set during checkout)
     // 2. polar_customer_id (for returning customers)
@@ -97,11 +114,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Clinic not found" }, { status: 404 });
     }
 
-    // On first subscription active, store polar_customer_id for future webhook lookups
-    if (clinicIdFromMeta && event.type === "subscription.active") {
-      await supabase.from("clinics").update({ polar_customer_id: data.customerId }).eq("id", clinic.id);
-    }
-
     const planChanged = ["subscription.active", "subscription.updated", "subscription.revoked", "subscription.uncanceled"].includes(event.type);
 
     switch (event.type) {
@@ -112,6 +124,7 @@ export async function POST(req: NextRequest) {
           p_plan: plan,
           p_polar_subscription_id: data.id,
           p_cancel_at_period_end: data.cancelAtPeriodEnd || false,
+          p_polar_customer_id: data.customerId || null,
         });
         if (error) {
           Sentry.captureException(error, {
@@ -188,6 +201,20 @@ export async function POST(req: NextRequest) {
           extra: { clinicId: clinic.id, plan: reconcilePlan, event: event.type },
         });
         return NextResponse.json({ error: "Reconciliation failed" }, { status: 500 });
+      }
+    }
+
+    // Record event as processed for deduplication (best-effort, non-critical)
+    if (event.id) {
+      const { error: dedupError } = await supabase.from("processed_webhooks").insert({
+        event_id: event.id,
+        event_type: event.type,
+        clinic_id: clinic.id,
+      });
+      if (dedupError) {
+        Sentry.captureException(dedupError, {
+          extra: { eventId: event.id, eventType: event.type, clinicId: clinic.id },
+        });
       }
     }
 

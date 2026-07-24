@@ -31,16 +31,19 @@ export async function createCheckoutLink(
 
   try {
     const polar = new Polar({ accessToken: polarConfig.accessToken });
+    // ponytail: The Polar SDK's create parameter is a discriminated union on
+    // paymentProcessor. Stripe path — extract the union member explicitly so
+    // type drift on SDK upgrades is caught at compile time.
     const result = await polar.checkoutLinks.create({
       productPriceId,
-      paymentProcessor: "stripe",
+      paymentProcessor: "stripe" as const,
       allowDiscountCodes: true,
       metadata: {
-        clinic_id: metadata.clinic_id,
-        plan: metadata.plan,
+        clinic_id: metadata.clinic_id ?? "",
+        plan: metadata.plan ?? "",
       },
       successUrl: `${APP_URL}/dashboard/settings/billing?checkout=success`,
-    } as Parameters<typeof polar.checkoutLinks.create>[0]);
+    });
 
     return { url: result.url, error: null };
   } catch (err) {
