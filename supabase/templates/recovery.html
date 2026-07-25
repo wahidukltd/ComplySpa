@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Reset your password</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FFFFFF;">
+    <tr>
+      <td align="center" style="padding:48px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:540px;">
+          <tr>
+            <td>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="width:4px;height:28px;background:#6E97A7;"></td>
+                  <td style="padding-left:12px;">
+                    <p style="margin:0;font-size:13px;color:rgba(0,0,0,0.55);letter-spacing:0.5px;">RESET PASSWORD</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.12);border-radius:0 0 8px 8px;">
+                <tr>
+                  <td style="padding:32px 28px;">
+                    <h2 style="color:#000000;font-size:20px;font-weight:600;margin:0 0 12px;">Reset your password</h2>
+                    <p style="color:#000000;font-size:14px;line-height:1.6;margin:0 0 16px;">
+                      You requested a password reset for your ComplySpa account. Click the button below to set a new password.
+                    </p>
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+                      <tr>
+                        <td align="center" style="border-radius:6px;background:#6E97A7;">
+                          <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 24px;font-size:14px;font-weight:500;color:#FFFFFF;text-decoration:none;border-radius:6px;background:#6E97A7;">Reset password</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="color:rgba(0,0,0,0.45);font-size:12px;line-height:1.5;margin:0;">
+                      Or copy this URL into your browser:<br>
+                      <span style="color:#6E97A7;font-size:12px;word-break:break-all;">{{ .ConfirmationURL }}</span>
+                    </p>
+                    <hr style="border:none;border-top:1px solid rgba(0,0,0,0.12);margin:24px 0 16px;">
+                    <p style="color:rgba(0,0,0,0.45);font-size:12px;line-height:1.5;margin:0;">
+                      If you did not request a password reset, you can safely ignore this email. Your password will remain unchanged.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 0 0;">
+              <p style="color:rgba(0,0,0,0.45);font-size:11px;line-height:1.5;margin:0 0 4px;">
+                ComplySpa — Med Spa Compliance
+              </p>
+              <p style="color:rgba(0,0,0,0.45);font-size:11px;line-height:1.5;margin:0;">
+                This is an automated message from ComplySpa.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

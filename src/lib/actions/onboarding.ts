@@ -54,13 +54,17 @@ async function createClinicInternal(input: CreateClinicInput) {
 
   try {
     const { sendEmail, HELLO_FROM } = await import("@/lib/email/send");
+    const { buildWelcomeEmail } = await import("@/lib/email/templates/welcome");
+    const firstName = authUser?.user_metadata?.name?.split(" ")[0] ?? "there";
     await sendEmail({
       from: HELLO_FROM,
       to: userEmail,
       subject: "Welcome to your compliance dashboard",
-      html: `<p>Your clinic "${name}" is set up and ready.</p>
-<p>You've added staff and credentials. Your first inspection-readiness scan is running now.</p>
-<p><a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard">Go to your dashboard</a></p>`,
+      html: buildWelcomeEmail({
+        clinicName: name,
+        dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+        ownerFirstName: firstName,
+      }),
     });
   } catch (emailErr) {
     Sentry.captureException(emailErr);

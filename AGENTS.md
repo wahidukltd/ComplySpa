@@ -98,8 +98,8 @@ NEXT_PUBLIC_APP_URL            # Checkout success redirect
 Without these, there is no checkout flow, no customer portal, and no subscription state transitions from Polar. Users stay on `trial` forever. The cron-based transitions (trial expiry → `expired_trial` → `inactive`) work independently of Polar.
 
 **Specific untested gaps (documented so re-audit is not needed when Polar approval arrives):**
-1. **No webhook idempotency table** — duplicate `subscription.active` events 30 sec apart hit RPC twice. Advisory lock prevents concurrent races but not duplicates. Add a `processed_webhooks` table keyed by event ID for at-least-once → exactly-once.
-2. **`polar_customer_id` update race** — first subscription sets it outside the advisory lock. Two concurrent webhook events could both see null and both write. Move inside `update_clinic_subscription()` or add a separate locked RPC.
+1. ~~**No webhook idempotency table** — duplicate `subscription.active` events 30 sec apart hit RPC twice.~~ **RESOLVED** by migration 036 (`processed_webhooks` table, event_id PK).
+2. ~~**`polar_customer_id` update race** — first subscription sets it outside the advisory lock.~~ **RESOLVED** by migration 036 (moved inside `update_clinic_subscription()` RPC).
 3. **`as Parameters<...>[0]` in checkout.ts** — the Polar SDK union type is masked by a type assertion. If the SDK types drift on upgrade, the compiler won't catch it. Remove the cast and use the correct union member type.
 4. **8 of 11 transitions are Polar-gated** — only signup→trial, trial→expired_trial, and expired_trial→inactive work today. The other 8 (skip trial, purchase during trial, upgrade, downgrade, cancel, uncancel, revoke, trial→active) all require Polar approval and live webhook payloads to validate.
 
@@ -248,3 +248,4 @@ These are acknowledged gaps that don't warrant fixing at their current risk leve
 - **Webhook rate limiter in-memory** — Resend webhook rate limiter uses a `Map` that resets on Vercel deploy. Resend controls the caller IPs, Svix validates signatures. Add persistent storage if throughput exceeds 100 req/min.
 - **In-memory rate limits (report email, health)** — Same pattern as resend webhook. Acceptable at current scale. Add persistent storage if throughput grows.
 - **No e2e tests** — `tests/e2e/` has only `.gitkeep`. Add Playwright tests before major UI refactors.
+- **API Access has no frontend** — `canAccessAPI` entitlement exists for `multi_location` and the billing page shows "Yes", but there is no API keys page, token generator, or API documentation UI. Multi_location subscribers cannot actually use the API. Revisit when API feature is actively developed.

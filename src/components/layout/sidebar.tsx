@@ -7,6 +7,7 @@ import {
   Users,
   ShieldCheck,
   FileText,
+  Bell,
   Settings,
   X,
   type LucideIcon,
@@ -18,6 +19,7 @@ const navItems: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Staff", href: "/dashboard/staff", icon: Users },
   { label: "Credentials", href: "/dashboard/credentials", icon: ShieldCheck },
   { label: "Reports", href: "/dashboard/reports", icon: FileText },
+  { label: "Alerts", href: "/dashboard/alerts", icon: Bell },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 

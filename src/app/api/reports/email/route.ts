@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { getEntitlements } from "@/lib/utils/entitlements";
+import {
+  buildReportEmailHtml,
+  buildReportSubject,
+} from "@/lib/email/templates/report";
 
 const emailReportSchema = z.object({
   reportUrl: z.string(),
@@ -32,10 +36,6 @@ setInterval(() => {
     if (now > entry.resetAt) reportRateLimit.delete(key);
   }
 }, 300000);
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -110,9 +110,6 @@ export async function POST(req: NextRequest) {
     }
 
     const isWhiteLabel = entitlements.reportTier === "white_label";
-    const emailSubject = isWhiteLabel
-      ? `Compliance Report — ${escapeHtml(clinicName)}`
-      : `Compliance Audit Report — ${escapeHtml(clinicName)}`;
 
     if (!checkReportRateLimit(userRecord.email)) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
@@ -159,53 +156,19 @@ export async function POST(req: NextRequest) {
     }
 
     const base64Content = Buffer.from(pdfBuffer).toString("base64");
+    const emailSubject = buildReportSubject(clinicName, isWhiteLabel);
 
-    const emailHeading = isWhiteLabel ? "Compliance Report" : "Compliance Audit Report";
+    const emailHtml = buildReportEmailHtml({
+      clinicName,
+      reportId,
+      isWhiteLabel,
+      subject: emailSubject,
+    });
+
     const result = await sendEmailWithAttachment({
       to: userRecord.email,
       subject: emailSubject,
-      html: `
-        <!DOCTYPE html>
-        <html><head><meta charset="utf-8"></head>
-        <body style="margin:0;padding:0;background:#F5F5F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F5F5F5;padding:24px 0;">
-            <tr><td align="center">
-              <table cellpadding="0" cellspacing="0" border="0" style="max-width:540px;width:100%;background:#FFFFFF;border-radius:8px;">
-                <tr>
-                  <td style="padding:32px 32px 0 32px;">
-                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                      <tr>
-                        <td style="width:4px;height:32px;background:#6E97A7;"></td>
-                        <td style="padding-left:12px;">
-                          <p style="margin:0;font-size:16px;font-weight:600;color:#000000;">${escapeHtml(emailHeading)}</p>
-                          <p style="margin:2px 0 0 0;font-size:13px;color:rgba(0,0,0,0.55);">${escapeHtml(clinicName)}</p>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                <tr><td style="padding:24px 32px 0 32px;border-top:1px solid rgba(0,0,0,0.08);">
-                  <p style="margin:0;font-size:14px;color:#000000;">Hello,</p>
-                  <p style="margin:12px 0 0 0;font-size:14px;color:#000000;line-height:1.5;">
-                    Your ${isWhiteLabel ? "compliance report" : "compliance audit report"} has been generated and is attached to this email.
-                  </p>
-                  <table cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;background:#F8FAFB;border-radius:6px;padding:16px;font-size:13px;color:#000000;width:100%;">
-                    <tr><td style="padding:4px 0;color:rgba(0,0,0,0.55);width:100px;">Clinic</td><td style="padding:4px 0;font-weight:500;">${escapeHtml(clinicName)}</td></tr>
-                    <tr><td style="padding:4px 0;color:rgba(0,0,0,0.55);">Report ID</td><td style="padding:4px 0;font-weight:500;font-family:monospace;font-size:12px;">${reportId}</td></tr>
-                  </table>
-                </td></tr>
-                <tr><td style="padding:24px 32px 32px 32px;">
-                  <p style="margin:0;font-size:12px;color:rgba(0,0,0,0.45);line-height:1.5;">
-                    This report was generated from ${isWhiteLabel ? "your clinic's credential records." : "your credential tracking system at ComplySpa."}
-                    ${isWhiteLabel ? "" : "Please verify all information before submitting to a regulatory body."}
-                  </p>
-                </td></tr>
-              </table>
-            </td></tr>
-          </table>
-        </body>
-        </html>
-      `,
+      html: emailHtml,
       attachment: {
         content: base64Content,
         filename: `${isWhiteLabel ? "" : "compliance-"}report-${clinicName.replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "-").toLowerCase()}.pdf`,
@@ -230,4 +193,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-
