@@ -10,7 +10,7 @@ const cspValue = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https: blob:",
   "font-src 'self'",
-  `connect-src 'self' https://*.${supabaseHost} wss://*.${supabaseHost} https://*.ingest.us.sentry.io`,
+  `connect-src 'self' https://${supabaseHost} https://*.${supabaseHost} wss://*.${supabaseHost} https://*.ingest.us.sentry.io`,
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
