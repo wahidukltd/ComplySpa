@@ -3,7 +3,11 @@ import "server-only";
 import { Resend } from "resend";
 import * as Sentry from "@sentry/nextjs";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend(): Resend {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY is not set");
+  return new Resend(key);
+}
 
 const ALERTS_FROM = "Compliance Alerts <alerts@complyspa.com>";
 export const HELLO_FROM = "ComplySpa <hello@complyspa.com>";
@@ -31,7 +35,7 @@ export async function sendEmail(
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { data, error } = await resend.emails.send({
+      const { data, error } = await getResend().emails.send({
         from: params.from ?? ALERTS_FROM,
         to: [params.to],
         subject: params.subject,
@@ -100,7 +104,7 @@ export async function sendEmailWithAttachment(
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { data, error } = await resend.emails.send({
+      const { data, error } = await getResend().emails.send({
         from: params.from ?? ALERTS_FROM,
         to: [params.to],
         subject: params.subject,
