@@ -6,7 +6,7 @@ import { completeInvitationSignup, restoreExistingAccount } from "@/lib/actions/
 
 export const dynamic = "force-dynamic";
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage(props: { searchParams: Promise<{ plan?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id;
@@ -14,6 +14,9 @@ export default async function OnboardingPage() {
   if (!userId) {
     redirect("/sign-in");
   }
+
+  const { plan } = await props.searchParams;
+  const validPlan = plan === "solo" || plan === "practice" || plan === "multi_location" ? plan : null;
 
   const { data: existingUser } = await supabase
     .from("users")
@@ -40,6 +43,5 @@ export default async function OnboardingPage() {
     Sentry.captureException(err);
   }
 
-  return <OnboardingForm />;
+  return <OnboardingForm plan={validPlan} />;
 }
-

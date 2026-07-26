@@ -246,7 +246,7 @@ host = "smtp.resend.com"
 port = 465
 user = "resend"
 pass = "env(RESEND_SMTP_PASS)"
-admin_email = "support@complyspa.com"
+admin_email = "hello@complyspa.com"
 sender_name = "ComplySpa"
 
 [auth.email.template.confirmation]

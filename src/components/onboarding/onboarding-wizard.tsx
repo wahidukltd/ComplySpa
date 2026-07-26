@@ -7,7 +7,7 @@ import { WizardStepStaff } from "./wizard-step-staff";
 import { WizardStepCredentials } from "./wizard-step-credentials";
 import { WizardStepDone } from "./wizard-step-done";
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ plan }: { plan?: string | null }) {
   const [currentStep, setCurrentStep] = useState(1);
   const clinicId = useRef<string | null>(null);
   const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
@@ -61,6 +61,7 @@ export function OnboardingWizard() {
         <WizardStepDone
           staffCount={staff.length}
           credentialCount={credentialCount}
+          plan={plan}
         />
       )}
     </div>

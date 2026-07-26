@@ -146,7 +146,7 @@ export function PlanCards({ checkoutUrls }: Props) {
                   >
                     Start free trial
                   </Link>
-                  {checkoutUrls?.[plan.name.toLowerCase().replace("-", "_")] && (
+                  {checkoutUrls?.[plan.name.toLowerCase().replace("-", "_")] ? (
                     <a
                       href={checkoutUrls[plan.name.toLowerCase().replace("-", "_")]}
                       target="_blank"
@@ -158,6 +158,16 @@ export function PlanCards({ checkoutUrls }: Props) {
                     >
                       Subscribe now &rarr;
                     </a>
+                  ) : (
+                    <Link
+                      href={`/sign-up?plan=${plan.name.toLowerCase().replace("-", "_")}`}
+                      className={cn(
+                        buttonVariants({ variant: "ghost" }),
+                        "w-full text-xs"
+                      )}
+                    >
+                      Subscribe now &rarr;
+                    </Link>
                   )}
                 </div>
               </CardContent>
