@@ -239,6 +239,8 @@ The `auth_user_id` column in `users` table links Supabase Auth accounts to clini
 
 - **Never change DNS records unless absolutely necessary.** Each change causes propagation delays that take the site down temporarily. The default Cloudflare + Vercel setup (proxied A record → 76.76.21.21) is correct and stable. CNAME flattening at the apex introduces risk for zero benefit.
 
+- **Stale Vercel CDN cache can serve old HTML after a new deploy.** After pushing a new deployment, Vercel's CDN may serve cached HTML from the OLD deployment even though the new deployment is promoted to production. The old HTML references chunk paths that differ from the new deployment (e.g., `/_next/static/chunks/...` vs `/_next/static/immutable/chunks/...`). The user's browser downloads mismatched JavaScript chunks, causing blank page rendering. The fix is to push a trivial empty commit (`git commit --allow-empty -m "message"`) to trigger a fresh production build, which creates a completely new deployment with fresh CDN cache entries. Do NOT try to create a new Vercel deployment via the API with a commit SHA directly — preview deployments lack production env vars (`NEXT_PUBLIC_SUPABASE_URL`, etc.) and will fail with `"nextjs_docs"` build errors. Only the git push → auto-deploy pipeline (which runs on main branch pushes) has the correct production env vars.
+
 ### Known Technical Debt
 
 These are acknowledged gaps that don't warrant fixing at their current risk level. Revisit if the related code area is being actively developed:
