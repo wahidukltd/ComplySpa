@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AuthCard } from "./AuthCard";
@@ -17,7 +17,7 @@ function mapAuthError(err: { message?: string; code?: string }): string {
   return err.message || "Authentication failed. Please try again.";
 }
 
-export function SignUpForm() {
+function SignUpFormInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -43,9 +43,7 @@ export function SignUpForm() {
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo: callbackUrl,
-      },
+      options: { emailRedirectTo: callbackUrl },
     });
 
     if (signUpError) {
@@ -64,9 +62,7 @@ export function SignUpForm() {
     const supabase = createClient();
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: callbackUrl,
-      },
+      options: { redirectTo: callbackUrl },
     });
 
     if (oauthError) {
@@ -95,7 +91,7 @@ export function SignUpForm() {
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/sign-in" className="font-medium text-primary hover:underline">
+          <Link href={`/sign-in${plan ? `?plan=${plan}` : ""}`} className="font-medium text-primary hover:underline">
             Sign in
           </Link>
         </>
@@ -104,7 +100,7 @@ export function SignUpForm() {
       <div className="space-y-4">
         {plan && (
           <p className="text-xs text-muted-foreground text-center">
-            You selected the <strong>{plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : "Multi-Location"}</strong> plan. After verifying your email, you will be prompted to subscribe.
+            You selected <strong>{plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : "Multi-Location"}</strong>. After verifying, you will subscribe.
           </p>
         )}
         <button
@@ -168,5 +164,13 @@ export function SignUpForm() {
         </form>
       </div>
     </AuthCard>
+  );
+}
+
+export function SignUpForm() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpFormInner />
+    </Suspense>
   );
 }

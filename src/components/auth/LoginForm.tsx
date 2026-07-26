@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ function mapAuthError(err: { message?: string; code?: string }): string {
   return err.message || "Authentication failed. Please try again.";
 }
 
-export function LoginForm() {
+function LoginFormInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -54,13 +54,11 @@ export function LoginForm() {
   async function handleGoogleLogin() {
     setError(null);
 
-    const callbackUrl = `${window.location.origin}/auth/callback${plan ? `?next=/email-verified&plan=${plan}` : ""}`;
+    const callbackUrl = `${window.location.origin}/auth/callback${plan ? `?plan=${plan}` : ""}`;
 
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: callbackUrl,
-      },
+      options: { redirectTo: callbackUrl },
     });
 
     if (oauthError) {
@@ -145,5 +143,13 @@ export function LoginForm() {
         </form>
       </div>
     </AuthCard>
+  );
+}
+
+export function LoginForm() {
+  return (
+    <Suspense fallback={null}>
+      <LoginFormInner />
+    </Suspense>
   );
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
+import { createCheckoutLink } from "@/lib/polar/checkout";
 import { OnboardingForm } from "./onboarding-form";
 import { completeInvitationSignup, restoreExistingAccount } from "@/lib/actions/onboarding";
 
@@ -16,7 +17,7 @@ export default async function OnboardingPage(props: { searchParams: Promise<{ pl
   }
 
   const { plan } = await props.searchParams;
-  const validPlan = plan === "solo" || plan === "practice" || plan === "multi_location" ? plan : null;
+  const validPlan = plan === "solo" || plan === "practice" || plan === "multi_location" ? plan as "solo" | "practice" | "multi_location" : null;
 
   const { data: existingUser } = await supabase
     .from("users")
@@ -25,6 +26,26 @@ export default async function OnboardingPage(props: { searchParams: Promise<{ pl
     .maybeSingle();
 
   if (existingUser) {
+    if (validPlan) {
+      const { data: clinic } = await supabase
+        .from("clinics")
+        .select("plan, polar_customer_id")
+        .eq("id", existingUser.clinic_id)
+        .single();
+
+      if (clinic) {
+        if (clinic.plan === validPlan) {
+          redirect("/dashboard");
+        }
+        const result = await createCheckoutLink(validPlan, clinic.polar_customer_id ?? undefined, {
+          clinic_id: existingUser.clinic_id,
+          plan: validPlan,
+        });
+        if (result?.url) {
+          redirect(result.url);
+        }
+      }
+    }
     redirect("/dashboard");
   }
 

@@ -15,7 +15,11 @@ function validateNext(next: string | null): string {
 
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
+  const code = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
   const next = validateNext(searchParams.get("next"));
+  const plan = searchParams.get("plan");
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -23,51 +27,43 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${origin}/sign-in?error=misconfiguration`);
   }
 
-  const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() { return req.cookies.getAll(); },
-      setAll(cookiesToSet) {
-        for (const { name, value } of cookiesToSet) {
-          req.cookies.set(name, value);
-        }
-      },
-    },
-  });
-
-  const code = searchParams.get("code");
-  const tokenHash = searchParams.get("token_hash");
-  const type = searchParams.get("type");
-  const plan = searchParams.get("plan");
-
   // PKCE password-reset flow: token_hash + type=recovery
   if (tokenHash && type === "recovery") {
+    const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() { return req.cookies.getAll(); },
+        setAll() {},
+      },
+    });
     const { error } = await supabase.auth.verifyOtp({ type: "recovery", token_hash: tokenHash });
-    if (!error) {
-      return NextResponse.redirect(`${origin}/reset-password`);
-    }
-    return NextResponse.redirect(`${origin}/sign-in?error=recovery_failed`);
+    return NextResponse.redirect(`${origin}${error ? "/sign-in?error=recovery_failed" : "/reset-password"}`);
   }
 
   // OAuth code exchange (sign-in callback + email confirmation callback)
   if (code) {
+    const dest = next === "/email-verified"
+      ? `${origin}/email-verified${plan ? `?plan=${plan}` : ""}`
+      : `${origin}${next}${plan ? `?plan=${plan}` : ""}`;
+
+    const res = NextResponse.redirect(dest);
+
+    const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() { return req.cookies.getAll(); },
+        setAll(cookiesToSet) {
+          for (const { name, value, options } of cookiesToSet) {
+            res.cookies.set(name, value, { ...options, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+          }
+        },
+      },
+    });
+
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       return NextResponse.redirect(`${origin}/sign-in?error=auth_callback_error`);
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.redirect(`${origin}/sign-in?error=session_failed`);
-    }
-
-    // If this was a sign-in (user already has a session), go to the requested page
-    // If this was an email confirmation, show the verified page
-    // Determine by checking if user has email_confirmed_at that was just set
-    if (next === "/email-verified") {
-      return NextResponse.redirect(`${origin}/email-verified${plan ? `?plan=${plan}` : ""}`);
-    }
-
-    return NextResponse.redirect(`${origin}${next}${plan ? `?plan=${plan}` : ""}`);
+    return res;
   }
 
   // Fallback: password recovery implicit flow (hash fragment — handled client-side)
