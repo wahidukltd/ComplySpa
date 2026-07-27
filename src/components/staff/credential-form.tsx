@@ -219,20 +219,16 @@ export function CredentialForm({
               <SelectContent>
                 {credentialTypes.map((ct) => (
                   <SelectItem key={ct.id} value={ct.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{ct.name}</span>
-                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                        {ct.category}
-                      </span>
-                    </div>
+                    {ct.name}
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {ct.category}
+                    </span>
                   </SelectItem>
                 ))}
                 <div className="border-t border-border my-1" />
                 <SelectItem value={ADD_CUSTOM_VALUE}>
-                  <div className="flex items-center gap-2 text-primary">
-                    <Plus className="size-3.5" />
-                    <span>Add custom type</span>
-                  </div>
+                  <Plus className="size-3.5" />
+                  <span>Add custom type</span>
                 </SelectItem>
               </SelectContent>
             </Select>
