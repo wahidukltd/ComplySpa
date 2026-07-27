@@ -42,9 +42,12 @@ CREATE FUNCTION auto_complete_onboarding_item()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  v_user_id users.id%TYPE;
 BEGIN
+  SELECT id INTO v_user_id FROM users WHERE auth_user_id = auth.jwt() ->> 'sub';
   UPDATE onboarding_items
-  SET status = 'completed', completed_at = NOW()
+  SET status = 'completed', completed_at = NOW(), completed_by_user_id = v_user_id
   WHERE staff_member_id = NEW.staff_member_id
     AND credential_type_id = NEW.credential_type_id
     AND status = 'pending';

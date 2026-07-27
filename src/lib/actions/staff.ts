@@ -70,6 +70,11 @@ export async function addStaffMember(input: StaffMemberInput) {
     return { success: false, error: "Failed to add staff member. Please try again." };
   }
 
+  const staffRole = parsed.data.role;
+  if (staffRole) {
+    await createOnboardingItems(staff.id, clinicId, staffRole);
+  }
+
   revalidatePath("/dashboard/staff");
   revalidatePath("/dashboard");
   return { success: true, id: staff.id };
@@ -236,7 +241,11 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
 
   const role = parsed.data.role;
   if (role) {
-    await createOnboardingItems(staff.id, clinicId, role);
+    const onboardingResult = await createOnboardingItems(staff.id, clinicId, role);
+    if (onboardingResult.error) {
+      await supabase.from("staff_members").update({ deleted_at: new Date().toISOString() }).eq("id", staff.id);
+      return { success: false, error: onboardingResult.error };
+    }
   }
 
   if (wizardCount > 0) {
@@ -256,7 +265,7 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
 
     if (credError) {
       Sentry.captureException(credError);
-      await supabase.from("staff_members").delete().eq("id", staff.id);
+      await supabase.from("staff_members").update({ deleted_at: new Date().toISOString() }).eq("id", staff.id);
       return { success: false, error: "Failed to add credentials. Staff member was not created." };
     }
   }

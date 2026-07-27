@@ -3,7 +3,7 @@
 ALTER TABLE onboarding_items ADD COLUMN is_required boolean NOT NULL DEFAULT true;
 
 INSERT INTO credential_types (name, category, default_renewal_cycle_days, is_custom)
-VALUES ('ACLS Certification', 'training', 730, false);
+VALUES ('ACLS Certification', 'training', 730, true);
 
 INSERT INTO credential_types (name, category, default_renewal_cycle_days, is_custom)
-VALUES ('Chemical Peel Certification', 'training', 365, false);
+VALUES ('Chemical Peel Certification', 'training', 365, true);

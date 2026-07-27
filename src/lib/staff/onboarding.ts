@@ -5,11 +5,11 @@ export async function createOnboardingItems(
   staffMemberId: string,
   clinicId: string,
   role: string,
-) {
+): Promise<{ error?: string }> {
   const requiredNames = ROLE_CREDENTIAL_MAP[role] ?? [];
   const optionalNames = ROLE_CREDENTIAL_OPTIONAL_MAP[role] ?? [];
   const allNames = [...requiredNames, ...optionalNames];
-  if (allNames.length === 0) return;
+  if (allNames.length === 0) return {};
 
   const supabase = await createClient();
 
@@ -18,7 +18,7 @@ export async function createOnboardingItems(
     .select("id, name")
     .in("name", allNames);
 
-  if (!types || types.length === 0) return;
+  if (!types || types.length === 0) return {};
 
   const nameToId: Record<string, string> = {};
   for (const t of types) nameToId[t.name] = t.id;
@@ -44,13 +44,16 @@ export async function createOnboardingItems(
     }
   }
 
-  if (rows.length === 0) return;
+  if (rows.length === 0) return {};
 
   const { error } = await supabase.from("onboarding_items").insert(rows);
   if (error) {
     const Sentry = await import("@sentry/nextjs");
     Sentry.captureException(error);
+    return { error: "Failed to create onboarding items." };
   }
+
+  return {};
 }
 
 export async function getOnboardingProgress(staffMemberId: string) {

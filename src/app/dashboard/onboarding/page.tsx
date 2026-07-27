@@ -4,10 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { ROLE_DISPLAY_LABELS } from "@/lib/staff/role-credential-defaults";
-import { ArrowRight } from "lucide-react";
+import { OnboardingList } from "./onboarding-list";
 
 export const dynamic = "force-dynamic";
 
@@ -97,12 +95,6 @@ export default async function OnboardingDashboardPage() {
     (s) => s.progress.requiredTotal === 0,
   ).length;
 
-  function formatMissing(names: string[]): string {
-    if (names.length === 0) return "";
-    if (names.length <= 3) return names.join(", ");
-    return names.slice(0, 3).join(", ") + ` +${names.length - 3} more`;
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -147,89 +139,7 @@ export default async function OnboardingDashboardPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-2">
-          {staffList.map((member) => {
-            const pct =
-              member.progress.requiredTotal > 0
-                ? Math.round((member.progress.requiredCompleted / member.progress.requiredTotal) * 100)
-                : 0;
-            return (
-              <Link
-                key={member.id}
-                href={`/dashboard/staff/${member.id}`}
-                className="block rounded-lg border p-4 hover:bg-muted/50"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{member.name}</p>
-                      <Badge
-                        variant={
-                          member.progress.requiredTotal === 0
-                            ? "outline"
-                            : !member.progress.blocked
-                              ? "default"
-                              : member.progress.requiredCompleted > 0
-                                ? "secondary"
-                                : "destructive"
-                        }
-                        className="text-xs"
-                      >
-                        {member.progress.requiredTotal === 0
-                          ? "Pending"
-                          : !member.progress.blocked
-                            ? "Ready"
-                            : member.progress.requiredCompleted > 0
-                              ? `${pct}%`
-                              : "Blocked"}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {member.role ? (ROLE_DISPLAY_LABELS[member.role] ?? member.role) : "No role"}
-                    </p>
-                    {member.progress.blocked && member.progress.missingNames.length > 0 && (
-                      <p className="text-xs text-destructive">
-                        ❌ {formatMissing(member.progress.missingNames)}
-                      </p>
-                    )}
-                    {!member.progress.blocked && member.progress.requiredTotal > 0 && (
-                      <p className="text-xs text-[#4A8C5C]">
-                        ✓ All required items complete
-                        {member.progress.optionalTotal > 0 && member.progress.optionalCompleted < member.progress.optionalTotal && (
-                          <span className="text-muted-foreground">
-                            {" "}({member.progress.optionalCompleted}/{member.progress.optionalTotal} optional)
-                          </span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-20 overflow-hidden rounded-full bg-muted sm:w-28">
-                        <div
-                          className={`h-full rounded-full ${
-                            member.progress.requiredTotal === 0
-                              ? "bg-muted-foreground/20"
-                              : !member.progress.blocked
-                                ? "bg-[#4A8C5C]"
-                                : "bg-[#C2853A]"
-                          }`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {member.progress.requiredTotal > 0
-                          ? `${member.progress.requiredCompleted}/${member.progress.requiredTotal}`
-                          : "—"}
-                      </span>
-                    </div>
-                    <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+        <OnboardingList staffList={staffList} />
       )}
     </div>
   );
