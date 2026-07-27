@@ -1,4 +1,4 @@
-export const ROLE_CREDENTIAL_MAP: Record<string, string[]> = {
+export const ROLE_CREDENTIAL_REQUIRED_MAP: Record<string, string[]> = {
   MD: ['Physician License (MD/DO)', 'DEA Registration', 'CPR/BLS Certification',
     'HIPAA Training', 'OSHA Bloodborne Pathogens Training',
     'Malpractice Insurance', 'Medical Director Agreement'],
@@ -17,6 +17,13 @@ export const ROLE_CREDENTIAL_MAP: Record<string, string[]> = {
   front_desk: ['HIPAA Training', 'OSHA Bloodborne Pathogens Training'],
   other: [],
 };
+
+export const ROLE_CREDENTIAL_OPTIONAL_MAP: Record<string, string[]> = {
+  RN: ['ACLS Certification'],
+  esthetician: ['Chemical Peel Certification'],
+};
+
+export const ROLE_CREDENTIAL_MAP = ROLE_CREDENTIAL_REQUIRED_MAP;
 
 export const ROLE_DISPLAY_LABELS: Record<string, string> = {
   MD: 'Physician',

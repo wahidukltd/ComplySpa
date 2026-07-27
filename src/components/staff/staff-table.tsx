@@ -39,9 +39,10 @@ interface StaffTableProps {
   staff: StaffMember[];
   onDelete: (id: string) => void;
   credStatusMap?: Record<string, "valid" | "expiring" | "expired" | "none">;
+  onboardingStatusMap?: Record<string, { total: number; completed: number; blocked: boolean }>;
 }
 
-export function StaffTable({ staff, onDelete, credStatusMap = {} }: StaffTableProps) {
+export function StaffTable({ staff, onDelete, credStatusMap = {}, onboardingStatusMap = {} }: StaffTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -105,6 +106,7 @@ export function StaffTable({ staff, onDelete, credStatusMap = {} }: StaffTablePr
             <TableHead className="w-[10px]" />
             <TableHead>Name</TableHead>
             <TableHead>Role</TableHead>
+            <TableHead>Onboarding</TableHead>
             <TableHead>Hire Date</TableHead>
             <TableHead>Email</TableHead>
             <TableHead className="w-[80px]">Actions</TableHead>
@@ -113,7 +115,7 @@ export function StaffTable({ staff, onDelete, credStatusMap = {} }: StaffTablePr
         <TableBody>
           {filteredStaff.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+              <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                 No staff match your search or filters.
               </TableCell>
             </TableRow>
@@ -152,6 +154,38 @@ export function StaffTable({ staff, onDelete, credStatusMap = {} }: StaffTablePr
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const prog = onboardingStatusMap[member.id];
+                      if (!prog || prog.total === 0) {
+                        return <span className="text-xs text-muted-foreground">—</span>;
+                      }
+                      const allRequiredDone = !prog.blocked;
+                      const started = prog.completed > 0;
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                            allRequiredDone
+                              ? "text-[#4A8C5C]"
+                              : started
+                                ? "text-[#C2853A]"
+                                : "text-destructive"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block size-2 rounded-full ${
+                              allRequiredDone
+                                ? "bg-[#4A8C5C]"
+                                : started
+                                  ? "bg-[#C2853A]"
+                                  : "bg-destructive"
+                            }`}
+                          />
+                          {allRequiredDone ? "Ready" : started ? `${prog.completed}/${prog.total}` : "Blocked"}
+                        </span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDate(member.hire_date) || "—"}

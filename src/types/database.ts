@@ -368,6 +368,7 @@ export type Database = {
           created_at: string
           credential_type_id: string
           id: string
+          is_required: boolean
           staff_member_id: string
           status: string
           updated_at: string
@@ -379,6 +380,7 @@ export type Database = {
           created_at?: string
           credential_type_id: string
           id?: string
+          is_required?: boolean
           staff_member_id: string
           status?: string
           updated_at?: string
@@ -390,6 +392,7 @@ export type Database = {
           created_at?: string
           credential_type_id?: string
           id?: string
+          is_required?: boolean
           staff_member_id?: string
           status?: string
           updated_at?: string

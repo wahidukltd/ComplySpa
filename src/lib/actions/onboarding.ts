@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClinicSchema, type CreateClinicInput } from "@/lib/validations/clinic";
 import { getEntitlements } from "@/lib/utils/entitlements";
-import { getOnboardingItems, updateOnboardingItemStatus } from "@/lib/staff/onboarding";
+import { getOnboardingItems, getOnboardingProgress, updateOnboardingItemStatus } from "@/lib/staff/onboarding";
 import * as Sentry from "@sentry/nextjs";
 
 // ── Existing clinic onboarding functions ──
@@ -171,16 +171,12 @@ export async function getStaffOnboarding(staffId: string) {
     .maybeSingle();
   if (!userRecord) return { error: "Unauthorized" };
 
-  const items = await getOnboardingItems(staffId);
-  const total = items.length;
-  const completed = items.filter((i) => i.status === "completed").length;
-  const skipped = items.filter((i) => i.status === "skipped").length;
-  const pending = items.filter((i) => i.status === "pending").length;
+  const [items, progress] = await Promise.all([
+    getOnboardingItems(staffId),
+    getOnboardingProgress(staffId),
+  ]);
 
-  return {
-    items,
-    progress: { total, completed, skipped, pending },
-  };
+  return { items, progress };
 }
 
 export async function markOnboardingItemComplete(itemId: string) {

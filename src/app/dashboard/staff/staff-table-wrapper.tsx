@@ -15,7 +15,7 @@ export function StaffTableWrapper({
 }: {
   staff: StaffMember[];
   credStatusMap?: Record<string, "valid" | "expiring" | "expired" | "none">;
-  onboardingStatusMap?: Record<string, { total: number; completed: number }>;
+  onboardingStatusMap?: Record<string, { total: number; completed: number; blocked: boolean }>;
 }) {
   const router = useRouter();
 

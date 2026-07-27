@@ -1,31 +1,46 @@
 import { createClient } from "@/lib/supabase/server";
-import { ROLE_CREDENTIAL_MAP } from "@/lib/staff/role-credential-defaults";
+import { ROLE_CREDENTIAL_MAP, ROLE_CREDENTIAL_OPTIONAL_MAP } from "@/lib/staff/role-credential-defaults";
 
 export async function createOnboardingItems(
   staffMemberId: string,
   clinicId: string,
   role: string,
 ) {
-  const credentialNames = ROLE_CREDENTIAL_MAP[role] ?? [];
-  if (credentialNames.length === 0) return;
+  const requiredNames = ROLE_CREDENTIAL_MAP[role] ?? [];
+  const optionalNames = ROLE_CREDENTIAL_OPTIONAL_MAP[role] ?? [];
+  const allNames = [...requiredNames, ...optionalNames];
+  if (allNames.length === 0) return;
 
   const supabase = await createClient();
 
   const { data: types } = await supabase
     .from("credential_types")
     .select("id, name")
-    .in("name", credentialNames);
+    .in("name", allNames);
 
   if (!types || types.length === 0) return;
 
   const nameToId: Record<string, string> = {};
   for (const t of types) nameToId[t.name] = t.id;
 
-  const rows: Array<{ staff_member_id: string; clinic_id: string; credential_type_id: string }> = [];
-  for (const name of credentialNames) {
+  const requiredSet = new Set(requiredNames);
+
+  const rows: Array<{
+    staff_member_id: string;
+    clinic_id: string;
+    credential_type_id: string;
+    is_required: boolean;
+  }> = [];
+
+  for (const name of allNames) {
     const credentialTypeId = nameToId[name];
     if (credentialTypeId) {
-      rows.push({ staff_member_id: staffMemberId, clinic_id: clinicId, credential_type_id: credentialTypeId });
+      rows.push({
+        staff_member_id: staffMemberId,
+        clinic_id: clinicId,
+        credential_type_id: credentialTypeId,
+        is_required: requiredSet.has(name),
+      });
     }
   }
 
@@ -43,16 +58,34 @@ export async function getOnboardingProgress(staffMemberId: string) {
 
   const { data, error } = await supabase
     .from("onboarding_items")
-    .select("status")
+    .select("status, is_required")
     .eq("staff_member_id", staffMemberId);
 
-  if (error || !data) return { total: 0, completed: 0, skipped: 0, pending: 0 };
+  if (error || !data) {
+    return {
+      total: 0, completed: 0, skipped: 0, pending: 0,
+      requiredTotal: 0, requiredCompleted: 0,
+      optionalTotal: 0, optionalCompleted: 0,
+      blocked: false,
+    };
+  }
 
-  const completed = data.filter((i) => i.status === "completed").length;
-  const skipped = data.filter((i) => i.status === "skipped").length;
-  const pending = data.filter((i) => i.status === "pending").length;
+  const required = data.filter((i) => i.is_required);
+  const optional = data.filter((i) => !i.is_required);
 
-  return { total: data.length, completed, skipped, pending };
+  const requiredPending = required.filter((i) => i.status === "pending").length;
+
+  return {
+    total: data.length,
+    completed: data.filter((i) => i.status === "completed").length,
+    skipped: data.filter((i) => i.status === "skipped").length,
+    pending: data.filter((i) => i.status === "pending").length,
+    requiredTotal: required.length,
+    requiredCompleted: required.filter((i) => i.status === "completed").length,
+    optionalTotal: optional.length,
+    optionalCompleted: optional.filter((i) => i.status === "completed").length,
+    blocked: requiredPending > 0,
+  };
 }
 
 export async function getOnboardingItems(staffMemberId: string) {
@@ -63,6 +96,7 @@ export async function getOnboardingItems(staffMemberId: string) {
     .select(`
       id,
       status,
+      is_required,
       completed_at,
       completed_by_user_id,
       credential_type:credential_types!onboarding_items_credential_type_id_fkey(name, category)

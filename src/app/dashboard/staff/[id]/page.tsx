@@ -60,8 +60,18 @@ export default async function StaffDetailPage({
 
   const roleLabel = staff.role ? (ROLE_DISPLAY_LABELS[staff.role] ?? staff.role) : null;
 
-  const { items: onboardingItems = [], progress: onboardingProgress = { total: 0, completed: 0, skipped: 0, pending: 0 } } =
-    await getStaffOnboarding(id).then((r) => ("items" in r ? r : { items: [], progress: { total: 0, completed: 0, skipped: 0, pending: 0 } }));
+  const { items: onboardingItems = [], progress: onboardingProgress = {
+    total: 0, completed: 0, skipped: 0, pending: 0,
+    requiredTotal: 0, requiredCompleted: 0,
+    optionalTotal: 0, optionalCompleted: 0,
+    blocked: false,
+  } } =
+    await getStaffOnboarding(id).then((r) => ("items" in r ? r : { items: [], progress: {
+      total: 0, completed: 0, skipped: 0, pending: 0,
+      requiredTotal: 0, requiredCompleted: 0,
+      optionalTotal: 0, optionalCompleted: 0,
+      blocked: false,
+    } }));
 
   const validCount = credentials?.filter((c) => c.status === "valid").length ?? 0;
   const expiringCount = credentials?.filter((c) => c.status === "expiring").length ?? 0;
@@ -127,6 +137,11 @@ export default async function StaffDetailPage({
         items={onboardingItems}
         total={onboardingProgress.total}
         completed={onboardingProgress.completed}
+        requiredTotal={onboardingProgress.requiredTotal}
+        requiredCompleted={onboardingProgress.requiredCompleted}
+        optionalTotal={onboardingProgress.optionalTotal}
+        optionalCompleted={onboardingProgress.optionalCompleted}
+        blocked={onboardingProgress.blocked}
       />
 
       <div className="flex items-center justify-between">
