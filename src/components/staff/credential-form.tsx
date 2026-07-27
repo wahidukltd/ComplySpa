@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createClient } from "@/lib/supabase/client";
@@ -148,6 +148,14 @@ export function CredentialForm({
     setUploading(false);
   }
 
+  const selectItems = useMemo(
+    () => [
+      ...credentialTypes.map((ct) => ({ value: ct.id, label: ct.name })),
+      { value: ADD_CUSTOM_VALUE, label: "Add custom type" },
+    ],
+    [credentialTypes],
+  );
+
   const selectedType = credentialTypes.find((t) => t.id === selectedTypeId);
 
   const handleTypeChange = (value: string | null) => {
@@ -212,6 +220,7 @@ export function CredentialForm({
             <Select
               value={selectedTypeId}
               onValueChange={handleTypeChange}
+              items={selectItems}
             >
               <SelectTrigger id="credential_type_id">
                 <SelectValue placeholder="Select a credential type" />
