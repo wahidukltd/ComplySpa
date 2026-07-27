@@ -90,3 +90,8 @@ graphify-out/
 zmail-cli.jar
 zmail-cli.bat
 zoho-login.ps1
+
+# Project ground truth — contains secrets/env config, never committed
+AGENTS.md
+FEATURES_AND_PLANS.md
+docs/
