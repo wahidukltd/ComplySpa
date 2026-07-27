@@ -14,18 +14,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
   credentialSchema,
   type CredentialInput,
 } from "@/lib/validations/staff";
 import { uploadDocument } from "@/lib/utils/upload";
-import { Loader2, Upload } from "lucide-react";
+import { addCustomCredentialType } from "@/lib/actions/credential-types";
+import { Loader2, Upload, Plus } from "lucide-react";
+import { toast } from "sonner";
 import * as Sentry from "@sentry/nextjs";
 import type { Tables } from "@/types/database";
 
 type Credential = Tables<"credentials">;
 type CredentialTypeOption = Pick<Tables<"credential_types">, "id" | "name" | "category">;
+
+const ADD_CUSTOM_VALUE = "__add_custom__";
 
 interface CredentialFormProps {
   staffMemberId: string;
@@ -46,6 +58,11 @@ export function CredentialForm({
   const [selectedTypeId, setSelectedTypeId] = useState<string | undefined>(defaultValues?.credential_type_id ?? undefined);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customCategory, setCustomCategory] = useState("training");
+  const [customRenewal, setCustomRenewal] = useState("");
+  const [customSaving, setCustomSaving] = useState(false);
 
   const {
     register,
@@ -71,7 +88,8 @@ export function CredentialForm({
   );
 
   useEffect(() => {
-    async function loadTypes() {
+    let cancelled = false;
+    (async () => {
       const supabase = createClient();
       const { data: staff } = await supabase
         .from("staff_members")
@@ -79,8 +97,8 @@ export function CredentialForm({
         .eq("id", staffMemberId)
         .single();
       if (!staff) {
-        setTypesError("Staff member not found.");
-        setTypesLoading(false);
+        if (!cancelled) setTypesError("Staff member not found.");
+        if (!cancelled) setTypesLoading(false);
         return;
       }
       const { data, error } = await supabase
@@ -90,13 +108,13 @@ export function CredentialForm({
         .order("name");
       if (error) {
         Sentry.captureException(error);
-        setTypesError("Failed to load credential types. Please refresh.");
-      } else {
+        if (!cancelled) setTypesError("Failed to load credential types. Please refresh.");
+      } else if (!cancelled) {
         setCredentialTypes(data ?? []);
       }
-      setTypesLoading(false);
-    }
-    loadTypes();
+      if (!cancelled) setTypesLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [staffMemberId]);
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -134,166 +152,275 @@ export function CredentialForm({
 
   const handleTypeChange = (value: string | null) => {
     if (!value) return;
+    if (value === ADD_CUSTOM_VALUE) {
+      setCustomName("");
+      setCustomCategory("training");
+      setCustomRenewal("");
+      setDialogOpen(true);
+      return;
+    }
     setSelectedTypeId(value);
     setValue("credential_type_id", value);
   };
 
-  return (
-    <form onSubmit={handleSubmit((data) => onSubmit({ ...data, document_url: documentUrl ?? undefined }))} className="space-y-6">
-      <input type="hidden" {...register("credential_type_id")} />
+  async function handleCreateCustom() {
+    if (!customName.trim()) {
+      toast.error("Name is required.");
+      return;
+    }
+    setCustomSaving(true);
+    const result = await addCustomCredentialType({
+      name: customName.trim(),
+      category: customCategory,
+      renewal_days: customRenewal ? parseInt(customRenewal, 10) : undefined,
+    });
+    setCustomSaving(false);
 
-      <div className="space-y-2">
-        <Label htmlFor="credential_type_id">
-          Credential type <span className="text-destructive">*</span>
-        </Label>
-        {typesLoading ? (
-          <div className="h-10 animate-pulse rounded-md bg-muted" />
-        ) : typesError ? (
-          <p className="text-sm text-destructive">{typesError}</p>
-        ) : (
-          <Select
-            value={selectedTypeId}
-            onValueChange={handleTypeChange}
-          >
-            <SelectTrigger id="credential_type_id">
-              <SelectValue placeholder="Select a credential type" />
-            </SelectTrigger>
-            <SelectContent>
-              {credentialTypes.map((ct) => (
-                <SelectItem key={ct.id} value={ct.id}>
-                  <div className="flex items-center gap-2">
-                    <span>{ct.name}</span>
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {ct.category}
-                    </span>
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+
+    if (result.data) {
+      setCredentialTypes((prev) => {
+        const exists = prev.some((t) => t.id === result.data!.id);
+        if (exists) return prev;
+        return [...prev, result.data].sort((a, b) => a.name.localeCompare(b.name));
+      });
+      setSelectedTypeId(result.data.id);
+      setValue("credential_type_id", result.data.id);
+      toast.success(`"${result.data.name}" created`);
+    }
+
+    setDialogOpen(false);
+  }
+
+  return (
+    <>
+      <form onSubmit={handleSubmit((data) => onSubmit({ ...data, document_url: documentUrl ?? undefined }))} className="space-y-6">
+        <input type="hidden" {...register("credential_type_id")} />
+
+        <div className="space-y-2">
+          <Label htmlFor="credential_type_id">
+            Credential type <span className="text-destructive">*</span>
+          </Label>
+          {typesLoading ? (
+            <div className="h-10 animate-pulse rounded-md bg-muted" />
+          ) : typesError ? (
+            <p className="text-sm text-destructive">{typesError}</p>
+          ) : (
+            <Select
+              value={selectedTypeId}
+              onValueChange={handleTypeChange}
+            >
+              <SelectTrigger id="credential_type_id">
+                <SelectValue placeholder="Select a credential type" />
+              </SelectTrigger>
+              <SelectContent>
+                {credentialTypes.map((ct) => (
+                  <SelectItem key={ct.id} value={ct.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{ct.name}</span>
+                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {ct.category}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+                <div className="border-t border-border my-1" />
+                <SelectItem value={ADD_CUSTOM_VALUE}>
+                  <div className="flex items-center gap-2 text-primary">
+                    <Plus className="size-3.5" />
+                    <span>Add custom type</span>
                   </div>
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        {errors.credential_type_id && (
-          <p className="text-sm text-destructive">{errors.credential_type_id.message}</p>
-        )}
-        {selectedType && (
+              </SelectContent>
+            </Select>
+          )}
+          {errors.credential_type_id && (
+            <p className="text-sm text-destructive">{errors.credential_type_id.message}</p>
+          )}
+          {selectedType && (
+            <p className="text-xs text-muted-foreground">
+              Category: <span className="font-medium">{selectedType.category}</span>
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="license_number">Number / ID</Label>
+          <Input
+            id="license_number"
+            {...register("license_number")}
+            placeholder="e.g. RN123456, policy number, contract ID"
+          />
+          {errors.license_number && (
+            <p className="text-sm text-destructive">{errors.license_number.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="state">State</Label>
+          <Input
+            id="state"
+            {...register("state")}
+            maxLength={100}
+            placeholder="e.g. TX"
+          />
+          {errors.state && (
+            <p className="text-sm text-destructive">{errors.state.message}</p>
+          )}
           <p className="text-xs text-muted-foreground">
-            Category: <span className="font-medium">{selectedType.category}</span>
+            For multi-state tracking, add multiple credentials of the same type — one per state.
           </p>
-        )}
-      </div>
+        </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="license_number">Number / ID</Label>
-        <Input
-          id="license_number"
-          {...register("license_number")}
-          placeholder="e.g. RN123456, policy number, contract ID"
-        />
-        {errors.license_number && (
-          <p className="text-sm text-destructive">{errors.license_number.message}</p>
-        )}
-      </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="issue_date">Issue date</Label>
+            <Input id="issue_date" type="date" {...register("issue_date")} />
+            {errors.issue_date && (
+              <p className="text-sm text-destructive">{errors.issue_date.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="expiration_date">Expiration date</Label>
+            <Input id="expiration_date" type="date" {...register("expiration_date")} />
+            {errors.expiration_date && (
+              <p className="text-sm text-destructive">{errors.expiration_date.message}</p>
+            )}
+          </div>
+        </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="state">State</Label>
-        <Input
-          id="state"
-          {...register("state")}
-          maxLength={100}
-          placeholder="e.g. TX"
-        />
-        {errors.state && (
-          <p className="text-sm text-destructive">{errors.state.message}</p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          For multi-state tracking, add multiple credentials of the same type — one per state.
-        </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="issue_date">Issue date</Label>
-          <Input id="issue_date" type="date" {...register("issue_date")} />
-          {errors.issue_date && (
-            <p className="text-sm text-destructive">{errors.issue_date.message}</p>
+          <Label htmlFor="verification_url">Verification URL</Label>
+          <Input
+            id="verification_url"
+            type="url"
+            {...register("verification_url")}
+            placeholder="https://www.example.gov/verify"
+          />
+          {errors.verification_url && (
+            <p className="text-sm text-destructive">{errors.verification_url.message}</p>
           )}
+          <p className="text-xs text-muted-foreground">
+            Link to the state board license lookup page for this credential.
+          </p>
         </div>
+
         <div className="space-y-2">
-          <Label htmlFor="expiration_date">Expiration date</Label>
-          <Input id="expiration_date" type="date" {...register("expiration_date")} />
-          {errors.expiration_date && (
-            <p className="text-sm text-destructive">{errors.expiration_date.message}</p>
+          <Label>Document</Label>
+          <div className="flex items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-muted">
+              <Upload className="size-4" />
+              {uploading ? "Uploading..." : "Upload file"}
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,.pdf"
+                className="hidden"
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
+            </label>
+            {documentUrl && (
+              <span className="text-sm text-muted-foreground">
+                ✓ File uploaded
+              </span>
+            )}
+          </div>
+          {uploadError && (
+            <p className="text-sm text-destructive">{uploadError}</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            JPG, PNG, WebP, or PDF. Max 10MB.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="notes">Notes</Label>
+          <Textarea
+            id="notes"
+            {...register("notes")}
+            placeholder="Any additional notes about this credential..."
+            rows={2}
+          />
+          {errors.notes && (
+            <p className="text-sm text-destructive">{errors.notes.message}</p>
           )}
         </div>
-      </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="verification_url">Verification URL</Label>
-        <Input
-          id="verification_url"
-          type="url"
-          {...register("verification_url")}
-          placeholder="https://www.example.gov/verify"
-        />
-        {errors.verification_url && (
-          <p className="text-sm text-destructive">{errors.verification_url.message}</p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          Link to the state board license lookup page for this credential.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Document</Label>
-        <div className="flex items-center gap-3">
-          <label className="flex cursor-pointer items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-muted">
-            <Upload className="size-4" />
-            {uploading ? "Uploading..." : "Upload file"}
-            <input
-              type="file"
-              accept=".jpg,.jpeg,.png,.webp,.pdf"
-              className="hidden"
-              onChange={handleFileUpload}
-              disabled={uploading}
-            />
-          </label>
-          {documentUrl && (
-            <span className="text-sm text-muted-foreground">
-              ✓ File uploaded
-            </span>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            submitLabel
           )}
-        </div>
-        {uploadError && (
-          <p className="text-sm text-destructive">{uploadError}</p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          JPG, PNG, WebP, or PDF. Max 10MB.
-        </p>
-      </div>
+        </Button>
+      </form>
 
-      <div className="space-y-2">
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea
-          id="notes"
-          {...register("notes")}
-          placeholder="Any additional notes about this credential..."
-          rows={2}
-        />
-        {errors.notes && (
-          <p className="text-sm text-destructive">{errors.notes.message}</p>
-        )}
-      </div>
-
-      <Button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 size-4 animate-spin" />
-            Saving...
-          </>
-        ) : (
-          submitLabel
-        )}
-      </Button>
-    </form>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add custom credential type</DialogTitle>
+            <DialogDescription>
+              Create a new credential type for your clinic. It will only be visible to your clinic.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="custom-name">Name</Label>
+              <Input
+                id="custom-name"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="e.g. Radiofrequency Microneedling Cert"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="custom-category">Category</Label>
+              <Select value={customCategory} onValueChange={(v) => v && setCustomCategory(v)}>
+                <SelectTrigger id="custom-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="license">License</SelectItem>
+                  <SelectItem value="training">Training</SelectItem>
+                  <SelectItem value="insurance">Insurance</SelectItem>
+                  <SelectItem value="agreement">Agreement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="custom-renewal">Renewal cycle (days, optional)</Label>
+              <Input
+                id="custom-renewal"
+                type="number"
+                value={customRenewal}
+                onChange={(e) => setCustomRenewal(e.target.value)}
+                placeholder="e.g. 365"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateCustom} disabled={customSaving}>
+              {customSaving ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create type"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
