@@ -29,7 +29,7 @@ import {
 } from "@/lib/validations/staff";
 import { uploadDocument } from "@/lib/utils/upload";
 import { addCustomCredentialType } from "@/lib/actions/credential-types";
-import { Loader2, Upload, Plus } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import * as Sentry from "@sentry/nextjs";
 import type { Tables } from "@/types/database";
@@ -220,15 +220,11 @@ export function CredentialForm({
                 {credentialTypes.map((ct) => (
                   <SelectItem key={ct.id} value={ct.id}>
                     {ct.name}
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {ct.category}
-                    </span>
                   </SelectItem>
                 ))}
                 <div className="border-t border-border my-1" />
                 <SelectItem value={ADD_CUSTOM_VALUE}>
-                  <Plus className="size-3.5" />
-                  <span>Add custom type</span>
+                  Add custom type
                 </SelectItem>
               </SelectContent>
             </Select>
