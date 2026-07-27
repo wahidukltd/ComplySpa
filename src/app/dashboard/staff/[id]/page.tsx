@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
 import { ROLE_DISPLAY_LABELS } from "@/lib/staff/role-credential-defaults";
+import { getStaffOnboarding } from "@/lib/actions/onboarding";
+import { OnboardingChecklist } from "@/components/staff/staff-onboarding-checklist";
 import { Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 
@@ -57,6 +59,9 @@ export default async function StaffDetailPage({
     .order("expiration_date", { ascending: true, nullsFirst: false });
 
   const roleLabel = staff.role ? (ROLE_DISPLAY_LABELS[staff.role] ?? staff.role) : null;
+
+  const { items: onboardingItems = [], progress: onboardingProgress = { total: 0, completed: 0, skipped: 0, pending: 0 } } =
+    await getStaffOnboarding(id).then((r) => ("items" in r ? r : { items: [], progress: { total: 0, completed: 0, skipped: 0, pending: 0 } }));
 
   const validCount = credentials?.filter((c) => c.status === "valid").length ?? 0;
   const expiringCount = credentials?.filter((c) => c.status === "expiring").length ?? 0;
@@ -117,6 +122,12 @@ export default async function StaffDetailPage({
           )}
         </CardContent>
       </Card>
+
+      <OnboardingChecklist
+        items={onboardingItems}
+        total={onboardingProgress.total}
+        completed={onboardingProgress.completed}
+      />
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

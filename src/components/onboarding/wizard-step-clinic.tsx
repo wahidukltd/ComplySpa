@@ -46,7 +46,7 @@ export function WizardStepClinic({ onNext }: { onNext: (clinicId: string) => voi
         if (result.fieldErrors) {
           const flat: Record<string, string> = {};
           for (const [key, msgs] of Object.entries(result.fieldErrors)) {
-            if (msgs && msgs.length > 0) flat[key] = msgs[0] ?? "";
+            if (msgs && Array.isArray(msgs) && msgs.length > 0) flat[key] = msgs[0] ?? "";
           }
           setErrors(flat);
         }

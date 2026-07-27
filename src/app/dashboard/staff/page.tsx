@@ -34,6 +34,7 @@ export default async function StaffListPage() {
   const staffIds = (staff ?? []).map((s) => s.id);
 
   const credStatusMap: Record<string, "valid" | "expiring" | "expired" | "none"> = {};
+  const onboardingStatusMap: Record<string, { total: number; completed: number }> = {};
 
   if (staffIds.length > 0) {
     const { data: credCounts } = await supabase
@@ -57,6 +58,21 @@ export default async function StaffListPage() {
         }
       }
     }
+
+    const { data: onboardingData } = await supabase
+      .from("onboarding_items")
+      .select("staff_member_id, status")
+      .in("staff_member_id", staffIds);
+
+    if (onboardingData) {
+      for (const id of staffIds) {
+        const memberItems = onboardingData.filter((i) => i.staff_member_id === id);
+        onboardingStatusMap[id] = {
+          total: memberItems.length,
+          completed: memberItems.filter((i) => i.status === "completed").length,
+        };
+      }
+    }
   }
 
   return (
@@ -74,6 +90,7 @@ export default async function StaffListPage() {
       <StaffTableWrapper
         staff={(staff ?? []) as Tables<"staff_members">[]}
         credStatusMap={credStatusMap}
+        onboardingStatusMap={onboardingStatusMap}
       />
     </div>
   );

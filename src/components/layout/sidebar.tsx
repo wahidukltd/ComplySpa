@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Users,
+  UserCheck,
   ShieldCheck,
   FileText,
   Bell,
@@ -12,11 +14,11 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const navItems: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Staff", href: "/dashboard/staff", icon: Users },
+  { label: "Onboarding", href: "/dashboard/onboarding", icon: UserCheck },
   { label: "Credentials", href: "/dashboard/credentials", icon: ShieldCheck },
   { label: "Reports", href: "/dashboard/reports", icon: FileText },
   { label: "Alerts", href: "/dashboard/alerts", icon: Bell },

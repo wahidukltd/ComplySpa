@@ -360,6 +360,71 @@ export type Database = {
           },
         ]
       }
+      onboarding_items: {
+        Row: {
+          clinic_id: string
+          completed_at: string | null
+          completed_by_user_id: string | null
+          created_at: string
+          credential_type_id: string
+          id: string
+          staff_member_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          clinic_id: string
+          completed_at?: string | null
+          completed_by_user_id?: string | null
+          created_at?: string
+          credential_type_id: string
+          id?: string
+          staff_member_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          clinic_id?: string
+          completed_at?: string | null
+          completed_by_user_id?: string | null
+          created_at?: string
+          credential_type_id?: string
+          id?: string
+          staff_member_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_items_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_items_completed_by_user_id_fkey"
+            columns: ["completed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_items_credential_type_id_fkey"
+            columns: ["credential_type_id"]
+            isOneToOne: false
+            referencedRelation: "credential_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_items_staff_member_id_fkey"
+            columns: ["staff_member_id"]
+            isOneToOne: false
+            referencedRelation: "staff_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       processed_webhooks: {
         Row: {
           clinic_id: string | null

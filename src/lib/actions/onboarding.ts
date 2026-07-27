@@ -1,13 +1,17 @@
 "use server";
+
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClinicSchema, type CreateClinicInput } from "@/lib/validations/clinic";
-import { revalidatePath } from "next/cache";
 import { getEntitlements } from "@/lib/utils/entitlements";
+import { getOnboardingItems, updateOnboardingItemStatus } from "@/lib/staff/onboarding";
 import * as Sentry from "@sentry/nextjs";
+
+// ── Existing clinic onboarding functions ──
 
 async function createClinicInternal(input: CreateClinicInput) {
   const supabase = await createClient();
@@ -22,8 +26,8 @@ async function createClinicInternal(input: CreateClinicInput) {
   }
 
   const { name, address, state } = parsed.data;
-
   const userEmail = authUser?.email ?? null;
+
   if (!authUser?.email_confirmed_at) {
     return { clinicId: null, error: "Please verify your email address before setting up your clinic.", fieldErrors: undefined };
   }
@@ -151,4 +155,78 @@ export async function restoreExistingAccount(authUserId: string): Promise<{ redi
   }
 
   return { redirectTo: getEntitlements(clinic.plan).blocked ? "/resume" : "/dashboard", error: null };
+}
+
+// ── New onboarding progress functions ──
+
+export async function getStaffOnboarding(staffId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.id) return { error: "Unauthorized" };
+
+  const { data: userRecord } = await supabase
+    .from("users")
+    .select("clinic_id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (!userRecord) return { error: "Unauthorized" };
+
+  const items = await getOnboardingItems(staffId);
+  const total = items.length;
+  const completed = items.filter((i) => i.status === "completed").length;
+  const skipped = items.filter((i) => i.status === "skipped").length;
+  const pending = items.filter((i) => i.status === "pending").length;
+
+  return {
+    items,
+    progress: { total, completed, skipped, pending },
+  };
+}
+
+export async function markOnboardingItemComplete(itemId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.id) return { error: "Unauthorized" };
+
+  const { data: userRecord } = await supabase
+    .from("users")
+    .select("id, role")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (!userRecord) return { error: "Unauthorized" };
+  if (userRecord.role === "viewer") return { error: "Insufficient permissions" };
+
+  const result = await updateOnboardingItemStatus(itemId, "completed", userRecord.id);
+  if (result.error) {
+    Sentry.captureException(result.error);
+    return { error: "Failed to complete onboarding item." };
+  }
+
+  revalidatePath("/dashboard/staff");
+  revalidatePath("/dashboard/onboarding");
+  return { success: true };
+}
+
+export async function markOnboardingItemSkipped(itemId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.id) return { error: "Unauthorized" };
+
+  const { data: userRecord } = await supabase
+    .from("users")
+    .select("id, role")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (!userRecord) return { error: "Unauthorized" };
+  if (userRecord.role === "viewer") return { error: "Insufficient permissions" };
+
+  const result = await updateOnboardingItemStatus(itemId, "skipped", userRecord.id);
+  if (result.error) {
+    Sentry.captureException(result.error);
+    return { error: "Failed to skip onboarding item." };
+  }
+
+  revalidatePath("/dashboard/staff");
+  revalidatePath("/dashboard/onboarding");
+  return { success: true };
 }

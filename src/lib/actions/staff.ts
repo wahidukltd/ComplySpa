@@ -4,6 +4,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { staffMemberSchema, addStaffWithCredentialsSchema, type StaffMemberInput, type AddStaffWithCredentialsInput } from "@/lib/validations/staff";
+import { createOnboardingItems } from "@/lib/staff/onboarding";
 import { getClinicIdAndPlan } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
 import { PlanLimitError } from "@/lib/utils/errors";
@@ -233,6 +234,11 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
     return { success: false, error: "Failed to add staff member. Please try again." };
   }
 
+  const role = parsed.data.role;
+  if (role) {
+    await createOnboardingItems(staff.id, clinicId, role);
+  }
+
   if (wizardCount > 0) {
     const credentialRows = parsed.data.credentials.map((c) => ({
       staff_member_id: staff.id,
@@ -257,6 +263,7 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
 
   revalidatePath("/dashboard/staff");
   revalidatePath(`/dashboard/staff/${staff.id}`);
+  revalidatePath("/dashboard/onboarding");
   revalidatePath("/dashboard");
   return { success: true, id: staff.id };
 }

@@ -11,9 +11,11 @@ type StaffMember = Tables<"staff_members">;
 export function StaffTableWrapper({
   staff,
   credStatusMap = {},
+  onboardingStatusMap = {},
 }: {
   staff: StaffMember[];
   credStatusMap?: Record<string, "valid" | "expiring" | "expired" | "none">;
+  onboardingStatusMap?: Record<string, { total: number; completed: number }>;
 }) {
   const router = useRouter();
 
@@ -27,5 +29,12 @@ export function StaffTableWrapper({
     }
   }
 
-  return <StaffTable staff={staff} onDelete={handleDelete} credStatusMap={credStatusMap} />;
+  return (
+    <StaffTable
+      staff={staff}
+      onDelete={handleDelete}
+      credStatusMap={credStatusMap}
+      onboardingStatusMap={onboardingStatusMap}
+    />
+  );
 }
