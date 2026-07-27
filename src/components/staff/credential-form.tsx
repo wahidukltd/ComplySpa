@@ -43,6 +43,7 @@ export function CredentialForm({
   const [credentialTypes, setCredentialTypes] = useState<CredentialTypeOption[]>([]);
   const [typesLoading, setTypesLoading] = useState(true);
   const [typesError, setTypesError] = useState<string | null>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<string | undefined>(defaultValues?.credential_type_id ?? undefined);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -129,15 +130,17 @@ export function CredentialForm({
     setUploading(false);
   }
 
-  const grouped = credentialTypes.reduce<Record<string, CredentialTypeOption[]>>((acc, ct) => {
-    const cat = ct.category || "other";
-    (acc[cat] ??= []).push(ct);
-    return acc;
-  }, {});
+  const selectedType = credentialTypes.find((t) => t.id === selectedTypeId);
+
+  const handleTypeChange = (value: string | null) => {
+    if (!value) return;
+    setSelectedTypeId(value);
+    setValue("credential_type_id", value);
+  };
 
   return (
     <form onSubmit={handleSubmit((data) => onSubmit({ ...data, document_url: documentUrl ?? undefined }))} className="space-y-6">
-      <input type="hidden" {...register("staff_member_id")} />
+      <input type="hidden" {...register("credential_type_id")} />
 
       <div className="space-y-2">
         <Label htmlFor="credential_type_id">
@@ -149,24 +152,22 @@ export function CredentialForm({
           <p className="text-sm text-destructive">{typesError}</p>
         ) : (
           <Select
-            defaultValue={defaultValues?.credential_type_id ?? undefined}
-            onValueChange={(value) => value && setValue("credential_type_id", value)}
+            value={selectedTypeId}
+            onValueChange={handleTypeChange}
           >
             <SelectTrigger id="credential_type_id">
               <SelectValue placeholder="Select a credential type" />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(grouped).map(([category, types]) => (
-                <div key={category}>
-                  <div className="px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-                    {category}
+              {credentialTypes.map((ct) => (
+                <SelectItem key={ct.id} value={ct.id}>
+                  <div className="flex items-center gap-2">
+                    <span>{ct.name}</span>
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {ct.category}
+                    </span>
                   </div>
-                  {types.map((ct) => (
-                    <SelectItem key={ct.id} value={ct.id}>
-                      {ct.name}
-                    </SelectItem>
-                  ))}
-                </div>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -174,14 +175,19 @@ export function CredentialForm({
         {errors.credential_type_id && (
           <p className="text-sm text-destructive">{errors.credential_type_id.message}</p>
         )}
+        {selectedType && (
+          <p className="text-xs text-muted-foreground">
+            Category: <span className="font-medium">{selectedType.category}</span>
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="license_number">License number</Label>
+        <Label htmlFor="license_number">Number / ID</Label>
         <Input
           id="license_number"
           {...register("license_number")}
-          placeholder="e.g. RN123456"
+          placeholder="e.g. RN123456, policy number, contract ID"
         />
         {errors.license_number && (
           <p className="text-sm text-destructive">{errors.license_number.message}</p>

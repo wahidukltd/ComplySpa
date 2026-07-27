@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { ROLE_DISPLAY_LABELS } from "@/lib/staff/role-credential-defaults";
 import { getStaffOnboarding } from "@/lib/actions/onboarding";
 import { OnboardingChecklist } from "@/components/staff/staff-onboarding-checklist";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Paperclip } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +51,7 @@ export default async function StaffDetailPage({
       state,
       expiration_date,
       status,
+      document_url,
       credential_type:credential_types!credentials_credential_type_id_fkey(name, category)
     `)
     .eq("staff_member_id", id)
@@ -175,33 +176,46 @@ export default async function StaffDetailPage({
         </Card>
       ) : (
         <div className="space-y-2">
-          {credentials.map((cred) => (
-            <Link
-              key={cred.id}
-              href={`/dashboard/staff/${id}/credentials/${cred.id}/edit`}
-              className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50"
-            >
-              <div>
-                <p className="font-medium">{cred.credential_type?.name ?? "Credential"}</p>
-                <p className="text-sm text-muted-foreground">
-                  {cred.license_number && `${cred.license_number} · `}
-                  {cred.state && `${cred.state} · `}
-                  {cred.expiration_date && `Expires ${formatDate(cred.expiration_date)}`}
-                </p>
-              </div>
-              <Badge
-                variant={
-                  cred.status === "expired"
-                    ? "destructive"
-                    : cred.status === "expiring"
-                      ? "secondary"
-                      : "default"
-                }
+          {credentials.map((cred) => {
+            const category = cred.credential_type?.category;
+            return (
+              <Link
+                key={cred.id}
+                href={`/dashboard/credentials/${cred.id}`}
+                className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50"
               >
-                {cred.status}
-              </Badge>
-            </Link>
-          ))}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{cred.credential_type?.name ?? "Credential"}</p>
+                    {category && (
+                      <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {category}
+                      </span>
+                    )}
+                    {cred.document_url && (
+                      <Paperclip className="size-3 shrink-0 text-muted-foreground" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {cred.license_number && `${cred.license_number} · `}
+                    {cred.state && `${cred.state} · `}
+                    {cred.expiration_date && `Expires ${formatDate(cred.expiration_date)}`}
+                  </p>
+                </div>
+                <Badge
+                  variant={
+                    cred.status === "expired"
+                      ? "destructive"
+                      : cred.status === "expiring"
+                        ? "secondary"
+                        : "default"
+                  }
+                >
+                  {cred.status}
+                </Badge>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
