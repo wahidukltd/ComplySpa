@@ -25,7 +25,7 @@ export default async function EditStaffPage({
 
   const { data: staff } = await supabase
     .from("staff_members")
-    .select("id, clinic_id, name, role, email, phone, hire_date, procedures_performed, created_at, updated_at, deleted_at, suspended_at, suspended_plan")
+    .select("id, clinic_id, name, role, email, phone, hire_date, procedures_performed, created_at, updated_at, deleted_at, suspended_at, suspended_plan, location, department, manager")
     .eq("id", id)
     .eq("clinic_id", userRecord.clinic_id)
     .is("deleted_at", null)

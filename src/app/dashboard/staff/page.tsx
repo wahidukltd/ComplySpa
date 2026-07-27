@@ -31,6 +31,34 @@ export default async function StaffListPage() {
     .is("suspended_at", null)
     .order("name");
 
+  const staffIds = (staff ?? []).map((s) => s.id);
+
+  const credStatusMap: Record<string, "valid" | "expiring" | "expired" | "none"> = {};
+
+  if (staffIds.length > 0) {
+    const { data: credCounts } = await supabase
+      .from("credentials")
+      .select("staff_member_id, status")
+      .in("staff_member_id", staffIds)
+      .is("suspended_at", null)
+      .is("deleted_at", null);
+
+    if (credCounts) {
+      for (const id of staffIds) {
+        const memberCreds = credCounts.filter((c) => c.staff_member_id === id);
+        if (memberCreds.length === 0) {
+          credStatusMap[id] = "none";
+        } else if (memberCreds.some((c) => c.status === "expired")) {
+          credStatusMap[id] = "expired";
+        } else if (memberCreds.some((c) => c.status === "expiring")) {
+          credStatusMap[id] = "expiring";
+        } else {
+          credStatusMap[id] = "valid";
+        }
+      }
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -43,8 +71,10 @@ export default async function StaffListPage() {
         </Link>
       </PageHeader>
 
-      <StaffTableWrapper staff={(staff ?? []) as Tables<"staff_members">[]} />
+      <StaffTableWrapper
+        staff={(staff ?? []) as Tables<"staff_members">[]}
+        credStatusMap={credStatusMap}
+      />
     </div>
   );
 }
-

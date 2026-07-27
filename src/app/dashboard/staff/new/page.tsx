@@ -21,7 +21,7 @@ export default async function NewStaffPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Add Staff Member" description="Enter the staff member's details below." />
-      <div className="max-w-lg">
+      <div className="max-w-2xl">
         <StaffFormWrapper />
       </div>
     </div>

@@ -8,7 +8,13 @@ import type { Tables } from "@/types/database";
 
 type StaffMember = Tables<"staff_members">;
 
-export function StaffTableWrapper({ staff }: { staff: StaffMember[] }) {
+export function StaffTableWrapper({
+  staff,
+  credStatusMap = {},
+}: {
+  staff: StaffMember[];
+  credStatusMap?: Record<string, "valid" | "expiring" | "expired" | "none">;
+}) {
   const router = useRouter();
 
   async function handleDelete(id: string) {
@@ -21,5 +27,5 @@ export function StaffTableWrapper({ staff }: { staff: StaffMember[] }) {
     }
   }
 
-  return <StaffTable staff={staff} onDelete={handleDelete} />;
+  return <StaffTable staff={staff} onDelete={handleDelete} credStatusMap={credStatusMap} />;
 }

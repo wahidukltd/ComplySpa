@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
+import { ROLE_DISPLAY_LABELS } from "@/lib/staff/role-credential-defaults";
 import { Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 
@@ -31,7 +32,7 @@ export default async function StaffDetailPage({
 
   const { data: staff } = await supabase
     .from("staff_members")
-    .select("id, name, role, email, phone, hire_date, procedures_performed")
+    .select("id, name, role, email, phone, hire_date, procedures_performed, location, department, manager")
     .eq("id", id)
     .eq("clinic_id", userRecord.clinic_id)
     .is("deleted_at", null)
@@ -55,9 +56,15 @@ export default async function StaffDetailPage({
     .is("suspended_at", null)
     .order("expiration_date", { ascending: true, nullsFirst: false });
 
+  const roleLabel = staff.role ? (ROLE_DISPLAY_LABELS[staff.role] ?? staff.role) : null;
+
+  const validCount = credentials?.filter((c) => c.status === "valid").length ?? 0;
+  const expiringCount = credentials?.filter((c) => c.status === "expiring").length ?? 0;
+  const expiredCount = credentials?.filter((c) => c.status === "expired").length ?? 0;
+
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={staff.name} description={staff.role ? `Role: ${staff.role}` : undefined}>
+      <PageHeader title={staff.name} description={roleLabel ? `Role: ${roleLabel}` : undefined}>
         <Link href={`/dashboard/staff/${id}/edit`} className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}>
           <Pencil className="size-4" />
           Edit
@@ -78,10 +85,28 @@ export default async function StaffDetailPage({
               <p>{staff.phone}</p>
             </div>
           )}
+          {staff.location && (
+            <div>
+              <p className="text-xs text-muted-foreground">Location</p>
+              <p>{staff.location}</p>
+            </div>
+          )}
+          {staff.department && (
+            <div>
+              <p className="text-xs text-muted-foreground">Department</p>
+              <p>{staff.department}</p>
+            </div>
+          )}
           {staff.hire_date && (
             <div>
               <p className="text-xs text-muted-foreground">Hire Date</p>
               <p>{formatDate(staff.hire_date)}</p>
+            </div>
+          )}
+          {staff.manager && (
+            <div>
+              <p className="text-xs text-muted-foreground">Manager</p>
+              <p>{staff.manager}</p>
             </div>
           )}
           {staff.procedures_performed?.length > 0 && (
@@ -94,7 +119,16 @@ export default async function StaffDetailPage({
       </Card>
 
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Credentials</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold">Credentials</h2>
+          {credentials && credentials.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="text-status-valid">{validCount} valid</span>
+              {expiringCount > 0 && <span className="text-status-expiring">· {expiringCount} expiring</span>}
+              {expiredCount > 0 && <span className="text-destructive">· {expiredCount} expired</span>}
+            </div>
+          )}
+        </div>
         <Link href={`/dashboard/staff/${id}/credentials/new`} className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-1.5")}>
           <Plus className="size-4" />
           Add credential

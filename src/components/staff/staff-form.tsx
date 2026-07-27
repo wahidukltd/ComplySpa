@@ -17,21 +17,13 @@ import {
   staffMemberSchema,
   type StaffMemberInput,
 } from "@/lib/validations/staff";
+import { ROLE_DISPLAY_LABELS, ROLE_VALUES } from "@/lib/staff/role-credential-defaults";
 import { Loader2 } from "lucide-react";
 import type { Tables } from "@/types/database";
 
 type StaffMember = Tables<"staff_members">;
 
-const ROLES = [
-  { value: "RN", label: "Registered Nurse (RN)" },
-  { value: "NP", label: "Nurse Practitioner (NP)" },
-  { value: "PA", label: "Physician Assistant (PA)" },
-  { value: "MD", label: "Medical Doctor (MD)" },
-  { value: "DO", label: "Doctor of Osteopathic Medicine (DO)" },
-  { value: "esthetician", label: "Esthetician" },
-  { value: "MA", label: "Medical Assistant (MA)" },
-  { value: "other", label: "Other" },
-];
+const ROLE_KEYS = ROLE_VALUES;
 
 interface StaffFormProps {
   defaultValues?: Partial<StaffMember>;
@@ -55,6 +47,9 @@ export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save" }: Sta
       hire_date: defaultValues?.hire_date ?? "",
       email: defaultValues?.email ?? "",
       phone: defaultValues?.phone ?? "",
+      location: defaultValues?.location ?? "",
+      department: defaultValues?.department ?? "",
+      manager: defaultValues?.manager ?? "",
       procedures_performed: defaultValues?.procedures_performed ?? [],
     },
   });
@@ -97,9 +92,9 @@ export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save" }: Sta
             <SelectValue placeholder="Select a role" />
           </SelectTrigger>
           <SelectContent>
-            {ROLES.map((r) => (
-              <SelectItem key={r.value} value={r.value}>
-                {r.label}
+            {ROLE_KEYS.map((key) => (
+              <SelectItem key={key} value={key}>
+                {ROLE_DISPLAY_LABELS[key] ?? key}
               </SelectItem>
             ))}
           </SelectContent>
@@ -109,42 +104,49 @@ export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save" }: Sta
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="hire_date">Hire date</Label>
-        <Input
-          id="hire_date"
-          type="date"
-          {...register("hire_date")}
-        />
-        {errors.hire_date && (
-          <p className="text-sm text-destructive">{errors.hire_date.message}</p>
-        )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="hire_date">Hire date</Label>
+          <Input id="hire_date" type="date" {...register("hire_date")} />
+          {errors.hire_date && (
+            <p className="text-sm text-destructive">{errors.hire_date.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="location">Location</Label>
+          <Input id="location" {...register("location")} placeholder="e.g. Main Street Clinic" />
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          {...register("email")}
-          placeholder="jane@clinic.com"
-        />
-        {errors.email && (
-          <p className="text-sm text-destructive">{errors.email.message}</p>
-        )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="department">Department</Label>
+          <Input id="department" {...register("department")} placeholder="e.g. Injectables" />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone</Label>
+          <Input id="phone" type="tel" {...register("phone")} placeholder="+1 (555) 000-0000" />
+          {errors.phone && (
+            <p className="text-sm text-destructive">{errors.phone.message}</p>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="phone">Phone</Label>
-        <Input
-          id="phone"
-          type="tel"
-          {...register("phone")}
-          placeholder="+1 (555) 000-0000"
-        />
-        {errors.phone && (
-          <p className="text-sm text-destructive">{errors.phone.message}</p>
-        )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" type="email" {...register("email")} placeholder="jane@clinic.com" />
+          {errors.email && (
+            <p className="text-sm text-destructive">{errors.email.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="manager">Manager</Label>
+          <Input id="manager" {...register("manager")} placeholder="e.g. Dr. Smith" />
+        </div>
       </div>
 
       <div className="space-y-2">
