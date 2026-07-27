@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getEntitlements, type Plan } from "./entitlements";
+import { getEntitlements } from "./entitlements";
 
 export type { Plan } from "./entitlements";
 

@@ -53,7 +53,7 @@ describe("All subscription transitions behave correctly", () => {
         if (key === "maxStaff" || key === "maxCredentials" || key === "maxUsers") {
           expect(l[key as keyof typeof l]).toBe(value);
         } else {
-          expect((e as any)[key]).toBe(value);
+          expect(e[key as keyof typeof e]).toBe(value);
         }
       }
     });

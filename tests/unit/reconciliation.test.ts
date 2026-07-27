@@ -58,7 +58,6 @@ describe("Downgrade — feature tier changes", () => {
   });
 
   it("Multi → Solo: lose everything above basic", () => {
-    const multi = getEntitlements("multi_location");
     const solo = getEntitlements("solo");
     expect(solo.canAccessAPI).toBe(false);
     expect(solo.canEmailReports).toBe(false);
@@ -70,7 +69,6 @@ describe("Downgrade — feature tier changes", () => {
 
 describe("Upgrade — resource restoration", () => {
   it("Solo → Practice: report tier basic→audit, email enabled, user mgmt", () => {
-    const solo = getEntitlements("solo");
     const practice = getEntitlements("practice");
     expect(practice.reportTier).toBe("audit");
     expect(practice.canEmailReports).toBe(true);
