@@ -180,7 +180,16 @@ export async function syncStaffOnboarding(staffId: string) {
     .single();
   if (!staff || !staff.role) return { success: false, error: "Staff member has no role." };
 
-  await supabase.from("onboarding_items").delete().eq("staff_member_id", staffId);
+  const { error: delError } = await supabase
+    .from("onboarding_items")
+    .delete()
+    .eq("staff_member_id", staffId)
+    .eq("clinic_id", userRecord.clinic_id);
+  if (delError) {
+    Sentry.captureException(delError);
+    return { success: false, error: "Failed to sync onboarding items." };
+  }
+
   await createOnboardingItems(staffId, userRecord.clinic_id, staff.role);
 
   revalidatePath("/dashboard/onboarding");
@@ -214,7 +223,15 @@ export async function syncAllStaffOnboarding() {
   let synced = 0;
   for (const staff of staffList) {
     if (staff.role) {
-      await supabase.from("onboarding_items").delete().eq("staff_member_id", staff.id);
+      const { error: delErr } = await supabase
+        .from("onboarding_items")
+        .delete()
+        .eq("staff_member_id", staff.id)
+        .eq("clinic_id", userRecord.clinic_id);
+      if (delErr) {
+        Sentry.captureException(delErr);
+        continue;
+      }
       await createOnboardingItems(staff.id, userRecord.clinic_id, staff.role);
       synced++;
     }

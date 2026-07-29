@@ -31,6 +31,10 @@ CREATE POLICY "Update onboarding items"
   ON onboarding_items FOR UPDATE
   USING (clinic_id = auth_clinic_id());
 
+CREATE POLICY "Delete onboarding items"
+  ON onboarding_items FOR DELETE
+  USING (clinic_id = auth_clinic_id());
+
 -- 2. Attach updated_at trigger using existing function
 CREATE TRIGGER trigger_onboarding_items_updated_at
   BEFORE UPDATE ON onboarding_items

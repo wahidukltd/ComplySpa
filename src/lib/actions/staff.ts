@@ -129,7 +129,15 @@ export async function updateStaffMember(id: string, input: StaffMemberInput) {
   }
 
   if (newRole && oldRole !== newRole) {
-    await supabase.from("onboarding_items").delete().eq("staff_member_id", id);
+    const { error: delErr } = await supabase
+      .from("onboarding_items")
+      .delete()
+      .eq("staff_member_id", id)
+      .eq("clinic_id", user.clinic_id);
+    if (delErr) {
+      Sentry.captureException(delErr);
+      return { error: "Failed to update role. Please try again." };
+    }
     await createOnboardingItems(id, user.clinic_id, newRole);
   }
 
