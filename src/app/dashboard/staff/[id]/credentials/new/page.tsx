@@ -7,10 +7,15 @@ export const dynamic = "force-dynamic";
 
 export default async function NewCredentialPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ credentialTypeId?: string }>;
 }) {
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const credentialTypeId = resolvedSearchParams.credentialTypeId;
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id;
@@ -41,7 +46,7 @@ export default async function NewCredentialPage({
         description="Enter the credential details below."
       />
       <div className="max-w-lg">
-        <NewCredentialFormWrapper staffMemberId={id} />
+        <NewCredentialFormWrapper staffMemberId={id} credentialTypeId={credentialTypeId} />
       </div>
     </div>
   );

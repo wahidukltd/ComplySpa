@@ -100,8 +100,10 @@ export async function getOnboardingItems(staffMemberId: string) {
       id,
       status,
       is_required,
+      created_at,
       completed_at,
       completed_by_user_id,
+      credential_type_id,
       credential_type:credential_types!onboarding_items_credential_type_id_fkey(name, category)
     `)
     .eq("staff_member_id", staffMemberId)

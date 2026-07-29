@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { OnboardingList } from "./onboarding-list";
+import { PopulateButton } from "./populate-button";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,13 @@ export default async function OnboardingDashboardPage() {
     },
   }));
 
+  const staffWithRoles = (staff ?? []).filter((s) => s.role);
+  const staffWithRolesAndNoItems = staffWithRoles.filter((s) => {
+    const prog = progressMap[s.id];
+    return !prog || prog.total === 0;
+  });
+  const showPopulate = staffWithRolesAndNoItems.length > 0;
+
   const readyCount = staffList.filter(
     (s) => s.progress.requiredTotal > 0 && !s.progress.blocked,
   ).length;
@@ -100,7 +108,9 @@ export default async function OnboardingDashboardPage() {
       <PageHeader
         title="Onboarding"
         description="Track staff readiness at a glance."
-      />
+      >
+        <PopulateButton visible={showPopulate} />
+      </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Card>

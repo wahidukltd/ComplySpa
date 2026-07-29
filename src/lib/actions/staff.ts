@@ -99,6 +99,18 @@ export async function updateStaffMember(id: string, input: StaffMemberInput) {
   if (!user) return { error: "Unauthorized" };
   if (user.role === "viewer") return { error: "Insufficient permissions" };
 
+  const { data: currentStaff } = await supabase
+    .from("staff_members")
+    .select("role")
+    .eq("id", id)
+    .eq("clinic_id", user.clinic_id)
+    .is("deleted_at", null)
+    .single();
+  if (!currentStaff) return { error: "Staff member not found." };
+
+  const oldRole = currentStaff.role;
+  const newRole = parsed.data.role;
+
   const { error } = await supabase
     .from("staff_members")
     .update({
@@ -116,8 +128,14 @@ export async function updateStaffMember(id: string, input: StaffMemberInput) {
     return { error: "Failed to update staff member. Please try again." };
   }
 
+  if (newRole && oldRole !== newRole) {
+    await supabase.from("onboarding_items").delete().eq("staff_member_id", id);
+    await createOnboardingItems(id, user.clinic_id, newRole);
+  }
+
   revalidatePath("/dashboard/staff");
   revalidatePath(`/dashboard/staff/${id}`);
+  revalidatePath("/dashboard/onboarding");
   revalidatePath("/dashboard");
   return { success: true };
 }

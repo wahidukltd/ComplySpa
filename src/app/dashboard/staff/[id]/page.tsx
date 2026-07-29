@@ -138,6 +138,7 @@ export default async function StaffDetailPage({
         items={onboardingItems}
         total={onboardingProgress.total}
         completed={onboardingProgress.completed}
+        staffMemberId={id}
         requiredTotal={onboardingProgress.requiredTotal}
         requiredCompleted={onboardingProgress.requiredCompleted}
         optionalTotal={onboardingProgress.optionalTotal}
