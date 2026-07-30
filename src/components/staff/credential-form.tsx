@@ -63,6 +63,7 @@ export function CredentialForm({
   const [customCategory, setCustomCategory] = useState("training");
   const [customRenewal, setCustomRenewal] = useState("");
   const [customSaving, setCustomSaving] = useState(false);
+  const [typeSearch, setTypeSearch] = useState("");
   const [expirationEdited, setExpirationEdited] = useState(false);
 
   const {
@@ -149,12 +150,21 @@ export function CredentialForm({
     setUploading(false);
   }
 
+  const filteredTypes = useMemo(
+    () => {
+      if (!typeSearch) return credentialTypes;
+      const q = typeSearch.toLowerCase();
+      return credentialTypes.filter((ct) => ct.name.toLowerCase().includes(q));
+    },
+    [credentialTypes, typeSearch],
+  );
+
   const selectItems = useMemo(
     () => [
-      ...credentialTypes.map((ct) => ({ value: ct.id, label: ct.name })),
+      ...filteredTypes.map((ct) => ({ value: ct.id, label: ct.name })),
       { value: ADD_CUSTOM_VALUE, label: "Add custom type" },
     ],
-    [credentialTypes],
+    [filteredTypes],
   );
 
   const selectedType = credentialTypes.find((t) => t.id === selectedTypeId);
@@ -228,26 +238,34 @@ export function CredentialForm({
           ) : typesError ? (
             <p className="text-sm text-destructive">{typesError}</p>
           ) : (
-            <Select
-              value={selectedTypeId}
-              onValueChange={handleTypeChange}
-              items={selectItems}
-            >
-              <SelectTrigger id="credential_type_id">
-                <SelectValue placeholder="Select a credential type" />
-              </SelectTrigger>
-              <SelectContent>
-                {credentialTypes.map((ct) => (
-                  <SelectItem key={ct.id} value={ct.id}>
-                    {ct.name}
+            <div className="space-y-2">
+              <Input
+                placeholder="Search credential types..."
+                value={typeSearch}
+                onChange={(e) => setTypeSearch(e.target.value)}
+                className="h-8 text-sm"
+              />
+              <Select
+                value={selectedTypeId}
+                onValueChange={handleTypeChange}
+                items={selectItems}
+              >
+                <SelectTrigger id="credential_type_id">
+                  <SelectValue placeholder="Select a credential type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredTypes.map((ct) => (
+                    <SelectItem key={ct.id} value={ct.id}>
+                      {ct.name}
+                    </SelectItem>
+                  ))}
+                  <div className="border-t border-border my-1" />
+                  <SelectItem value={ADD_CUSTOM_VALUE}>
+                    Add custom type
                   </SelectItem>
-                ))}
-                <div className="border-t border-border my-1" />
-                <SelectItem value={ADD_CUSTOM_VALUE}>
-                  Add custom type
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                </SelectContent>
+              </Select>
+            </div>
           )}
           {errors.credential_type_id && (
             <p className="text-sm text-destructive">{errors.credential_type_id.message}</p>
