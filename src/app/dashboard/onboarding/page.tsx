@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { OnboardingList } from "./onboarding-list";
 import { PopulateButton } from "./populate-button";
+import { getStaffReadinessBulk } from "@/lib/staff/readiness";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,8 @@ export default async function OnboardingDashboardPage() {
   });
   const showPopulate = staffWithRolesAndNoItems.length > 0;
 
+  const readinessMap = staffIds.length > 0 ? await getStaffReadinessBulk(staffIds) : {};
+
   const readyCount = staffList.filter(
     (s) => s.progress.requiredTotal > 0 && !s.progress.blocked,
   ).length;
@@ -149,7 +152,7 @@ export default async function OnboardingDashboardPage() {
           </Link>
         </div>
       ) : (
-        <OnboardingList staffList={staffList} />
+        <OnboardingList staffList={staffList} readinessMap={readinessMap} />
       )}
     </div>
   );

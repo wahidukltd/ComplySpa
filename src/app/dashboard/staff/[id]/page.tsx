@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils";
 import { ROLE_DISPLAY_LABELS } from "@/lib/staff/role-credential-defaults";
 import { getStaffOnboarding } from "@/lib/actions/onboarding";
 import { OnboardingChecklist } from "@/components/staff/staff-onboarding-checklist";
-import { Pencil, Plus, Paperclip, RefreshCw } from "lucide-react";
+import { getStaffReadiness } from "@/lib/staff/readiness";
+import type { ReadinessResult } from "@/lib/staff/readiness";
+import { Pencil, Plus, Paperclip, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +80,13 @@ export default async function StaffDetailPage({
   const expiringCount = credentials?.filter((c) => c.status === "expiring").length ?? 0;
   const expiredCount = credentials?.filter((c) => c.status === "expired").length ?? 0;
 
+  const readiness: ReadinessResult = await getStaffReadiness(id).catch(() => ({
+    status: "pending" as const,
+    missingCredentials: [],
+    expiredCredentials: [],
+    expiringCredentials: [],
+  }));
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={staff.name} description={roleLabel ? `Role: ${roleLabel}` : undefined}>
@@ -133,6 +142,111 @@ export default async function StaffDetailPage({
           )}
         </CardContent>
       </Card>
+
+      {readiness.status === "non_compliant" && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
+              <div>
+                <p className="font-semibold text-destructive">Non-Compliant — Cannot work</p>
+                {readiness.expiredCredentials.length > 0 && (
+                  <ul className="mt-1 space-y-1 text-sm">
+                    {readiness.expiredCredentials.map((ec) => (
+                      <li key={ec.credentialId}>
+                        <Link href={`/dashboard/credentials/${ec.credentialId}`} className="text-destructive hover:underline">
+                          {ec.name} — expired
+                        </Link>
+                        <Link
+                          href={`/dashboard/credentials/${ec.credentialId}/renew`}
+                          className="ml-2 text-xs text-primary hover:underline"
+                        >
+                          Renew
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {readiness.missingCredentials.length > 0 && (
+                  <ul className="mt-1 space-y-1 text-sm">
+                    {readiness.missingCredentials.map((mc) => (
+                      <li key={mc.name}>
+                        <span className="text-destructive">{mc.name} — missing</span>
+                        <Link
+                          href={`/dashboard/staff/${id}/credentials/new`}
+                          className="ml-2 text-xs text-primary hover:underline"
+                        >
+                          Add now
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {readiness.status === "at_risk" && (
+        <Card className="border-[#C2853A]/30 bg-[#C2853A]/5">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-[#C2853A]" />
+              <div>
+                <p className="font-semibold text-[#C2853A]">At Risk — credentials expiring soon</p>
+                <ul className="mt-1 space-y-1 text-sm">
+                  {readiness.expiringCredentials.map((ec) => (
+                    <li key={ec.credentialId}>
+                      <Link href={`/dashboard/credentials/${ec.credentialId}`} className="hover:underline">
+                        {ec.name}
+                      </Link>
+                      <Link
+                        href={`/dashboard/credentials/${ec.credentialId}/renew`}
+                        className="ml-2 text-xs text-primary hover:underline"
+                      >
+                        Renew
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {readiness.status === "ready" && (
+        <Card className="border-[#4A8C5C]/30 bg-[#4A8C5C]/5">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[#4A8C5C]" />
+              <div>
+                <p className="font-medium text-[#4A8C5C]">Ready — all required credentials are valid</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {readiness.status === "pending" && (
+        <Card className="border-muted-foreground/20 bg-muted/20">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-muted-foreground">Pending — no credentials tracked yet</p>
+                <Link
+                  href={`/dashboard/staff/${id}/credentials/new`}
+                  className="mt-1 inline-block text-xs text-primary hover:underline"
+                >
+                  Add credentials
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <OnboardingChecklist
         items={onboardingItems}

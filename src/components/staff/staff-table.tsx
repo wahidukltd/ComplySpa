@@ -19,18 +19,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Trash2, Search } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Search, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { formatDate } from "@/lib/utils/date";
 import { ROLE_DISPLAY_LABELS, ROLE_VALUES } from "@/lib/staff/role-credential-defaults";
 import type { Tables } from "@/types/database";
+import type { ReadinessResult } from "@/lib/staff/readiness";
 
 type StaffMember = Tables<"staff_members">;
 
-const STATUS_COLORS: Record<string, string> = {
-  valid: "bg-[#4A8C5C]",
-  expiring: "bg-[#C2853A]",
-  expired: "bg-[#B8443A]",
-  none: "bg-muted-foreground/30",
+const READINESS_STYLES: Record<string, { color: string; label: string; icon: "check" | "alert" | "warning" | "info" } | undefined> = {
+  ready: { color: "text-[#4A8C5C]", label: "Ready", icon: "check" },
+  at_risk: { color: "text-[#C2853A]", label: "At Risk", icon: "alert" },
+  non_compliant: { color: "text-destructive font-semibold", label: "Non-Compliant", icon: "warning" },
+  pending: { color: "text-muted-foreground", label: "Pending", icon: "info" },
 };
 
 const ROLE_KEYS = ["", ...ROLE_VALUES] as const;
@@ -38,11 +39,41 @@ const ROLE_KEYS = ["", ...ROLE_VALUES] as const;
 interface StaffTableProps {
   staff: StaffMember[];
   onDelete: (id: string) => void;
-  credStatusMap?: Record<string, "valid" | "expiring" | "expired" | "none">;
-  onboardingStatusMap?: Record<string, { total: number; completed: number; blocked: boolean }>;
+  readinessMap?: Record<string, ReadinessResult>;
 }
 
-export function StaffTable({ staff, onDelete, credStatusMap = {}, onboardingStatusMap = {} }: StaffTableProps) {
+function ReadinessIcon({ type }: { type: "check" | "alert" | "warning" | "info" }) {
+  const labels: Record<string, string> = {
+    check: "Ready",
+    alert: "At risk",
+    warning: "Non-compliant",
+    info: "Pending",
+  };
+  return (
+    <span aria-label={labels[type]} role="img">
+      {type === "check" && <CheckCircle2 className="size-4 shrink-0 text-[#4A8C5C]" />}
+      {type === "alert" && <AlertTriangle className="size-4 shrink-0 text-[#C2853A]" />}
+      {type === "warning" && <AlertTriangle className="size-4 shrink-0 text-destructive" />}
+      {type === "info" && <Info className="size-4 shrink-0 text-muted-foreground" />}
+    </span>
+  );
+}
+
+function formatReadinessDetails(r: ReadinessResult): string {
+  const parts: string[] = [];
+  if (r.missingCredentials.length > 0) {
+    parts.push(`Missing: ${r.missingCredentials.map((m) => m.name).join(", ")}`);
+  }
+  if (r.expiredCredentials.length > 0) {
+    parts.push(`Expired: ${r.expiredCredentials.map((e) => e.name).join(", ")}`);
+  }
+  if (r.expiringCredentials.length > 0) {
+    parts.push(`Expiring: ${r.expiringCredentials.map((e) => e.name).join(", ")}`);
+  }
+  return parts.join(" · ");
+}
+
+export function StaffTable({ staff, onDelete, readinessMap = {} }: StaffTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -103,13 +134,13 @@ export function StaffTable({ staff, onDelete, credStatusMap = {}, onboardingStat
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[10px]" />
             <TableHead>Name</TableHead>
             <TableHead>Role</TableHead>
-            <TableHead>Onboarding</TableHead>
+            <TableHead>Readiness</TableHead>
+            <TableHead>Details</TableHead>
             <TableHead>Hire Date</TableHead>
             <TableHead>Email</TableHead>
-            <TableHead className="w-[80px]">Actions</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -121,7 +152,8 @@ export function StaffTable({ staff, onDelete, credStatusMap = {}, onboardingStat
             </TableRow>
           ) : (
             filteredStaff.map((member) => {
-              const credStatus = credStatusMap[member.id] ?? "none";
+              const rStatus: keyof typeof READINESS_STYLES = readinessMap[member.id]?.status ?? "pending";
+              const rStyle = READINESS_STYLES[rStatus]!;
               return (
                 <TableRow
                   key={member.id}
@@ -135,16 +167,6 @@ export function StaffTable({ staff, onDelete, credStatusMap = {}, onboardingStat
                   tabIndex={0}
                   role="link"
                 >
-                  <TableCell>
-                    <div
-                      className={`size-2.5 rounded-full ${STATUS_COLORS[credStatus]}`}
-                      title={
-                        credStatus === "none"
-                          ? "No credentials"
-                          : `All credentials ${credStatus}`
-                      }
-                    />
-                  </TableCell>
                   <TableCell className="font-medium">{member.name}</TableCell>
                   <TableCell>
                     {member.role ? (
@@ -156,36 +178,13 @@ export function StaffTable({ staff, onDelete, credStatusMap = {}, onboardingStat
                     )}
                   </TableCell>
                   <TableCell>
-                    {(() => {
-                      const prog = onboardingStatusMap[member.id];
-                      if (!prog || prog.total === 0) {
-                        return <span className="text-xs text-muted-foreground">—</span>;
-                      }
-                      const allRequiredDone = !prog.blocked;
-                      const started = prog.completed > 0;
-                      return (
-                        <span
-                          className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                            allRequiredDone
-                              ? "text-[#4A8C5C]"
-                              : started
-                                ? "text-[#C2853A]"
-                                : "text-destructive"
-                          }`}
-                        >
-                          <span
-                            className={`inline-block size-2 rounded-full ${
-                              allRequiredDone
-                                ? "bg-[#4A8C5C]"
-                                : started
-                                  ? "bg-[#C2853A]"
-                                  : "bg-destructive"
-                            }`}
-                          />
-                          {allRequiredDone ? "Ready" : started ? `${prog.completed}/${prog.total}` : "Blocked"}
-                        </span>
-                      );
-                    })()}
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${rStyle.color}`}>
+                      <ReadinessIcon type={rStyle.icon} />
+                      {rStyle.label}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={readinessMap[member.id] ? formatReadinessDetails(readinessMap[member.id]!) : ""}>
+                    {readinessMap[member.id] ? formatReadinessDetails(readinessMap[member.id]!) : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDate(member.hire_date) || "—"}

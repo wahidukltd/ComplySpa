@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { StaffTableWrapper } from "./staff-table-wrapper";
 import { cn } from "@/lib/utils";
+import { getStaffReadinessBulk } from "@/lib/staff/readiness";
 import type { Tables } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -33,49 +34,7 @@ export default async function StaffListPage() {
 
   const staffIds = (staff ?? []).map((s) => s.id);
 
-  const credStatusMap: Record<string, "valid" | "expiring" | "expired" | "none"> = {};
-  const onboardingStatusMap: Record<string, { total: number; completed: number; blocked: boolean }> = {};
-
-  if (staffIds.length > 0) {
-    const { data: credCounts } = await supabase
-      .from("credentials")
-      .select("staff_member_id, status")
-      .in("staff_member_id", staffIds)
-      .is("suspended_at", null)
-      .is("deleted_at", null);
-
-    if (credCounts) {
-      for (const id of staffIds) {
-        const memberCreds = credCounts.filter((c) => c.staff_member_id === id);
-        if (memberCreds.length === 0) {
-          credStatusMap[id] = "none";
-        } else if (memberCreds.some((c) => c.status === "expired")) {
-          credStatusMap[id] = "expired";
-        } else if (memberCreds.some((c) => c.status === "expiring")) {
-          credStatusMap[id] = "expiring";
-        } else {
-          credStatusMap[id] = "valid";
-        }
-      }
-    }
-
-    const { data: onboardingData } = await supabase
-      .from("onboarding_items")
-      .select("staff_member_id, status, is_required")
-      .in("staff_member_id", staffIds);
-
-    if (onboardingData) {
-      for (const id of staffIds) {
-        const memberItems = onboardingData.filter((i) => i.staff_member_id === id);
-        const requiredPending = memberItems.filter((i) => i.is_required && i.status === "pending").length;
-        onboardingStatusMap[id] = {
-          total: memberItems.length,
-          completed: memberItems.filter((i) => i.status === "completed").length,
-          blocked: requiredPending > 0,
-        };
-      }
-    }
-  }
+  const readinessMap = await getStaffReadinessBulk(staffIds);
 
   return (
     <div className="flex flex-col gap-6">
@@ -91,8 +50,7 @@ export default async function StaffListPage() {
 
       <StaffTableWrapper
         staff={(staff ?? []) as Tables<"staff_members">[]}
-        credStatusMap={credStatusMap}
-        onboardingStatusMap={onboardingStatusMap}
+        readinessMap={readinessMap}
       />
     </div>
   );

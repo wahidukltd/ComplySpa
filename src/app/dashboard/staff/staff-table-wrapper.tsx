@@ -5,17 +5,16 @@ import { StaffTable } from "@/components/staff/staff-table";
 import { deleteStaffMember } from "@/lib/actions/staff";
 import { toast } from "sonner";
 import type { Tables } from "@/types/database";
+import type { ReadinessResult } from "@/lib/staff/readiness";
 
 type StaffMember = Tables<"staff_members">;
 
 export function StaffTableWrapper({
   staff,
-  credStatusMap = {},
-  onboardingStatusMap = {},
+  readinessMap = {},
 }: {
   staff: StaffMember[];
-  credStatusMap?: Record<string, "valid" | "expiring" | "expired" | "none">;
-  onboardingStatusMap?: Record<string, { total: number; completed: number; blocked: boolean }>;
+  readinessMap?: Record<string, ReadinessResult>;
 }) {
   const router = useRouter();
 
@@ -33,8 +32,7 @@ export function StaffTableWrapper({
     <StaffTable
       staff={staff}
       onDelete={handleDelete}
-      credStatusMap={credStatusMap}
-      onboardingStatusMap={onboardingStatusMap}
+      readinessMap={readinessMap}
     />
   );
 }

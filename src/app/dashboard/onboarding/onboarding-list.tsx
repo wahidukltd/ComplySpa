@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ROLE_DISPLAY_LABELS, ROLE_VALUES } from "@/lib/staff/role-credential-defaults";
 import { Search, ArrowRight } from "lucide-react";
+import type { ReadinessResult } from "@/lib/staff/readiness";
 
 interface StaffMember {
   id: string;
@@ -21,10 +22,19 @@ interface StaffProgress {
   blocked: boolean; missingNames: string[];
 }
 
+const READINESS_CHIP: Record<string, { label: string; className: string } | undefined> = {
+  ready: { label: "Ready", className: "bg-[#4A8C5C]/10 text-[#4A8C5C]" },
+  at_risk: { label: "At Risk", className: "bg-[#C2853A]/10 text-[#C2853A]" },
+  non_compliant: { label: "Non-Compliant", className: "bg-destructive/10 text-destructive" },
+  pending: { label: "Pending", className: "bg-muted text-muted-foreground" },
+};
+
 export function OnboardingList({
   staffList,
+  readinessMap = {},
 }: {
   staffList: (StaffMember & { progress: StaffProgress })[];
+  readinessMap?: Record<string, ReadinessResult>;
 }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -106,6 +116,15 @@ export function OnboardingList({
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{member.name}</p>
+                      {(() => {
+                        const chipStatus: keyof typeof READINESS_CHIP = readinessMap[member.id]?.status ?? "pending";
+                        const chipStyle = READINESS_CHIP[chipStatus]!;
+                        return (
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${chipStyle.className}`}>
+                            {chipStyle.label}
+                          </span>
+                        );
+                      })()}
                       <Badge
                         variant={
                           member.progress.requiredTotal === 0

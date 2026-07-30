@@ -12,4 +12,6 @@ export type CredentialStatus = "valid" | "expiring" | "expired";
 
 export type AlertDeliveryStatus = "delivered" | "failed" | "pending";
 
+export type ReadinessStatus = "ready" | "at_risk" | "non_compliant" | "pending";
+
 
