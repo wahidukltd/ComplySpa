@@ -14,4 +14,6 @@ export type AlertDeliveryStatus = "delivered" | "failed" | "pending";
 
 export type ReadinessStatus = "ready" | "at_risk" | "non_compliant" | "pending";
 
+export type ActionUrgency = "critical" | "warning" | "info";
+
 

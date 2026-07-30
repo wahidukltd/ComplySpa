@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { getActionCount } from "@/lib/actions/compliance-actions";
 import {
   LayoutDashboard,
   Users,
@@ -11,12 +13,14 @@ import {
   FileText,
   Bell,
   Settings,
+  ListChecks,
   X,
   type LucideIcon,
 } from "lucide-react";
 
 const navItems: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Actions", href: "/dashboard/actions", icon: ListChecks },
   { label: "Staff", href: "/dashboard/staff", icon: Users },
   { label: "Onboarding", href: "/dashboard/onboarding", icon: UserCheck },
   { label: "Credentials", href: "/dashboard/credentials", icon: ShieldCheck },
@@ -28,10 +32,12 @@ const navItems: { label: string; href: string; icon: LucideIcon }[] = [
 function NavLink({
   item,
   active,
+  badge,
   onNavigate,
 }: {
   item: { label: string; href: string; icon: LucideIcon };
   active: boolean;
+  badge?: number;
   onNavigate?: () => void;
 }) {
   const Icon = item.icon;
@@ -47,7 +53,12 @@ function NavLink({
       )}
     >
       <Icon className="size-4 shrink-0" />
-      {item.label}
+      <span className="flex-1">{item.label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="inline-flex items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground min-w-[18px] h-[18px]">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -55,11 +66,18 @@ function NavLink({
 export function Sidebar({
   open,
   onClose,
+  actionsCount: _actionsCount = 0,
 }: {
   open: boolean;
   onClose: () => void;
+  actionsCount?: number;
 }) {
   const pathname = usePathname();
+  const [badgeCount, setBadgeCount] = useState(_actionsCount);
+
+  useEffect(() => {
+    getActionCount().then((count) => setBadgeCount(count)).catch(() => {});
+  }, [pathname]);
 
   function isActive(href: string): boolean {
     return pathname === href || pathname.startsWith(href + "/");
@@ -74,11 +92,13 @@ export function Sidebar({
         </div>
         <nav className="flex-1 space-y-1 p-4">
           {navItems.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              active={isActive(item.href)}
-            />
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  active={isActive(item.href)}
+                  badge={item.label === "Actions" ? badgeCount : undefined}
+                  onNavigate={onClose}
+                />
           ))}
         </nav>
       </aside>
@@ -112,6 +132,7 @@ export function Sidebar({
                   key={item.href}
                   item={item}
                   active={isActive(item.href)}
+              badge={item.label === "Actions" ? badgeCount : undefined}
                   onNavigate={onClose}
                 />
               ))}
