@@ -219,6 +219,7 @@ export default async function CredentialDetailPage({
                   credentialId={credential.id}
                   staffMemberId={credential.staff_member_id}
                   verificationUrl={credential.verification_url}
+                  status={credential.status}
                 />
               </div>
             </CardContent>

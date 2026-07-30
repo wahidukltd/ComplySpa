@@ -3,16 +3,17 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { verifyCredentialNow, deleteCredential } from "@/lib/actions/credentials";
-import { ExternalLink, Trash2 } from "lucide-react";
+import { ExternalLink, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 interface CredentialActionsProps {
   credentialId: string;
   staffMemberId: string;
   verificationUrl: string | null;
+  status: string;
 }
 
-export function CredentialActions({ credentialId, staffMemberId, verificationUrl }: CredentialActionsProps) {
+export function CredentialActions({ credentialId, staffMemberId, verificationUrl, status }: CredentialActionsProps) {
   const router = useRouter();
 
   async function handleVerify() {
@@ -41,6 +42,16 @@ export function CredentialActions({ credentialId, staffMemberId, verificationUrl
 
   return (
     <div className="flex gap-2">
+      {status !== "valid" && (
+        <Button
+          variant={status === "expired" ? "default" : "secondary"}
+          onClick={() => router.push(`/dashboard/credentials/${credentialId}/renew`)}
+          className="gap-1.5"
+        >
+          <RefreshCw className="size-4" />
+          Renew
+        </Button>
+      )}
       {verificationUrl && (
         <Button variant="outline" onClick={handleVerify} className="gap-1.5">
           <ExternalLink className="size-4" />

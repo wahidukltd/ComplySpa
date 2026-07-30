@@ -7,6 +7,7 @@ import { credentialSchema, type CredentialInput } from "@/lib/validations/staff"
 import { getClinicIdAndPlan } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
 import { PlanLimitError } from "@/lib/utils/errors";
+import { getCredentialStatus } from "@/lib/utils/status";
 import * as Sentry from "@sentry/nextjs";
 
 export async function addCredential(input: CredentialInput & { document_url?: string }) {
@@ -134,6 +135,7 @@ export async function updateCredential(id: string, input: CredentialInput & { do
       verification_url: parsed.data.verification_url || null,
       notes: parsed.data.notes || null,
       document_url: document_url ?? null,
+      status: getCredentialStatus(parsed.data.expiration_date ?? null),
     })
     .eq("id", id);
 
@@ -208,9 +210,10 @@ export async function verifyCredentialNow(credentialId: string) {
 
   const { data: credential } = await supabase
     .from("credentials")
-    .select("id")
+    .select("id, expiration_date")
     .eq("id", credentialId)
     .eq("clinic_id", user.clinic_id)
+    .is("deleted_at", null)
     .is("suspended_at", null)
     .maybeSingle();
   if (!credential) return { error: "Credential not found" };
@@ -220,6 +223,7 @@ export async function verifyCredentialNow(credentialId: string) {
     .update({
       last_verified_date: new Date().toISOString(),
       verified_by_user_id: user.id,
+      status: getCredentialStatus(credential.expiration_date),
     })
     .eq("id", credentialId);
 

@@ -46,7 +46,7 @@ export async function addCustomCredentialType(input: {
       is_custom: true,
       clinic_id: clinicId,
     })
-    .select("id, name, category")
+    .select("id, name, category, default_renewal_cycle_days")
     .single();
 
   if (error) {

@@ -35,7 +35,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { Tables } from "@/types/database";
 
 type Credential = Tables<"credentials">;
-type CredentialTypeOption = Pick<Tables<"credential_types">, "id" | "name" | "category">;
+type CredentialTypeOption = Pick<Tables<"credential_types">, "id" | "name" | "category" | "default_renewal_cycle_days">;
 
 const ADD_CUSTOM_VALUE = "__add_custom__";
 
@@ -63,6 +63,7 @@ export function CredentialForm({
   const [customCategory, setCustomCategory] = useState("training");
   const [customRenewal, setCustomRenewal] = useState("");
   const [customSaving, setCustomSaving] = useState(false);
+  const [expirationEdited, setExpirationEdited] = useState(false);
 
   const {
     register,
@@ -103,7 +104,7 @@ export function CredentialForm({
       }
       const { data, error } = await supabase
         .from("credential_types")
-        .select("id, name, category")
+        .select("id, name, category, default_renewal_cycle_days")
         .or(`clinic_id.is.null,clinic_id.eq.${staff.clinic_id}`)
         .order("name");
       if (error) {
@@ -157,6 +158,16 @@ export function CredentialForm({
   );
 
   const selectedType = credentialTypes.find((t) => t.id === selectedTypeId);
+
+  useEffect(() => {
+    if (selectedType && selectedType.default_renewal_cycle_days && !defaultValues?.expiration_date && !expirationEdited) {
+      const calculated = new Date(Date.now() + selectedType.default_renewal_cycle_days * 86400000)
+        .toISOString().split("T")[0];
+      if (calculated) {
+        setValue("expiration_date", calculated);
+      }
+    }
+  }, [selectedType, defaultValues?.expiration_date, expirationEdited, setValue]);
 
   const handleTypeChange = (value: string | null) => {
     if (!value) return;
@@ -286,7 +297,10 @@ export function CredentialForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="expiration_date">Expiration date</Label>
-            <Input id="expiration_date" type="date" {...register("expiration_date")} />
+            <Input id="expiration_date" type="date" {...register("expiration_date")} onChange={(e) => {
+              setExpirationEdited(true);
+              register("expiration_date").onChange(e);
+            }} />
             {errors.expiration_date && (
               <p className="text-sm text-destructive">{errors.expiration_date.message}</p>
             )}

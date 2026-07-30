@@ -1,3 +1,4 @@
+// ponytail: keep logic in sync with update_credential_statuses() in SQL (migration 035)
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 const EXPIRING_THRESHOLD_MS = 90 * MS_PER_DAY;
 

@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatDate, daysUntil } from "@/lib/utils/date";
-import { ExternalLink, Search, Trash2, Paperclip, Eye } from "lucide-react";
+import { ExternalLink, Search, Trash2, Paperclip, Eye, RefreshCw } from "lucide-react";
 import { verifyCredentialNow, deleteCredential } from "@/lib/actions/credentials";
 
 interface CredentialRow {
@@ -212,6 +212,18 @@ export function CredentialsTable({ credentials }: { credentials: CredentialRow[]
                       >
                         <Eye className="size-3" />
                       </Button>
+                      {(cred.status === "expiring" || cred.status === "expired") && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/dashboard/credentials/${cred.id}/renew`);
+                          }}
+                        >
+                          <RefreshCw className="size-3" />
+                        </Button>
+                      )}
                       {cred.verification_url && (
                         <Button
                           variant="outline"
