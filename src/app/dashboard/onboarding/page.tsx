@@ -91,7 +91,7 @@ export default async function OnboardingDashboardPage() {
   });
   const showPopulate = staffWithRolesAndNoItems.length > 0;
 
-  const readinessMap = staffIds.length > 0 ? await getStaffReadinessBulk(staffIds) : {};
+  const readinessMap = staffIds.length > 0 ? await getStaffReadinessBulk(staffIds, userRecord.clinic_id) : {};
 
   const readyCount = staffList.filter(
     (s) => s.progress.requiredTotal > 0 && !s.progress.blocked,

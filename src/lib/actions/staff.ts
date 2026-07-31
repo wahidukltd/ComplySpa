@@ -299,7 +299,6 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
   revalidatePath("/dashboard/staff");
   revalidatePath(`/dashboard/staff/${staff.id}`);
   revalidatePath("/dashboard/onboarding");
-  revalidatePath("/dashboard/actions");
   revalidatePath("/dashboard");
   return { success: true, id: staff.id };
 }

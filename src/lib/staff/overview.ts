@@ -27,8 +27,8 @@ export interface RecentChange {
 export interface OverviewData {
   staffSummary: OverviewStaffSummary;
   complianceHealth: { score: number; readyCount: number; totalStaff: number };
-  topActions: ComplianceAction[];
-  actionCounts: { critical: number; warning: number };
+  actions: ComplianceAction[];
+  actionCounts: { critical: number; warning: number; info: number };
   credentialHealth: { total: number; valid: number; expiring: number; expired: number };
   onboardingSummary: { ready: number; inProgress: number; blocked: number; notStarted: number };
   recentChanges: RecentChange[];
@@ -263,7 +263,7 @@ export async function getOverviewData(clinicId: string): Promise<OverviewData> {
     readinessMap = await safeSection(
       "readiness",
       errors,
-      () => getStaffReadinessBulk(staffRows.map((s) => s.id)),
+      () => getStaffReadinessBulk(staffRows.map((s) => s.id), clinicId),
       {} as Record<string, ReadinessResult>,
     );
     // getStaffReadinessBulk catches internally and returns per-staff fallbacks;
@@ -283,27 +283,25 @@ export async function getOverviewData(clinicId: string): Promise<OverviewData> {
 
   const complianceHealth = computeComplianceHealth(readinessMap);
 
-  let allActions: ComplianceAction[] = [];
+  let actions: ComplianceAction[] = [];
   if (hasStaff && !readinessUnavailable) {
-    allActions = await safeSection(
+    actions = await safeSection(
       "actions",
       errors,
       () => buildComplianceActionsFromReadiness(staffRows, readinessMap, clinicId),
       [] as ComplianceAction[],
     );
   }
-  const topActions = allActions
-    .filter((a) => a.urgency === "critical" || a.urgency === "warning")
-    .slice(0, 3);
   const actionCounts = {
-    critical: allActions.filter((a) => a.urgency === "critical").length,
-    warning: allActions.filter((a) => a.urgency === "warning").length,
+    critical: actions.filter((a) => a.urgency === "critical").length,
+    warning: actions.filter((a) => a.urgency === "warning").length,
+    info: actions.filter((a) => a.urgency === "info").length,
   };
 
   return {
     staffSummary,
     complianceHealth,
-    topActions,
+    actions,
     actionCounts,
     credentialHealth,
     onboardingSummary,

@@ -24,7 +24,8 @@ async function fetchTemplateRows(clinicId: string, roles: string[]): Promise<Tem
     .from("role_templates")
     .select("id, clinic_id, role, is_active")
     .in("role", roles)
-    .is("is_active", true);
+    .is("is_active", true)
+    .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
 
   if (!templates || templates.length === 0) return [];
 

@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getOverviewData, type OverviewData, type RecentChange } from "@/lib/staff/overview";
-import { ActionCard } from "@/app/dashboard/actions/action-card";
+import { ActionList } from "@/components/overview/action-list";
+import { formatUnresolvedStaff } from "@/lib/utils/overview-copy";
 import { RefreshButton } from "@/components/overview/refresh-button";
 import { UpdatedLabel } from "@/components/overview/updated-label";
 import {
@@ -105,28 +106,35 @@ function ComplianceHealthCard({
 }
 
 function NeedsAttentionSection({
-  topActions,
+  actions,
   actionCounts,
   staffSummary,
   hasStaff,
   hasCredentials,
   readinessUnavailable,
+  sectionErrors,
+  canVerify,
 }: {
-  topActions: OverviewData["topActions"];
-  actionCounts: { critical: number; warning: number };
+  actions: OverviewData["actions"];
+  actionCounts: OverviewData["actionCounts"];
   staffSummary: OverviewData["staffSummary"];
   hasStaff: boolean;
   hasCredentials: boolean;
   readinessUnavailable: boolean;
+  sectionErrors: string[];
+  canVerify: boolean;
 }) {
   // Truthful all-clear: every staff member is actually work-ready. Gating on
-  // topActions alone is wrong — the actions builder skips `pending` staff by
-  // design, so a clinic with a pending member would show "all ready" while
-  // the hero says otherwise.
+  // the action list alone is wrong — the actions builder skips `pending` staff
+  // by design, so a clinic with a pending member would show "all ready" while
+  // the hero says otherwise. A failed actions section is treated like failed
+  // readiness: the empty fallback must not masquerade as a clean slate.
+  const actionsUnavailable = sectionErrors.includes("actions");
+  const dataUnavailable = readinessUnavailable || actionsUnavailable;
   const allWorkReady =
-    hasStaff && !readinessUnavailable && staffSummary.ready === staffSummary.total && staffSummary.total > 0;
+    hasStaff && !dataUnavailable && staffSummary.ready === staffSummary.total && staffSummary.total > 0;
   const hasUnresolvedStaff =
-    hasStaff && !readinessUnavailable && (staffSummary.pending > 0 || staffSummary.atRisk > 0 || staffSummary.nonCompliant > 0);
+    hasStaff && !dataUnavailable && (staffSummary.pending > 0 || staffSummary.atRisk > 0 || staffSummary.nonCompliant > 0);
 
   return (
     <div className="flex flex-col gap-3">
@@ -137,42 +145,22 @@ function NeedsAttentionSection({
             <span className="ml-2 text-destructive">{actionCounts.critical + actionCounts.warning}</span>
           )}
         </h2>
-        <Link
-          href="/dashboard/actions"
-          className="inline-flex items-center gap-1 text-xs text-primary underline-offset-4 hover:underline"
-        >
-          View all
-          <ArrowRight className="size-3" />
-        </Link>
       </div>
 
-      {!hasStaff ? null : readinessUnavailable ? (
+      {!hasStaff ? null : dataUnavailable ? (
         <Card className="border-muted-foreground/20 bg-muted/20">
           <CardContent className="flex items-center gap-3 py-4">
             <AlertTriangle className="size-5 shrink-0 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium">Readiness data unavailable</p>
+              <p className="text-sm font-medium">Compliance data unavailable</p>
               <p className="text-xs text-muted-foreground">
-                Staff readiness could not be computed. Try refreshing, or check the Actions page.
+                Compliance status could not be computed. Try refreshing to see your compliance actions.
               </p>
             </div>
           </CardContent>
         </Card>
-      ) : topActions.length > 0 ? (
-        <div className="space-y-2">
-          {topActions.map((action) => (
-            <ActionCard key={action.id} action={action} />
-          ))}
-          {actionCounts.critical + actionCounts.warning > topActions.length && (
-            <Link
-              href="/dashboard/actions"
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              +{actionCounts.critical + actionCounts.warning - topActions.length} more
-              <ArrowRight className="size-3" />
-            </Link>
-          )}
-        </div>
+      ) : actions.length > 0 ? (
+        <ActionList actions={actions} canVerify={canVerify} />
       ) : allWorkReady ? (
         <Card className="border-[#4A8C5C]/30 bg-[#4A8C5C]/5">
           <CardContent className="flex items-center gap-3 py-4">
@@ -190,10 +178,7 @@ function NeedsAttentionSection({
             <div>
               <p className="text-sm font-medium">No urgent action required</p>
               <p className="text-xs text-muted-foreground">
-                {staffSummary.pending > 0 && `${staffSummary.pending} staff member${staffSummary.pending > 1 ? "s" : ""} not yet work-ready (no credentials tracked). `}
-                {staffSummary.atRisk > 0 && `${staffSummary.atRisk} at risk, `}
-                {staffSummary.nonCompliant > 0 && `${staffSummary.nonCompliant} non-compliant. `}
-                See the hero chips for details.
+                {formatUnresolvedStaff(staffSummary.pending, staffSummary.atRisk, staffSummary.nonCompliant)}
               </p>
             </div>
           </CardContent>
@@ -219,7 +204,7 @@ function NeedsAttentionSection({
         </Card>
       )}
 
-      {hasStaff && hasCredentials && topActions.length === 0 && (
+      {hasStaff && hasCredentials && !dataUnavailable && actions.length === 0 && (
         <Card className="border-warning bg-warning-tint">
           <CardContent className="flex items-center gap-3 py-4">
             <AlertTriangle className="size-5 shrink-0 text-warning" />
@@ -362,7 +347,7 @@ export default async function DashboardPage() {
   if (!userId) redirect("/sign-in");
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
 
@@ -422,12 +407,14 @@ export default async function DashboardPage() {
       />
 
       <NeedsAttentionSection
-        topActions={data.topActions}
+        actions={data.actions}
         actionCounts={data.actionCounts}
         staffSummary={data.staffSummary}
         hasStaff={data.hasStaff}
         hasCredentials={data.hasCredentials}
         readinessUnavailable={data.readinessUnavailable}
+        sectionErrors={data.sectionErrors}
+        canVerify={userRecord.role !== "viewer"}
       />
 
       <OnboardingStrip onboardingSummary={data.onboardingSummary} hasStaff={data.hasStaff} />

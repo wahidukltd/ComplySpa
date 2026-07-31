@@ -34,7 +34,7 @@ export default async function StaffListPage() {
 
   const staffIds = (staff ?? []).map((s) => s.id);
 
-  const readinessMap = await getStaffReadinessBulk(staffIds);
+  const readinessMap = await getStaffReadinessBulk(staffIds, userRecord.clinic_id);
 
   return (
     <div className="flex flex-col gap-6">

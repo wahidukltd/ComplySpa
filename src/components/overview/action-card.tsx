@@ -26,7 +26,7 @@ function UrgencyIcon({ type }: { type: "critical" | "warning" | "info" }) {
   return <Info className="size-5 shrink-0 text-muted-foreground" aria-label={label} role="img" />;
 }
 
-export function ActionCard({ action }: { action: ComplianceAction }) {
+export function ActionCard({ action, canVerify = true }: { action: ComplianceAction; canVerify?: boolean }) {
   const router = useRouter();
   const urgencyStyle = URGENCY_STYLES[action.urgency];
 
@@ -56,10 +56,12 @@ export function ActionCard({ action }: { action: ComplianceAction }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {action.actionType === "verify_recommended" && action.credentialId ? (
-              <Button variant="outline" size="sm" onClick={handleVerify} className="gap-1">
-                <ExternalLink className="size-3" />
-                Verify
-              </Button>
+              canVerify ? (
+                <Button variant="outline" size="sm" onClick={handleVerify} className="gap-1">
+                  <ExternalLink className="size-3" />
+                  Verify
+                </Button>
+              ) : null
             ) : (
               <Button
                 variant={action.urgency === "critical" ? "default" : "secondary"}

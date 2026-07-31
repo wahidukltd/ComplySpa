@@ -90,7 +90,6 @@ export async function addCredential(input: CredentialInput & { document_url?: st
   revalidatePath(`/dashboard/staff/${parsed.data.staff_member_id}`);
   revalidatePath(`/dashboard/staff/${parsed.data.staff_member_id}/credentials`);
   revalidatePath("/dashboard/credentials");
-  revalidatePath("/dashboard/actions");
   revalidatePath("/dashboard");
   return { success: true, id: credential.id };
 }
@@ -148,7 +147,6 @@ export async function updateCredential(id: string, input: CredentialInput & { do
   revalidatePath(`/dashboard/staff/${existingCredential.staff_member_id}`);
   revalidatePath(`/dashboard/staff/${existingCredential.staff_member_id}/credentials`);
   revalidatePath("/dashboard/credentials");
-  revalidatePath("/dashboard/actions");
   revalidatePath("/dashboard");
   return { success: true };
 }
@@ -227,7 +225,8 @@ export async function verifyCredentialNow(credentialId: string) {
       verified_by_user_id: user.id,
       status: getCredentialStatus(credential.expiration_date),
     })
-    .eq("id", credentialId);
+    .eq("id", credentialId)
+    .eq("clinic_id", user.clinic_id);
 
   if (error) {
     Sentry.captureException(error);
@@ -235,7 +234,6 @@ export async function verifyCredentialNow(credentialId: string) {
   }
 
   revalidatePath("/dashboard/credentials");
-  revalidatePath("/dashboard/actions");
   revalidatePath("/dashboard");
   return { success: true };
 }

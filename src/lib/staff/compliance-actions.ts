@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getStaffReadinessBulk, type ReadinessResult } from "@/lib/staff/readiness";
+import type { ReadinessResult } from "@/lib/staff/readiness";
 import type { ActionUrgency } from "@/types";
-import * as Sentry from "@sentry/nextjs";
 
 export interface ComplianceAction {
   id: string;
@@ -16,13 +15,6 @@ export interface ComplianceAction {
   risk: string;
   actionLabel: string;
   actionHref: string;
-}
-
-export interface ActionsSummary {
-  total: number;
-  critical: number;
-  warning: number;
-  info: number;
 }
 
 function generateActionsForStaff(
@@ -124,17 +116,21 @@ export async function buildComplianceActionsFromReadiness(
   }
 
   if (credentialTypeNames.size > 0) {
-    const { data: typeRows } = await supabase
+    // Explicit global-or-own-clinic scoping (RLS backstops it) — matches the
+    // tenant-boundary pattern used across the readiness/overview path.
+    const { data: typeRows, error: typeErr } = await supabase
       .from("credential_types")
       .select("id, name")
-      .in("name", Array.from(credentialTypeNames));
+      .in("name", Array.from(credentialTypeNames))
+      .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
+    if (typeErr) throw new Error(typeErr.message);
     if (typeRows) {
       for (const t of typeRows) requiredTypeIds.add(t.id);
     }
   }
 
   if (requiredTypeIds.size > 0) {
-    const { data: staleCreds } = await supabase
+    const { data: staleCreds, error: staleErr } = await supabase
       .from("credentials")
       .select("id, staff_member_id, credential_type_id, last_verified_date, credential_type:credential_types!credentials_credential_type_id_fkey(name)")
       .eq("clinic_id", clinicId)
@@ -142,7 +138,10 @@ export async function buildComplianceActionsFromReadiness(
       .in("credential_type_id", Array.from(requiredTypeIds))
       .is("deleted_at", null)
       .is("suspended_at", null)
-      .lt("last_verified_date", new Date(Date.now() - 180 * 86400000).toISOString());
+      .not("status", "eq", "expired")
+      .lt("last_verified_date", new Date(Date.now() - 180 * 86400000).toISOString())
+      .limit(100);
+    if (staleErr) throw new Error(staleErr.message);
 
     if (staleCreds) {
       for (const sc of staleCreds) {
@@ -180,45 +179,4 @@ export async function buildComplianceActionsFromReadiness(
   });
 
   return allActions;
-}
-
-export async function getComplianceActions(): Promise<ComplianceAction[]> {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
-
-    const { data: userRecord } = await supabase
-      .from("users")
-      .select("clinic_id")
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-    if (!userRecord) return [];
-
-    const { data: staffRows } = await supabase
-      .from("staff_members")
-      .select("id, name, role")
-      .eq("clinic_id", userRecord.clinic_id)
-      .is("deleted_at", null)
-      .is("suspended_at", null)
-      .order("name");
-
-    if (!staffRows || staffRows.length === 0) return [];
-
-    const staffIds = staffRows.map((s) => s.id);
-    const readinessMap = await getStaffReadinessBulk(staffIds);
-
-    return buildComplianceActionsFromReadiness(staffRows, readinessMap, userRecord.clinic_id);
-  } catch (err) {
-    Sentry.captureException(err);
-    return [];
-  }
-}
-
-export async function getActionsSummary(): Promise<ActionsSummary> {
-  const actions = await getComplianceActions();
-  const critical = actions.filter((a) => a.urgency === "critical").length;
-  const warning = actions.filter((a) => a.urgency === "warning").length;
-  const info = actions.filter((a) => a.urgency === "info").length;
-  return { total: actions.length, critical, warning, info };
 }

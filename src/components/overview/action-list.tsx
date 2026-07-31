@@ -12,7 +12,7 @@ const GROUP_LABELS: Record<string, { title: string; limit: number }> = {
 
 const URGENCY_ORDER = ["critical", "warning", "info"];
 
-export function ActionList({ actions }: { actions: ComplianceAction[] }) {
+export function ActionList({ actions, canVerify = true }: { actions: ComplianceAction[]; canVerify?: boolean }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const grouped: Record<string, ComplianceAction[]> = {};
@@ -34,24 +34,27 @@ export function ActionList({ actions }: { actions: ComplianceAction[] }) {
         const isExpanded = expanded[urgency] ?? false;
         const visible = isExpanded ? items : items.slice(0, group.limit);
         const remaining = items.length - group.limit;
+        const controlsId = `action-group-${urgency}`;
 
         return (
           <div key={urgency}>
             <h2 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               {group.title} ({items.length})
             </h2>
-            <div className="space-y-2">
+            <div className="space-y-2" id={controlsId}>
               {visible.map((action) => (
-                <ActionCard key={action.id} action={action} />
+                <ActionCard key={action.id} action={action} canVerify={canVerify} />
               ))}
             </div>
-            {remaining > 0 && !isExpanded && (
+            {remaining > 0 && (
               <button
                 type="button"
-                onClick={() => setExpanded((prev) => ({ ...prev, [urgency]: true }))}
+                onClick={() => setExpanded((prev) => ({ ...prev, [urgency]: !prev[urgency] }))}
+                aria-expanded={isExpanded}
+                aria-controls={controlsId}
                 className="mt-2 text-xs text-muted-foreground hover:text-foreground"
               >
-                +{remaining} more
+                {isExpanded ? "Show less" : `+${remaining} more`}
               </button>
             )}
           </div>
