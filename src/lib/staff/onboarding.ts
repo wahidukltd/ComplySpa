@@ -1,50 +1,39 @@
 import { createClient } from "@/lib/supabase/server";
-import { ROLE_CREDENTIAL_MAP, ROLE_CREDENTIAL_OPTIONAL_MAP } from "@/lib/staff/role-credential-defaults";
+import { getResolvedTemplate } from "@/lib/staff/role-templates";
 
 export async function createOnboardingItems(
   staffMemberId: string,
   clinicId: string,
   role: string,
 ): Promise<{ error?: string }> {
-  const requiredNames = ROLE_CREDENTIAL_MAP[role] ?? [];
-  const optionalNames = ROLE_CREDENTIAL_OPTIONAL_MAP[role] ?? [];
-  const allNames = [...requiredNames, ...optionalNames];
-  if (allNames.length === 0) return {};
+  let template;
+  try {
+    template = await getResolvedTemplate(clinicId, role);
+  } catch (err) {
+    const Sentry = await import("@sentry/nextjs");
+    Sentry.captureException(err);
+    return { error: "Failed to load role template." };
+  }
+  if (!template) return {};
 
-  const supabase = await createClient();
+  const allItems = [...template.required, ...template.optional];
+  if (allItems.length === 0) return {};
 
-  const { data: types } = await supabase
-    .from("credential_types")
-    .select("id, name")
-    .in("name", allNames);
-
-  if (!types || types.length === 0) return {};
-
-  const nameToId: Record<string, string> = {};
-  for (const t of types) nameToId[t.name] = t.id;
-
-  const requiredSet = new Set(requiredNames);
+  const requiredIds = new Set(template.required.map((r) => r.credentialTypeId));
 
   const rows: Array<{
     staff_member_id: string;
     clinic_id: string;
     credential_type_id: string;
     is_required: boolean;
-  }> = [];
+  }> = allItems.map((item) => ({
+    staff_member_id: staffMemberId,
+    clinic_id: clinicId,
+    credential_type_id: item.credentialTypeId,
+    is_required: requiredIds.has(item.credentialTypeId),
+  }));
 
-  for (const name of allNames) {
-    const credentialTypeId = nameToId[name];
-    if (credentialTypeId) {
-      rows.push({
-        staff_member_id: staffMemberId,
-        clinic_id: clinicId,
-        credential_type_id: credentialTypeId,
-        is_required: requiredSet.has(name),
-      });
-    }
-  }
-
-  if (rows.length === 0) return {};
+  const supabase = await createClient();
 
   const { error } = await supabase.from("onboarding_items").insert(rows);
   if (error) {

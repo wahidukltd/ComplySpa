@@ -37,7 +37,6 @@ import { addStaffMemberWithCredentials } from "@/lib/actions/staff";
 import {
   ROLE_DISPLAY_LABELS,
   ROLE_CARD_ORDER,
-  ROLE_CREDENTIAL_MAP,
 } from "@/lib/staff/role-credential-defaults";
 import type { Tables } from "@/types/database";
 
@@ -75,6 +74,7 @@ export function StaffWizard() {
   const [wizardCredentials, setWizardCredentials] = useState<WizardCredential[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [step2Error, setStep2Error] = useState<string | null>(null);
+  const [clinicId, setClinicId] = useState<string | null>(null);
 
   const {
     register,
@@ -95,10 +95,20 @@ export function StaffWizard() {
   useEffect(() => {
     async function loadTypes() {
       const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: userRecord } = await supabase
+        .from("users")
+        .select("clinic_id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!userRecord) return;
+      setClinicId(userRecord.clinic_id);
+
       const { data, error } = await supabase
         .from("credential_types")
         .select("id, name, category")
-        .is("clinic_id", null)
+        .or(`clinic_id.is.null,clinic_id.eq.${userRecord.clinic_id}`)
         .order("name");
 
       if (error) {
@@ -110,14 +120,6 @@ export function StaffWizard() {
     }
     loadTypes();
   }, []);
-
-  const typeNameToId = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const ct of credentialTypes) {
-      map[ct.name] = ct.id;
-    }
-    return map;
-  }, [credentialTypes]);
 
   const typeIdToInfo = useMemo(() => {
     const map: Record<string, CredentialTypeOption> = {};
@@ -132,26 +134,61 @@ export function StaffWizard() {
     [credentialTypes, wizardCredentials],
   );
 
-  function handleRoleSelect(role: string) {
+  async function handleRoleSelect(role: string) {
     setSelectedRole(role);
     setStep2Error(null);
 
-    const names = ROLE_CREDENTIAL_MAP[role] ?? [];
-    const newCreds: WizardCredential[] = names.map((name) => {
-      const id = typeNameToId[name];
-      if (!id) return null;
-      const info = typeIdToInfo[id];
-      return {
-        credential_type_id: id,
-        credential_type_name: name,
-        category: info?.category ?? "other",
-        checked: true,
-        license_number: "",
-        state: "",
-        issue_date: "",
-        expiration_date: "",
-      };
-    }).filter(Boolean) as WizardCredential[];
+    if (!clinicId) {
+      setWizardCredentials([]);
+      return;
+    }
+
+    const supabase = createClient();
+
+    let { data: template } = await supabase
+      .from("role_templates")
+      .select("id")
+      .eq("clinic_id", clinicId)
+      .eq("role", role)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (!template) {
+      const { data: globalTemplate } = await supabase
+        .from("role_templates")
+        .select("id")
+        .is("clinic_id", null)
+        .eq("role", role)
+        .eq("is_active", true)
+        .maybeSingle();
+      template = globalTemplate;
+    }
+
+    if (!template) {
+      setWizardCredentials([]);
+      return;
+    }
+
+    const { data: items } = await supabase
+      .from("role_template_items")
+      .select(`
+        credential_type_id,
+        is_required,
+        credential_type:credential_types!role_template_items_credential_type_id_fkey(name, category)
+      `)
+      .eq("template_id", template.id)
+      .order("sort_order");
+
+    const newCreds: WizardCredential[] = (items ?? []).map((item) => ({
+      credential_type_id: item.credential_type_id,
+      credential_type_name: item.credential_type?.name ?? "Unknown",
+      category: item.credential_type?.category ?? "other",
+      checked: item.is_required,
+      license_number: "",
+      state: "",
+      issue_date: "",
+      expiration_date: "",
+    }));
 
     setWizardCredentials(newCreds);
   }

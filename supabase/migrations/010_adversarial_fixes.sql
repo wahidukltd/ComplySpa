@@ -6,7 +6,9 @@ REVOKE EXECUTE ON FUNCTION create_clinic_for_user(TEXT, TEXT, TEXT, TEXT, TEXT) 
 GRANT EXECUTE ON FUNCTION create_clinic_for_user(TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
 
 -- 2. Replace create_clinic_for_user with input validation + savepoint safety (C-1/H-2/H-3)
-CREATE OR REPLACE FUNCTION create_clinic_for_user(
+-- DROP first: CREATE OR REPLACE cannot rename input parameters (p_user_id -> p_clerk_sub).
+DROP FUNCTION IF EXISTS create_clinic_for_user(TEXT, TEXT, TEXT, TEXT, TEXT);
+CREATE FUNCTION create_clinic_for_user(
   p_clerk_sub TEXT,
   p_email TEXT,
   p_name TEXT,

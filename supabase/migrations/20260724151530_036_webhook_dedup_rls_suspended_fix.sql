@@ -33,6 +33,10 @@ CREATE INDEX IF NOT EXISTS idx_processed_webhooks_processed_at ON processed_webh
 ALTER TABLE processed_webhooks ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON processed_webhooks FROM anon, authenticated;
 
+-- Explicit service_role grants (the webhook handlers INSERT via createAdminClient
+-- and need DML here — without this, CLI-applied databases fail every webhook).
+GRANT SELECT, INSERT, UPDATE, DELETE ON processed_webhooks TO service_role;
+
 -- ===========================================================================
 -- 2. Update RPC to accept and set polar_customer_id atomically
 -- ===========================================================================

@@ -40,4 +40,10 @@ ALTER TABLE users ALTER COLUMN clerk_user_id DROP NOT NULL;
 REVOKE EXECUTE ON FUNCTION audit_credential_changes() FROM anon;
 REVOKE EXECUTE ON FUNCTION prevent_clerk_user_id_change() FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION prevent_clinic_id_change() FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION rls_auto_enable() FROM anon, authenticated;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'rls_auto_enable') THEN
+    REVOKE EXECUTE ON FUNCTION rls_auto_enable() FROM anon, authenticated;
+  END IF;
+END
+$$;

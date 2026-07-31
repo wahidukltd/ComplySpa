@@ -29,11 +29,19 @@ CREATE POLICY "Insert onboarding items"
 
 CREATE POLICY "Update onboarding items"
   ON onboarding_items FOR UPDATE
-  USING (clinic_id = auth_clinic_id());
+  USING (clinic_id = auth_clinic_id())
+  WITH CHECK (clinic_id = auth_clinic_id());
 
 CREATE POLICY "Delete onboarding items"
   ON onboarding_items FOR DELETE
   USING (clinic_id = auth_clinic_id());
+
+-- Table-level grants (same convention as migration 002 / 018):
+-- the auto-complete trigger updates onboarding_items on every credential
+-- INSERT, so anon/authenticated/service_role need DML here or credential
+-- writes fail (trigger runs as the inserting role).
+GRANT SELECT, INSERT, UPDATE, DELETE ON onboarding_items TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON onboarding_items TO service_role;
 
 -- 2. Attach updated_at trigger using existing function
 CREATE TRIGGER trigger_onboarding_items_updated_at

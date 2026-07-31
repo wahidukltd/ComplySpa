@@ -11,6 +11,7 @@ import { getStaffOnboarding } from "@/lib/actions/onboarding";
 import { OnboardingChecklist } from "@/components/staff/staff-onboarding-checklist";
 import { getStaffReadiness } from "@/lib/staff/readiness";
 import type { ReadinessResult } from "@/lib/staff/readiness";
+import { SyncStaffToTemplateButton } from "@/components/staff/sync-staff-to-template-button";
 import { Pencil, Plus, Paperclip, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
@@ -28,7 +29,7 @@ export default async function StaffDetailPage({
   if (!userId) redirect("/sign-in");
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
 
@@ -90,6 +91,9 @@ export default async function StaffDetailPage({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={staff.name} description={roleLabel ? `Role: ${roleLabel}` : undefined}>
+        {userRecord.role === "owner" || userRecord.role === "manager" ? (
+          <SyncStaffToTemplateButton staffMemberId={id} />
+        ) : null}
         <Link href={`/dashboard/staff/${id}/edit`} className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}>
           <Pencil className="size-4" />
           Edit

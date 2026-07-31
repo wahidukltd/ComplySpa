@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { ROLE_CREDENTIAL_REQUIRED_MAP } from "@/lib/staff/role-credential-defaults";
+import { getResolvedTemplate, getResolvedTemplatesBulk } from "@/lib/staff/role-templates";
 import type { ReadinessStatus } from "@/types";
 import * as Sentry from "@sentry/nextjs";
 
@@ -26,22 +26,6 @@ function bestStatusForType(credentials: { status: string }[]): string {
     }
   }
   return best;
-}
-
-async function resolveTypeNameToId(
-  requiredNames: string[],
-): Promise<Record<string, string>> {
-  const supabase = await createClient();
-  const { data: typeRows } = await supabase
-    .from("credential_types")
-    .select("id, name")
-    .in("name", requiredNames);
-
-  const map: Record<string, string> = {};
-  for (const t of typeRows ?? []) {
-    map[t.name] = t.id;
-  }
-  return map;
 }
 
 function groupCredentialsByType(
@@ -108,22 +92,24 @@ export async function getStaffReadiness(staffMemberId: string): Promise<Readines
 
     const { data: staff } = await supabase
       .from("staff_members")
-      .select("role")
+      .select("role, clinic_id")
       .eq("id", staffMemberId)
       .is("deleted_at", null)
       .is("suspended_at", null)
       .single();
 
-    if (!staff) {
-      return { status: "pending", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
-    }
-
-    const requiredNames = staff.role ? ROLE_CREDENTIAL_REQUIRED_MAP[staff.role] : undefined;
-    if (!requiredNames || requiredNames.length === 0) {
+    if (!staff || !staff.role) {
       return { status: "ready", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
     }
 
-    const typeNameToId = await resolveTypeNameToId(requiredNames);
+    const template = await getResolvedTemplate(staff.clinic_id, staff.role);
+    if (!template || template.required.length === 0) {
+      return { status: "ready", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
+    }
+
+    const requiredNames = template.required.map((r) => r.name);
+    const typeNameToId: Record<string, string> = {};
+    for (const r of template.required) typeNameToId[r.name] = r.credentialTypeId;
 
     const { data: credentials } = await supabase
       .from("credentials")
@@ -156,32 +142,41 @@ export async function getStaffReadinessBulk(
 
     const { data: staffRows } = await supabase
       .from("staff_members")
-      .select("id, role")
+      .select("id, role, clinic_id")
       .in("id", staffMemberIds)
       .is("deleted_at", null)
       .is("suspended_at", null);
 
     if (!staffRows || staffRows.length === 0) return result;
 
-    const roleMap: Record<string, string | null> = {};
+    const staffMap: Record<string, { role: string | null; clinicId: string }> = {};
     const roleStaffMap: Record<string, string[]> = {};
+    const roles = new Set<string>();
+    const clinics = new Set<string>();
+
     for (const s of staffRows) {
-      roleMap[s.id] = s.role;
-      const roleKey = s.role ?? "__none__";
-      if (!roleStaffMap[roleKey]) roleStaffMap[roleKey] = [];
-      roleStaffMap[roleKey].push(s.id);
+      staffMap[s.id] = { role: s.role, clinicId: s.clinic_id };
+      clinics.add(s.clinic_id);
+      if (s.role) {
+        roles.add(s.role);
+        if (!roleStaffMap[s.role]) roleStaffMap[s.role] = [];
+        roleStaffMap[s.role]!.push(s.id);
+      }
     }
 
-    const allRequiredNames = new Set<string>();
-    for (const roleKey of Object.keys(roleStaffMap)) {
-      if (roleKey === "__none__") continue;
-      const names = ROLE_CREDENTIAL_REQUIRED_MAP[roleKey];
-      if (names) names.forEach((n) => allRequiredNames.add(n));
-    }
+    const templatesByRole: Record<string, { requiredNames: string[]; typeNameToId: Record<string, string> }> = {};
 
-    let globalTypeNameToId: Record<string, string> = {};
-    if (allRequiredNames.size > 0) {
-      globalTypeNameToId = await resolveTypeNameToId(Array.from(allRequiredNames));
+    for (const clinicId of clinics) {
+      const clinicRoles = [...roles];
+      const resolved = await getResolvedTemplatesBulk(clinicId, clinicRoles);
+      for (const [role, template] of Object.entries(resolved)) {
+        const typeNameToId: Record<string, string> = {};
+        for (const r of template.required) typeNameToId[r.name] = r.credentialTypeId;
+        templatesByRole[`${clinicId}:${role}`] = {
+          requiredNames: template.required.map((r) => r.name),
+          typeNameToId,
+        };
+      }
     }
 
     const { data: allCredentials } = await supabase
@@ -204,11 +199,18 @@ export async function getStaffReadinessBulk(
     }
 
     for (const id of staffMemberIds) {
-      const role = roleMap[id] ?? null;
+      const staffInfo = staffMap[id];
       const creds = credsByStaff[id] ?? [];
 
-      const requiredNames = role ? ROLE_CREDENTIAL_REQUIRED_MAP[role] : undefined;
-      if (!requiredNames || requiredNames.length === 0) {
+      const role = staffInfo?.role ?? null;
+      if (!role) {
+        result[id] = { status: "ready", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
+        continue;
+      }
+
+      const templateKey = staffInfo ? `${staffInfo.clinicId}:${role}` : role;
+      const template = templatesByRole[templateKey];
+      if (!template || template.requiredNames.length === 0) {
         result[id] = { status: "ready", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
         continue;
       }
@@ -219,7 +221,7 @@ export async function getStaffReadinessBulk(
       }
 
       const credsByType = groupCredentialsByType(creds);
-      result[id] = computeReadinessFromMaps(requiredNames, globalTypeNameToId, credsByType);
+      result[id] = computeReadinessFromMaps(template.requiredNames, template.typeNameToId, credsByType);
     }
   } catch (err) {
     Sentry.captureException(err);

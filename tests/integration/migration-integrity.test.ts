@@ -3,16 +3,21 @@ import { execSql } from "./helpers";
 
 const EXPECTED_TABLES = [
   "alert_logs",
+  "alert_recipients",
   "audit_reports",
   "clinics",
   "credential_audit",
   "credential_types",
   "credentials",
+  "onboarding_items",
+  "processed_webhooks",
+  "role_template_items",
+  "role_templates",
   "staff_members",
   "users",
 ] as const;
 
-const SEED_CREDENTIAL_TYPE_COUNT = 12;
+const SEED_CREDENTIAL_TYPE_COUNT = 24;
 
 const EXPECTED_IMMUTABILITY_TRIGGERS = [
   "trigger_users_clinic_id_immutable",
@@ -49,18 +54,18 @@ function inList(values: readonly string[]): string {
 }
 
 describe("Migration integrity", () => {
-  it("all 8 tables exist in public schema", () => {
+  it("all 13 tables exist in public schema", () => {
     const result = execSql(
       `SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename IN (${inList(EXPECTED_TABLES)})`,
     );
-    expect(parseInt(result, 10)).toBe(8);
+    expect(parseInt(result, 10)).toBe(13);
   });
 
   it("all tables have RLS enabled", () => {
     const result = execSql(
       `SELECT count(*) FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity = true AND c.relname IN (${inList(EXPECTED_TABLES)})`,
     );
-    expect(parseInt(result, 10)).toBe(8);
+    expect(parseInt(result, 10)).toBe(13);
   });
 
   it(`${SEED_CREDENTIAL_TYPE_COUNT} seed credential types are present`, () => {

@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { ClipboardList } from "lucide-react";
 import { ClinicProfileForm } from "@/components/settings/clinic-profile-form";
 import { AlertRecipients } from "@/components/settings/alert-recipients";
 import { CustomCredentialTypes } from "@/components/settings/custom-credential-types";
@@ -48,7 +52,15 @@ export default async function SettingsPage() {
       <PageHeader
         title="Settings"
         description="Manage your clinic profile, alert recipients, credential types, and team."
-      />
+      >
+        <Link
+          href="/dashboard/settings/role-templates"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+        >
+          <ClipboardList className="size-4" />
+          Role Templates
+        </Link>
+      </PageHeader>
 
       <Tabs defaultValue="profile" className="w-full">
         <TabsList>

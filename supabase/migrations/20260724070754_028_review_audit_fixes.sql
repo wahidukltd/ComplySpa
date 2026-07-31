@@ -161,7 +161,13 @@ REVOKE INSERT, UPDATE, DELETE ON credential_audit FROM authenticated;
 -- to prevent direct RPC calls (defense-in-depth)
 -- ============================================================
 REVOKE EXECUTE ON FUNCTION enforce_plan_limits() FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION rls_auto_enable() FROM anon, authenticated;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'rls_auto_enable') THEN
+    REVOKE EXECUTE ON FUNCTION rls_auto_enable() FROM anon, authenticated;
+  END IF;
+END
+$$;
 
 -- ============================================================
 -- F7: Add RLS write-blocking policies on credential_audit
@@ -171,7 +177,7 @@ ALTER TABLE credential_audit FORCE ROW LEVEL SECURITY;
 CREATE POLICY "credential_audit_no_direct_insert" ON credential_audIT
   FOR INSERT WITH CHECK (false);
 CREATE POLICY "credential_audit_no_direct_update" ON credential_audit
-  FOR UPDATE USING (false);
+  FOR UPDATE USING (false) WITH CHECK (false);
 CREATE POLICY "credential_audit_no_direct_delete" ON credential_audit
   FOR DELETE USING (false);
 

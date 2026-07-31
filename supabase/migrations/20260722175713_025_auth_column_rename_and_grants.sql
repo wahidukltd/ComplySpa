@@ -75,7 +75,9 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- create_clinic_for_user — renamed p_user_id param + uses auth_user_id
-CREATE OR REPLACE FUNCTION create_clinic_for_user(
+-- DROP first: CREATE OR REPLACE cannot rename input parameters (p_clerk_sub -> p_user_id).
+DROP FUNCTION IF EXISTS create_clinic_for_user(TEXT, TEXT, TEXT, TEXT, TEXT);
+CREATE FUNCTION create_clinic_for_user(
   p_user_id TEXT,
   p_email TEXT,
   p_name TEXT,
@@ -156,7 +158,13 @@ REVOKE INSERT, UPDATE, DELETE ON audit_reports FROM anon;
 REVOKE EXECUTE ON FUNCTION audit_credential_changes() FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION prevent_auth_user_id_change() FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION prevent_clinic_id_change() FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION rls_auto_enable() FROM anon, authenticated;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'rls_auto_enable') THEN
+    REVOKE EXECUTE ON FUNCTION rls_auto_enable() FROM anon, authenticated;
+  END IF;
+END
+$$;
 REVOKE EXECUTE ON FUNCTION update_credential_statuses() FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION scan_expiring_credentials() FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION scan_escalation_alerts() FROM anon, authenticated;
