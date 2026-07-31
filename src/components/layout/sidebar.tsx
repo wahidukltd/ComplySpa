@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 const navItems: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "Actions", href: "/dashboard/actions", icon: ListChecks },
   { label: "Staff", href: "/dashboard/staff", icon: Users },
   { label: "Onboarding", href: "/dashboard/onboarding", icon: UserCheck },

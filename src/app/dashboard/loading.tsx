@@ -13,9 +13,15 @@ export default function DashboardLoading() {
           <Skeleton className="h-9 w-28" />
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Skeleton className="h-28 w-full rounded-lg" />
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-20 w-full rounded-lg" />
+        ))}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 w-full rounded-lg" />
+          <Skeleton key={i} className="h-24 w-full rounded-lg" />
         ))}
       </div>
       <Skeleton className="h-64 w-full rounded-lg" />

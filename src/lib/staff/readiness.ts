@@ -140,9 +140,25 @@ export async function getStaffReadinessBulk(
   try {
     const supabase = await createClient();
 
+    // Scope everything to the authenticated user's own clinic — never trust
+    // caller-supplied IDs as the tenant boundary (defense-in-depth: RLS
+    // backstops this, but an explicit clinic filter keeps the function safe
+    // even if a future caller switches to a service-role client).
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: userRecord } = user
+      ? await supabase
+          .from("users")
+          .select("clinic_id")
+          .eq("auth_user_id", user.id)
+          .maybeSingle()
+      : { data: null };
+    const authClinicId = userRecord?.clinic_id ?? null;
+    if (!authClinicId) return result;
+
     const { data: staffRows } = await supabase
       .from("staff_members")
       .select("id, role, clinic_id")
+      .eq("clinic_id", authClinicId)
       .in("id", staffMemberIds)
       .is("deleted_at", null)
       .is("suspended_at", null);
@@ -150,38 +166,29 @@ export async function getStaffReadinessBulk(
     if (!staffRows || staffRows.length === 0) return result;
 
     const staffMap: Record<string, { role: string | null; clinicId: string }> = {};
-    const roleStaffMap: Record<string, string[]> = {};
     const roles = new Set<string>();
-    const clinics = new Set<string>();
 
     for (const s of staffRows) {
       staffMap[s.id] = { role: s.role, clinicId: s.clinic_id };
-      clinics.add(s.clinic_id);
-      if (s.role) {
-        roles.add(s.role);
-        if (!roleStaffMap[s.role]) roleStaffMap[s.role] = [];
-        roleStaffMap[s.role]!.push(s.id);
-      }
+      if (s.role) roles.add(s.role);
     }
 
     const templatesByRole: Record<string, { requiredNames: string[]; typeNameToId: Record<string, string> }> = {};
 
-    for (const clinicId of clinics) {
-      const clinicRoles = [...roles];
-      const resolved = await getResolvedTemplatesBulk(clinicId, clinicRoles);
-      for (const [role, template] of Object.entries(resolved)) {
-        const typeNameToId: Record<string, string> = {};
-        for (const r of template.required) typeNameToId[r.name] = r.credentialTypeId;
-        templatesByRole[`${clinicId}:${role}`] = {
-          requiredNames: template.required.map((r) => r.name),
-          typeNameToId,
-        };
-      }
+    const resolved = await getResolvedTemplatesBulk(authClinicId, [...roles]);
+    for (const [role, template] of Object.entries(resolved)) {
+      const typeNameToId: Record<string, string> = {};
+      for (const r of template.required) typeNameToId[r.name] = r.credentialTypeId;
+      templatesByRole[`${authClinicId}:${role}`] = {
+        requiredNames: template.required.map((r) => r.name),
+        typeNameToId,
+      };
     }
 
     const { data: allCredentials } = await supabase
       .from("credentials")
       .select("staff_member_id, credential_type_id, status, id, credential_type:credential_types!credentials_credential_type_id_fkey(name)")
+      .eq("clinic_id", authClinicId)
       .in("staff_member_id", staffMemberIds)
       .is("suspended_at", null)
       .is("deleted_at", null);

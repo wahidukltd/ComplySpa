@@ -87,6 +87,101 @@ function generateActionsForStaff(
   return actions;
 }
 
+export async function buildComplianceActionsFromReadiness(
+  staffRows: { id: string; name: string; role: string | null }[],
+  readinessMap: Record<string, ReadinessResult>,
+  clinicId: string,
+): Promise<ComplianceAction[]> {
+  const supabase = await createClient();
+  const staffIds = staffRows.map((s) => s.id);
+  const nameMap: Record<string, string> = {};
+  const roleMap: Record<string, string> = {};
+  for (const s of staffRows) {
+    nameMap[s.id] = s.name;
+    if (s.role) roleMap[s.id] = s.role;
+  }
+
+  const allActions: ComplianceAction[] = [];
+
+  for (const id of staffIds) {
+    const readiness = readinessMap[id];
+    if (!readiness) continue;
+    if (readiness.status === "ready" || readiness.status === "pending") continue;
+
+    const actions = generateActionsForStaff(
+      id,
+      nameMap[id] ?? "Unknown",
+      roleMap[id] ?? "",
+      readiness,
+    );
+    allActions.push(...actions);
+  }
+
+  const requiredTypeIds = new Set<string>();
+  const credentialTypeNames = new Set<string>();
+  for (const action of allActions) {
+    if (action.credentialName) credentialTypeNames.add(action.credentialName);
+  }
+
+  if (credentialTypeNames.size > 0) {
+    const { data: typeRows } = await supabase
+      .from("credential_types")
+      .select("id, name")
+      .in("name", Array.from(credentialTypeNames));
+    if (typeRows) {
+      for (const t of typeRows) requiredTypeIds.add(t.id);
+    }
+  }
+
+  if (requiredTypeIds.size > 0) {
+    const { data: staleCreds } = await supabase
+      .from("credentials")
+      .select("id, staff_member_id, credential_type_id, last_verified_date, credential_type:credential_types!credentials_credential_type_id_fkey(name)")
+      .eq("clinic_id", clinicId)
+      .in("staff_member_id", staffIds)
+      .in("credential_type_id", Array.from(requiredTypeIds))
+      .is("deleted_at", null)
+      .is("suspended_at", null)
+      .lt("last_verified_date", new Date(Date.now() - 180 * 86400000).toISOString());
+
+    if (staleCreds) {
+      for (const sc of staleCreds) {
+        const staffName = nameMap[sc.staff_member_id] ?? "Unknown";
+        const staffRole = roleMap[sc.staff_member_id] ?? "";
+        const credName = sc.credential_type?.name ?? "Credential";
+        const monthsSince = Math.floor(
+          (Date.now() - new Date(sc.last_verified_date!).getTime()) / (30 * 86400000),
+        );
+
+        allActions.push({
+          id: `${sc.staff_member_id}-verify-${sc.id}`,
+          staffMemberId: sc.staff_member_id,
+          staffName,
+          role: staffRole,
+          actionType: "verify_recommended",
+          credentialName: credName,
+          credentialId: sc.id,
+          urgency: "info",
+          description: `${credName} — not verified in ${monthsSince} months`,
+          risk: "Verification status is stale. Recommended every 6 months.",
+          actionLabel: "Verify",
+          actionHref: `/dashboard/credentials/${sc.id}`,
+        });
+      }
+    }
+  }
+
+  allActions.sort((a, b) => {
+    const urgencyOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+    const aOrder = urgencyOrder[a.urgency] ?? 99;
+    const bOrder = urgencyOrder[b.urgency] ?? 99;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return a.staffName.localeCompare(b.staffName);
+  });
+
+  return allActions;
+}
+
 export async function getComplianceActions(): Promise<ComplianceAction[]> {
   try {
     const supabase = await createClient();
@@ -111,93 +206,9 @@ export async function getComplianceActions(): Promise<ComplianceAction[]> {
     if (!staffRows || staffRows.length === 0) return [];
 
     const staffIds = staffRows.map((s) => s.id);
-    const nameMap: Record<string, string> = {};
-    const roleMap: Record<string, string> = {};
-    for (const s of staffRows) {
-      nameMap[s.id] = s.name;
-      if (s.role) roleMap[s.id] = s.role;
-    }
-
     const readinessMap = await getStaffReadinessBulk(staffIds);
 
-    const allActions: ComplianceAction[] = [];
-
-    for (const id of staffIds) {
-      const readiness = readinessMap[id];
-      if (!readiness) continue;
-      if (readiness.status === "ready" || readiness.status === "pending") continue;
-
-      const actions = generateActionsForStaff(
-        id,
-        nameMap[id] ?? "Unknown",
-        roleMap[id] ?? "",
-        readiness,
-      );
-      allActions.push(...actions);
-    }
-
-    const requiredTypeIds = new Set<string>();
-    const credentialTypeNames = new Set<string>();
-    for (const action of allActions) {
-      if (action.credentialName) credentialTypeNames.add(action.credentialName);
-    }
-
-    if (credentialTypeNames.size > 0) {
-      const { data: typeRows } = await supabase
-        .from("credential_types")
-        .select("id, name")
-        .in("name", Array.from(credentialTypeNames));
-      if (typeRows) {
-        for (const t of typeRows) requiredTypeIds.add(t.id);
-      }
-    }
-
-    if (requiredTypeIds.size > 0) {
-      const { data: staleCreds } = await supabase
-        .from("credentials")
-        .select("id, staff_member_id, credential_type_id, last_verified_date, credential_type:credential_types!credentials_credential_type_id_fkey(name)")
-        .in("staff_member_id", staffIds)
-        .in("credential_type_id", Array.from(requiredTypeIds))
-        .is("deleted_at", null)
-        .is("suspended_at", null)
-        .lt("last_verified_date", new Date(Date.now() - 180 * 86400000).toISOString());
-
-      if (staleCreds) {
-        for (const sc of staleCreds) {
-          const staffName = nameMap[sc.staff_member_id] ?? "Unknown";
-          const staffRole = roleMap[sc.staff_member_id] ?? "";
-          const credName = sc.credential_type?.name ?? "Credential";
-          const monthsSince = Math.floor(
-            (Date.now() - new Date(sc.last_verified_date!).getTime()) / (30 * 86400000),
-          );
-
-          allActions.push({
-            id: `${sc.staff_member_id}-verify-${sc.id}`,
-            staffMemberId: sc.staff_member_id,
-            staffName,
-            role: staffRole,
-            actionType: "verify_recommended",
-            credentialName: credName,
-            credentialId: sc.id,
-            urgency: "info",
-            description: `${credName} — not verified in ${monthsSince} months`,
-            risk: "Verification status is stale. Recommended every 6 months.",
-            actionLabel: "Verify",
-            actionHref: `/dashboard/credentials/${sc.id}`,
-          });
-        }
-      }
-    }
-
-    allActions.sort((a, b) => {
-      const urgencyOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 };
-      const aOrder = urgencyOrder[a.urgency] ?? 99;
-      const bOrder = urgencyOrder[b.urgency] ?? 99;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return a.staffName.localeCompare(b.staffName);
-    });
-
-    return allActions;
+    return buildComplianceActionsFromReadiness(staffRows, readinessMap, userRecord.clinic_id);
   } catch (err) {
     Sentry.captureException(err);
     return [];
