@@ -27,6 +27,7 @@ interface OnboardingChecklistProps {
   optionalTotal?: number;
   optionalCompleted?: number;
   blocked?: boolean;
+  canEdit?: boolean;
 }
 
 function daysSince(dateStr: string): number {
@@ -43,6 +44,7 @@ export function OnboardingChecklist({
   optionalCompleted = 0,
   blocked = false,
   staffMemberId,
+  canEdit = false,
 }: OnboardingChecklistProps) {
   const router = useRouter();
   const wasBlocked = useRef(blocked);
@@ -121,27 +123,46 @@ export function OnboardingChecklist({
         <div className="flex items-center gap-2">
           {item.status === "pending" && (
             <>
-              <button
-                type="button"
-                onClick={() => handleComplete(item)}
-                className="rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
-              >
-                Complete
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSkip(item.id)}
-                className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
-              >
-                {item.is_required ? "Skip" : "Not needed"}
-              </button>
+              {canEdit && item.credential_type_id && (
+                <button
+                  type="button"
+                  onClick={() => handleComplete(item)}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+                >
+                  Complete
+                </button>
+              )}
+              {canEdit && !item.is_required && (
+                <button
+                  type="button"
+                  onClick={() => handleSkip(item.id)}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+                >
+                  Not needed
+                </button>
+              )}
             </>
+          )}
+          {item.status === "skipped" && item.is_required && (
+            <>
+              {canEdit && item.credential_type_id ? (
+                <button
+                  type="button"
+                  onClick={() => handleComplete(item)}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+                >
+                  Complete
+                </button>
+              ) : (
+                <span className="text-xs text-muted-foreground/60">Skipped</span>
+              )}
+            </>
+          )}
+          {item.status === "skipped" && !item.is_required && (
+            <span className="text-xs text-muted-foreground/60">Skipped</span>
           )}
           {item.status === "completed" && (
             <span className="text-xs text-[#4A8C5C]">Completed</span>
-          )}
-          {item.status === "skipped" && (
-            <span className="text-xs text-muted-foreground/60">Skipped</span>
           )}
         </div>
       </div>
@@ -149,10 +170,14 @@ export function OnboardingChecklist({
   }
 
   return (
-    <Card>
+    <Card id="onboarding">
       <CardContent className="pt-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Onboarding Progress</h3>
+          <h3 className="text-sm font-semibold">
+            {requiredTotal > 0
+              ? `Getting work-ready — ${requiredCompleted} of ${requiredTotal} required`
+              : "Getting Work Ready"}
+          </h3>
         </div>
 
         {requiredTotal > 0 && (

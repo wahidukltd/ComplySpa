@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Users,
-  UserCheck,
   ShieldCheck,
   FileText,
   Bell,
@@ -18,7 +17,6 @@ import {
 const navItems: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "Staff", href: "/dashboard/staff", icon: Users },
-  { label: "Onboarding", href: "/dashboard/onboarding", icon: UserCheck },
   { label: "Credentials", href: "/dashboard/credentials", icon: ShieldCheck },
   { label: "Reports", href: "/dashboard/reports", icon: FileText },
   { label: "Alerts", href: "/dashboard/alerts", icon: Bell },

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import "./helpers";
-import { getServiceClient, fetchAsUser } from "./helpers";
+import { getServiceClient, fetchAsUser, patchAsUser } from "./helpers";
 
 describe("onboarding flow", () => {
   const adminClient = createAdminClient();
@@ -170,5 +170,86 @@ describe("onboarding flow", () => {
     // Cleanup
     await adminClient.from("users").delete().eq("auth_user_id", rpcUserId);
     await adminClient.from("clinics").delete().eq("id", clinicId);
+  });
+
+  it("auto-complete trigger completes skipped required items; viewers cannot write onboarding_items (migration 044)", async () => {
+    const { data: clinic } = await adminClient
+      .from("clinics")
+      .insert({ name: `Trigger Test ${Date.now()}` })
+      .select("id")
+      .single();
+    trackClinic(clinic!.id);
+
+    const ownerAuthId = `trigger_owner_${Date.now()}`;
+    const viewerAuthId = `trigger_viewer_${Date.now()}`;
+    try {
+      const { error: userError } = await adminClient.from("users").insert([
+        { clinic_id: clinic!.id, email: `${ownerAuthId}@test.com`, role: "owner", auth_user_id: ownerAuthId },
+        { clinic_id: clinic!.id, email: `${viewerAuthId}@test.com`, role: "viewer", auth_user_id: viewerAuthId },
+      ]);
+      expect(userError).toBeNull();
+
+      const { data: typeRow } = await adminClient
+        .from("credential_types")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+      expect(typeRow).not.toBeNull();
+
+      const { data: staff } = await adminClient
+        .from("staff_members")
+        .insert({ clinic_id: clinic!.id, name: "Trigger Test RN", role: "RN" })
+        .select("id")
+        .single();
+      expect(staff).not.toBeNull();
+
+      const { data: item } = await adminClient
+        .from("onboarding_items")
+        .insert({
+          staff_member_id: staff!.id,
+          clinic_id: clinic!.id,
+          credential_type_id: typeRow!.id,
+          is_required: true,
+          status: "skipped",
+        })
+        .select("id")
+        .single();
+      expect(item).not.toBeNull();
+
+      // Owner adds the credential — the auto-complete trigger (running as the
+      // owner, the inserting role) must complete the skipped item (044 widening
+      // from status='pending' to IN ('pending','skipped')).
+      const res = await fetchAsUser(ownerAuthId, "credentials", {
+        method: "POST",
+        body: { staff_member_id: staff!.id, credential_type_id: typeRow!.id, clinic_id: clinic!.id },
+      });
+      expect(res.status).toBe(201);
+
+      const { data: after } = await adminClient
+        .from("onboarding_items")
+        .select("status, completed_at")
+        .eq("id", item!.id)
+        .single();
+      expect(after!.status).toBe("completed");
+      expect(after!.completed_at).not.toBeNull();
+
+      // Viewer attempts to flip the item directly via PostgREST — the 044
+      // role-gated policies must leave it untouched (RLS filters the row out;
+      // PostgREST returns 200 with an empty body for a zero-row UPDATE).
+      const patch = await patchAsUser(viewerAuthId, "onboarding_items", `id=eq.${item!.id}`, {
+        status: "pending",
+      });
+      expect([200, 204, 403]).toContain(patch.status);
+
+      const { data: afterPatch } = await adminClient
+        .from("onboarding_items")
+        .select("status")
+        .eq("id", item!.id)
+        .single();
+      expect(afterPatch!.status).toBe("completed");
+    } finally {
+      await adminClient.from("users").delete().in("auth_user_id", [ownerAuthId, viewerAuthId]);
+      await adminClient.from("clinics").delete().eq("id", clinic!.id);
+    }
   });
 });

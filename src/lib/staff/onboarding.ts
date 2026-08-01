@@ -1,6 +1,74 @@
 import { createClient } from "@/lib/supabase/server";
 import { getResolvedTemplate } from "@/lib/staff/role-templates";
 
+export interface OnboardingStaffState {
+  requiredTotal: number;
+  requiredCompleted: number;
+  requiredPending: number;
+  optionalTotal: number;
+  optionalCompleted: number;
+  missingNames: string[];
+}
+
+export const EMPTY_ONBOARDING_STATE: OnboardingStaffState = {
+  requiredTotal: 0,
+  requiredCompleted: 0,
+  requiredPending: 0,
+  optionalTotal: 0,
+  optionalCompleted: 0,
+  missingNames: [],
+};
+
+/** Per-staff onboarding state for a set of staff ids, scoped to one clinic.
+ * Pure aggregation of existing onboarding_items rows (orchestration only —
+ * no compliance rules live here). Throws on query error so callers can
+ * decide how to degrade (overview: safeSection; staff list: catch + fallback). */
+export async function getOnboardingStateByStaff(
+  clinicId: string,
+  staffMemberIds: string[],
+): Promise<Record<string, OnboardingStaffState>> {
+  if (staffMemberIds.length === 0) return {};
+
+  const supabase = await createClient();
+
+  const { data: items, error } = await supabase
+    .from("onboarding_items")
+    .select(`
+      staff_member_id,
+      status,
+      is_required,
+      credential_type:credential_types!onboarding_items_credential_type_id_fkey(name)
+    `)
+    .eq("clinic_id", clinicId)
+    .in("staff_member_id", staffMemberIds);
+
+  if (error) throw new Error(error.message);
+
+  const map: Record<string, OnboardingStaffState> = {};
+  for (const id of staffMemberIds) {
+    map[id] = { ...EMPTY_ONBOARDING_STATE };
+  }
+
+  for (const item of items ?? []) {
+    const state = map[item.staff_member_id];
+    if (!state) continue;
+    if (item.is_required) {
+      state.requiredTotal++;
+      if (item.status === "completed") {
+        state.requiredCompleted++;
+      } else if (item.status === "pending") {
+        state.requiredPending++;
+        if (item.credential_type?.name) state.missingNames.push(item.credential_type.name);
+      }
+    } else {
+      state.optionalTotal++;
+      if (item.status === "completed") state.optionalCompleted++;
+    }
+  }
+
+  return map;
+}
+
 export async function createOnboardingItems(
   staffMemberId: string,
   clinicId: string,

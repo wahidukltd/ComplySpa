@@ -6,15 +6,20 @@ import { deleteStaffMember } from "@/lib/actions/staff";
 import { toast } from "sonner";
 import type { Tables } from "@/types/database";
 import type { ReadinessResult } from "@/lib/staff/readiness";
+import type { OnboardingStaffState } from "@/lib/staff/onboarding";
 
 type StaffMember = Tables<"staff_members">;
 
 export function StaffTableWrapper({
   staff,
   readinessMap = {},
+  onboardingState = {},
+  dataUnavailable = false,
 }: {
   staff: StaffMember[];
   readinessMap?: Record<string, ReadinessResult>;
+  onboardingState?: Record<string, OnboardingStaffState>;
+  dataUnavailable?: boolean;
 }) {
   const router = useRouter();
 
@@ -33,6 +38,8 @@ export function StaffTableWrapper({
       staff={staff}
       onDelete={handleDelete}
       readinessMap={readinessMap}
+      onboardingState={onboardingState}
+      dataUnavailable={dataUnavailable}
     />
   );
 }

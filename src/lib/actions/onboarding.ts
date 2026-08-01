@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClinicSchema, type CreateClinicInput } from "@/lib/validations/clinic";
 import { getEntitlements } from "@/lib/utils/entitlements";
-import { getOnboardingItems, getOnboardingProgress, updateOnboardingItemStatus, createOnboardingItems } from "@/lib/staff/onboarding";
+import { getOnboardingItems, getOnboardingProgress, updateOnboardingItemStatus } from "@/lib/staff/onboarding";
 import * as Sentry from "@sentry/nextjs";
 
 // ── Existing clinic onboarding functions ──
@@ -155,91 +155,6 @@ export async function restoreExistingAccount(authUserId: string): Promise<{ redi
   }
 
   return { redirectTo: getEntitlements(clinic.plan).blocked ? "/resume" : "/dashboard", error: null };
-}
-
-export async function syncStaffOnboarding(staffId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user?.id) return { success: false, error: "Unauthorized" };
-
-  const { data: userRecord } = await supabase
-    .from("users")
-    .select("clinic_id, role")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-  if (!userRecord) return { success: false, error: "Unauthorized" };
-  if (userRecord.role === "viewer") return { success: false, error: "Insufficient permissions" };
-
-  const { data: staff } = await supabase
-    .from("staff_members")
-    .select("role")
-    .eq("id", staffId)
-    .eq("clinic_id", userRecord.clinic_id)
-    .is("deleted_at", null)
-    .is("suspended_at", null)
-    .single();
-  if (!staff || !staff.role) return { success: false, error: "Staff member has no role." };
-
-  const { error: delError } = await supabase
-    .from("onboarding_items")
-    .delete()
-    .eq("staff_member_id", staffId)
-    .eq("clinic_id", userRecord.clinic_id);
-  if (delError) {
-    Sentry.captureException(delError);
-    return { success: false, error: "Failed to sync onboarding items." };
-  }
-
-  await createOnboardingItems(staffId, userRecord.clinic_id, staff.role);
-
-  revalidatePath("/dashboard/onboarding");
-  revalidatePath("/dashboard/staff");
-  return { success: true };
-}
-
-export async function syncAllStaffOnboarding() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user?.id) return { success: false, error: "Unauthorized" };
-
-  const { data: userRecord } = await supabase
-    .from("users")
-    .select("clinic_id, role")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-  if (!userRecord) return { success: false, error: "Unauthorized" };
-  if (userRecord.role === "viewer") return { success: false, error: "Insufficient permissions" };
-
-  const { data: staffList } = await supabase
-    .from("staff_members")
-    .select("id, role")
-    .eq("clinic_id", userRecord.clinic_id)
-    .is("deleted_at", null)
-    .is("suspended_at", null)
-    .not("role", "is", null);
-
-  if (!staffList || staffList.length === 0) return { success: true, count: 0 };
-
-  let synced = 0;
-  for (const staff of staffList) {
-    if (staff.role) {
-      const { error: delErr } = await supabase
-        .from("onboarding_items")
-        .delete()
-        .eq("staff_member_id", staff.id)
-        .eq("clinic_id", userRecord.clinic_id);
-      if (delErr) {
-        Sentry.captureException(delErr);
-        continue;
-      }
-      await createOnboardingItems(staff.id, userRecord.clinic_id, staff.role);
-      synced++;
-    }
-  }
-
-  revalidatePath("/dashboard/onboarding");
-  revalidatePath("/dashboard/staff");
-  return { success: true, count: synced };
 }
 
 // ── New onboarding progress functions ──

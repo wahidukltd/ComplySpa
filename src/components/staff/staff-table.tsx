@@ -19,19 +19,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Trash2, Search, CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Search, CheckCircle2, AlertTriangle, ClipboardCheck } from "lucide-react";
 import { formatDate } from "@/lib/utils/date";
 import { ROLE_DISPLAY_LABELS, ROLE_VALUES } from "@/lib/staff/role-credential-defaults";
+import { deriveWorkStatus, WORK_STATUS_META, WORK_STATUS_FILTER, type WorkStatus } from "@/lib/utils/work-status";
+import type { OnboardingStaffState } from "@/lib/staff/onboarding";
 import type { Tables } from "@/types/database";
 import type { ReadinessResult } from "@/lib/staff/readiness";
 
 type StaffMember = Tables<"staff_members">;
 
-const READINESS_STYLES: Record<string, { color: string; label: string; icon: "check" | "alert" | "warning" | "info" } | undefined> = {
-  ready: { color: "text-[#4A8C5C]", label: "Ready", icon: "check" },
-  at_risk: { color: "text-[#C2853A]", label: "At Risk", icon: "alert" },
-  non_compliant: { color: "text-destructive font-semibold", label: "Non-Compliant", icon: "warning" },
-  pending: { color: "text-muted-foreground", label: "Pending", icon: "info" },
+const EMPTY_ONBOARDING_STATE: OnboardingStaffState = {
+  requiredTotal: 0,
+  requiredCompleted: 0,
+  requiredPending: 0,
+  optionalTotal: 0,
+  optionalCompleted: 0,
+  missingNames: [],
 };
 
 const ROLE_KEYS = ["", ...ROLE_VALUES] as const;
@@ -40,21 +44,21 @@ interface StaffTableProps {
   staff: StaffMember[];
   onDelete: (id: string) => void;
   readinessMap?: Record<string, ReadinessResult>;
+  onboardingState?: Record<string, OnboardingStaffState>;
+  dataUnavailable?: boolean;
 }
 
-function ReadinessIcon({ type }: { type: "check" | "alert" | "warning" | "info" }) {
+function StatusIcon({ type }: { type: "check" | "alert" | "warning" }) {
   const labels: Record<string, string> = {
-    check: "Ready",
-    alert: "At risk",
-    warning: "Non-compliant",
-    info: "Pending",
+    check: "Work ready",
+    alert: "In progress",
+    warning: "Blocked",
   };
   return (
     <span aria-label={labels[type]} role="img">
       {type === "check" && <CheckCircle2 className="size-4 shrink-0 text-[#4A8C5C]" />}
       {type === "alert" && <AlertTriangle className="size-4 shrink-0 text-[#C2853A]" />}
       {type === "warning" && <AlertTriangle className="size-4 shrink-0 text-destructive" />}
-      {type === "info" && <Info className="size-4 shrink-0 text-muted-foreground" />}
     </span>
   );
 }
@@ -73,10 +77,11 @@ function formatReadinessDetails(r: ReadinessResult): string {
   return parts.join(" · ");
 }
 
-export function StaffTable({ staff, onDelete, readinessMap = {} }: StaffTableProps) {
+export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState = {}, dataUnavailable = false }: StaffTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<WorkStatus | "">("");
 
   const filteredStaff = useMemo(() => {
     return staff.filter((member) => {
@@ -87,9 +92,14 @@ export function StaffTable({ staff, onDelete, readinessMap = {} }: StaffTablePro
         if (!nameMatch && !emailMatch) return false;
       }
       if (roleFilter && member.role !== roleFilter) return false;
+      if (statusFilter) {
+        const readiness = readinessMap[member.id] ?? { status: "pending", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
+        const onboarding = onboardingState[member.id] ?? EMPTY_ONBOARDING_STATE;
+        if (deriveWorkStatus(readiness, onboarding) !== statusFilter) return false;
+      }
       return true;
     });
-  }, [staff, search, roleFilter]);
+  }, [staff, search, roleFilter, statusFilter, readinessMap, onboardingState]);
 
   if (staff.length === 0) {
     return (
@@ -103,7 +113,18 @@ export function StaffTable({ staff, onDelete, readinessMap = {} }: StaffTablePro
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {dataUnavailable && (
+        <div className="flex items-center gap-3 rounded-lg border border-muted-foreground/20 bg-muted/20 px-4 py-3">
+          <AlertTriangle className="size-5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">Compliance data unavailable</p>
+            <p className="text-xs text-muted-foreground">
+              Work readiness could not be computed. Try refreshing to see staff statuses.
+            </p>
+          </div>
+        </div>
+      )}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
           <Input
@@ -113,7 +134,8 @@ export function StaffTable({ staff, onDelete, readinessMap = {} }: StaffTablePro
             className="pl-8"
           />
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Role:</span>
           {ROLE_KEYS.map((key) => {
             const label = key === "" ? "All" : (ROLE_DISPLAY_LABELS[key] ?? key);
             return (
@@ -130,13 +152,27 @@ export function StaffTable({ staff, onDelete, readinessMap = {} }: StaffTablePro
           })}
         </div>
       </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs text-muted-foreground">Status:</span>
+        {WORK_STATUS_FILTER.map((item) => (
+          <Button
+            key={item.value || "all-status"}
+            variant={statusFilter === item.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter(item.value)}
+            className="h-7 text-xs"
+          >
+            {item.label}
+          </Button>
+        ))}
+      </div>
 
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Role</TableHead>
-            <TableHead>Readiness</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead>Details</TableHead>
             <TableHead>Hire Date</TableHead>
             <TableHead>Email</TableHead>
@@ -152,15 +188,20 @@ export function StaffTable({ staff, onDelete, readinessMap = {} }: StaffTablePro
             </TableRow>
           ) : (
             filteredStaff.map((member) => {
-              const rStatus: keyof typeof READINESS_STYLES = readinessMap[member.id]?.status ?? "pending";
-              const rStyle = READINESS_STYLES[rStatus]!;
+              const readiness = readinessMap[member.id] ?? { status: "pending", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
+              const onboarding = onboardingState[member.id] ?? EMPTY_ONBOARDING_STATE;
+              const status = deriveWorkStatus(readiness, onboarding);
+              const meta = WORK_STATUS_META[status];
               return (
                 <TableRow
                   key={member.id}
                   className="cursor-pointer"
                   onClick={() => router.push(`/dashboard/staff/${member.id}`)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    // Only navigate on Enter when the row itself is focused —
+                    // a focused button inside (e.g. Continue onboarding) must
+                    // not trigger the row's handler on the bubbling keydown.
+                    if (e.key === "Enter" && e.target === e.currentTarget) {
                       router.push(`/dashboard/staff/${member.id}`);
                     }
                   }}
@@ -178,9 +219,9 @@ export function StaffTable({ staff, onDelete, readinessMap = {} }: StaffTablePro
                     )}
                   </TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${rStyle.color}`}>
-                      <ReadinessIcon type={rStyle.icon} />
-                      {rStyle.label}
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${meta.color}`}>
+                      <StatusIcon type={meta.icon} />
+                      {meta.label}
                     </span>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={readinessMap[member.id] ? formatReadinessDetails(readinessMap[member.id]!) : ""}>
@@ -193,39 +234,52 @@ export function StaffTable({ staff, onDelete, readinessMap = {} }: StaffTablePro
                     {member.email || "—"}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger>
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      {status !== "work_ready" && (
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label="Actions"
+                          variant={status === "blocked" ? "default" : "secondary"}
+                          size="sm"
+                          onClick={() => router.push(`/dashboard/staff/${member.id}#onboarding`)}
+                          className="h-7 gap-1 text-xs"
                         >
-                          <MoreHorizontal className="size-4" />
+                          <ClipboardCheck className="size-3.5" />
+                          Continue onboarding
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/dashboard/staff/${member.id}/edit`);
-                          }}
-                        >
-                          <Pencil className="mr-2 size-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(member.id);
-                          }}
-                        >
-                          <Trash2 className="mr-2 size-4" />
-                          Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="Actions"
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/dashboard/staff/${member.id}/edit`);
+                            }}
+                          >
+                            <Pencil className="mr-2 size-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDelete(member.id);
+                            }}
+                          >
+                            <Trash2 className="mr-2 size-4" />
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               );

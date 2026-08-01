@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { ReadinessResult } from "@/lib/staff/readiness";
+import type { OnboardingStaffState } from "@/lib/staff/onboarding";
 import type { ActionUrgency } from "@/types";
 
 export interface ComplianceAction {
@@ -7,7 +8,7 @@ export interface ComplianceAction {
   staffMemberId: string;
   staffName: string;
   role: string;
-  actionType: "renew_expired" | "renew_expiring" | "add_missing" | "verify_recommended";
+  actionType: "renew_expired" | "renew_expiring" | "add_missing" | "verify_recommended" | "complete_onboarding";
   credentialName: string;
   credentialId?: string;
   urgency: ActionUrgency;
@@ -83,6 +84,7 @@ export async function buildComplianceActionsFromReadiness(
   staffRows: { id: string; name: string; role: string | null }[],
   readinessMap: Record<string, ReadinessResult>,
   clinicId: string,
+  onboardingState?: Record<string, OnboardingStaffState> | null,
 ): Promise<ComplianceAction[]> {
   const supabase = await createClient();
   const staffIds = staffRows.map((s) => s.id);
@@ -98,7 +100,56 @@ export async function buildComplianceActionsFromReadiness(
   for (const id of staffIds) {
     const readiness = readinessMap[id];
     if (!readiness) continue;
-    if (readiness.status === "ready" || readiness.status === "pending") continue;
+    if (readiness.status === "ready") continue;
+
+    // Onboarding surfacing: staff whose readiness engine reports `pending`
+    // (no credentials tracked) have no individual missing/expired actions, so
+    // they would otherwise be invisible. Emit one aggregated onboarding card
+    // per such staff member — never for at_risk/non_compliant staff, who
+    // already get individual actions (avoids duplicate cards for one person).
+    if (readiness.status === "pending" && roleMap[id]) {
+      // onboardingState === null (or omitted) means the onboarding section
+      // failed to load — never fabricate cards from missing data; a failed
+      // section must not masquerade as "not started".
+      if (onboardingState == null) continue;
+
+      const state = onboardingState[id];
+      const pendingNames = state?.missingNames ?? [];
+      const requiredPending = state?.requiredPending ?? 0;
+
+      let description: string;
+      let actionLabel: string;
+      if (requiredPending > 0) {
+        if (pendingNames.length > 0) {
+          const shown = pendingNames.slice(0, 3).join(", ");
+          const more = pendingNames.length > 3 ? ` +${pendingNames.length - 3} more` : "";
+          description = `Onboarding incomplete — ${shown}${more} pending`;
+        } else {
+          // Pending items whose credential type name is unknown — fall back to
+          // a count rather than rendering an empty list.
+          description = `Onboarding incomplete — ${requiredPending} requirement${requiredPending === 1 ? "" : "s"} pending`;
+        }
+        actionLabel = "Continue onboarding";
+      } else {
+        description = "Onboarding not started — no requirements generated yet";
+        actionLabel = "Start onboarding";
+      }
+
+      allActions.push({
+        id: `${id}-complete-onboarding`,
+        staffMemberId: id,
+        staffName: nameMap[id] ?? "Unknown",
+        role: roleMap[id] ?? "",
+        actionType: "complete_onboarding",
+        credentialName: "",
+        urgency: "warning",
+        description,
+        risk: "Cannot start work until these requirements are completed.",
+        actionLabel,
+        actionHref: `/dashboard/staff/${id}#onboarding`,
+      });
+      continue;
+    }
 
     const actions = generateActionsForStaff(
       id,

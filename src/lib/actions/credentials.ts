@@ -65,6 +65,19 @@ export async function addCredential(input: CredentialInput & { document_url?: st
 
   if (!staff) return { success: false, error: "Staff member not found." };
 
+  // Validate the credential type against the clinic's accessible set (global
+  // defaults + own custom types) — a client-supplied id referencing another
+  // clinic's custom type must not reach the INSERT (mirrors the
+  // createRoleTemplate pattern).
+  const { data: typeRows, error: typeErr } = await supabase
+    .from("credential_types")
+    .select("id")
+    .eq("id", parsed.data.credential_type_id)
+    .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
+  if (typeErr || !typeRows || typeRows.length === 0) {
+    return { success: false, error: "Invalid credential type." };
+  }
+
   const { data: credential, error } = await supabase
     .from("credentials")
     .insert({

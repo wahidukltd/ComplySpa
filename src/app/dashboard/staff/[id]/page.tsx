@@ -88,16 +88,20 @@ export default async function StaffDetailPage({
     expiringCredentials: [],
   }));
 
+  const canEdit = userRecord.role === "owner" || userRecord.role === "manager";
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={staff.name} description={roleLabel ? `Role: ${roleLabel}` : undefined}>
-        {userRecord.role === "owner" || userRecord.role === "manager" ? (
+        {canEdit && onboardingItems.length > 0 ? (
           <SyncStaffToTemplateButton staffMemberId={id} />
         ) : null}
-        <Link href={`/dashboard/staff/${id}/edit`} className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}>
-          <Pencil className="size-4" />
-          Edit
-        </Link>
+        {canEdit && (
+          <Link href={`/dashboard/staff/${id}/edit`} className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}>
+            <Pencil className="size-4" />
+            Edit
+          </Link>
+        )}
       </PageHeader>
 
       <Card>
@@ -252,17 +256,36 @@ export default async function StaffDetailPage({
         </Card>
       )}
 
-      <OnboardingChecklist
-        items={onboardingItems}
-        total={onboardingProgress.total}
-        completed={onboardingProgress.completed}
-        staffMemberId={id}
-        requiredTotal={onboardingProgress.requiredTotal}
-        requiredCompleted={onboardingProgress.requiredCompleted}
-        optionalTotal={onboardingProgress.optionalTotal}
-        optionalCompleted={onboardingProgress.optionalCompleted}
-        blocked={onboardingProgress.blocked}
-      />
+      {onboardingItems.length === 0 ? (
+        <Card id="onboarding">
+          <CardContent className="pt-4">
+            <h3 className="text-sm font-semibold">Getting Work Ready</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {staff.role
+                ? "No requirements generated for this role yet."
+                : "Assign a role to generate requirements."}
+            </p>
+            {staff.role && canEdit && (
+              <div className="mt-3">
+                <SyncStaffToTemplateButton staffMemberId={id} />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <OnboardingChecklist
+          items={onboardingItems}
+          total={onboardingProgress.total}
+          completed={onboardingProgress.completed}
+          staffMemberId={id}
+          requiredTotal={onboardingProgress.requiredTotal}
+          requiredCompleted={onboardingProgress.requiredCompleted}
+          optionalTotal={onboardingProgress.optionalTotal}
+          optionalCompleted={onboardingProgress.optionalCompleted}
+          blocked={onboardingProgress.blocked}
+          canEdit={canEdit}
+        />
+      )}
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

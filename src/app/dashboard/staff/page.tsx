@@ -7,6 +7,8 @@ import Link from "next/link";
 import { StaffTableWrapper } from "./staff-table-wrapper";
 import { cn } from "@/lib/utils";
 import { getStaffReadinessBulk } from "@/lib/staff/readiness";
+import { getOnboardingStateByStaff, type OnboardingStaffState } from "@/lib/staff/onboarding";
+import * as Sentry from "@sentry/nextjs";
 import type { Tables } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +38,26 @@ export default async function StaffListPage() {
 
   const readinessMap = await getStaffReadinessBulk(staffIds, userRecord.clinic_id);
 
+  // Onboarding state degrades to "nothing pending" on failure rather than
+  // killing the queue page, but the degradation is surfaced honestly: a
+  // failure signal renders an unavailable notice above the table (mirrors the
+  // overview's readinessUnavailable pattern) instead of silently mislabeling
+  // every row as In Progress.
+  let onboardingState: Record<string, OnboardingStaffState> = {};
+  let onboardingFailed = false;
+  try {
+    onboardingState = await getOnboardingStateByStaff(userRecord.clinic_id, staffIds);
+  } catch (err) {
+    Sentry.captureException(err);
+    onboardingFailed = true;
+  }
+
+  // getStaffReadinessBulk returns {} only when its staff query failed (it
+  // catches per-staff errors internally) — an empty map for a clinic with
+  // staff means the readiness engine itself is down.
+  const readinessFailed = staffIds.length > 0 && Object.keys(readinessMap).length === 0;
+  const dataUnavailable = onboardingFailed || readinessFailed;
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -51,6 +73,8 @@ export default async function StaffListPage() {
       <StaffTableWrapper
         staff={(staff ?? []) as Tables<"staff_members">[]}
         readinessMap={readinessMap}
+        onboardingState={onboardingState}
+        dataUnavailable={dataUnavailable}
       />
     </div>
   );

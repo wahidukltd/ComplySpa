@@ -219,39 +219,6 @@ function NeedsAttentionSection({
   );
 }
 
-function OnboardingStrip({ onboardingSummary, hasStaff }: { onboardingSummary: OverviewData["onboardingSummary"]; hasStaff: boolean }) {
-  if (!hasStaff) return null;
-  const items = [
-    { label: "Ready", value: onboardingSummary.ready, color: "text-[#4A8C5C]" },
-    { label: "In progress", value: onboardingSummary.inProgress, color: "text-[#C2853A]" },
-    { label: "Blocked", value: onboardingSummary.blocked, color: "text-destructive" },
-    { label: "Not started", value: onboardingSummary.notStarted, color: "text-muted-foreground" },
-  ];
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Onboarding</h2>
-        <Link href="/dashboard/onboarding" className="inline-flex items-center gap-1 text-xs text-primary underline-offset-4 hover:underline">
-          View all
-          <ArrowRight className="size-3" />
-        </Link>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-4">
-        {items.map((item) => (
-          <Link key={item.label} href="/dashboard/onboarding">
-            <Card className="transition-colors hover:bg-muted/50">
-              <CardContent className="pt-4">
-                <p className={cn("text-2xl font-bold", item.color)}>{item.value}</p>
-                <p className="text-sm text-muted-foreground">{item.label}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function CredentialHealthCards({ credentialHealth, hasStaff }: { credentialHealth: OverviewData["credentialHealth"]; hasStaff: boolean }) {
   if (!hasStaff) return null;
   const items = [
@@ -416,8 +383,6 @@ export default async function DashboardPage() {
         sectionErrors={data.sectionErrors}
         canVerify={userRecord.role !== "viewer"}
       />
-
-      <OnboardingStrip onboardingSummary={data.onboardingSummary} hasStaff={data.hasStaff} />
 
       <CredentialHealthCards credentialHealth={data.credentialHealth} hasStaff={data.hasStaff} />
 

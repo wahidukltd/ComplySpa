@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { getStaffReadinessBulk, type ReadinessResult } from "@/lib/staff/readiness";
+import { getOnboardingStateByStaff } from "@/lib/staff/onboarding";
 import { buildComplianceActionsFromReadiness, type ComplianceAction } from "@/lib/staff/compliance-actions";
 import { computeComplianceHealth } from "@/lib/utils/compliance-health";
 import * as Sentry from "@sentry/nextjs";
@@ -30,7 +31,6 @@ export interface OverviewData {
   actions: ComplianceAction[];
   actionCounts: { critical: number; warning: number; info: number };
   credentialHealth: { total: number; valid: number; expiring: number; expired: number };
-  onboardingSummary: { ready: number; inProgress: number; blocked: number; notStarted: number };
   recentChanges: RecentChange[];
   failedAlerts: { count: number } | null;
   renderedAt: string;
@@ -42,7 +42,6 @@ export interface OverviewData {
 
 const EMPTY_STAFF_SUMMARY: OverviewStaffSummary = { total: 0, ready: 0, atRisk: 0, nonCompliant: 0, pending: 0 };
 const EMPTY_CREDENTIAL_HEALTH = { total: 0, valid: 0, expiring: 0, expired: 0 };
-const EMPTY_ONBOARDING = { ready: 0, inProgress: 0, blocked: 0, notStarted: 0 };
 
 function safeSection<T>(key: string, errors: string[], fn: () => Promise<T>, fallback: T): Promise<T> {
   return fn().catch((err) => {
@@ -81,7 +80,7 @@ export async function getOverviewData(clinicId: string): Promise<OverviewData> {
     [] as { id: string; name: string; role: string | null; created_at: string }[],
   );
 
-  const [credentialHealth, onboardingSummary, recentChanges, failedAlerts] = await Promise.all([
+  const [credentialHealth, onboardingState, recentChanges, failedAlerts] = await Promise.all([
     safeSection(
       "credentials",
       errors,
@@ -113,42 +112,8 @@ export async function getOverviewData(clinicId: string): Promise<OverviewData> {
     safeSection(
       "onboarding",
       errors,
-      async () => {
-        const ids = staffRows.map((s) => s.id);
-        if (ids.length === 0) return EMPTY_ONBOARDING;
-
-        const { data: items, error } = await supabase
-          .from("onboarding_items")
-          .select("staff_member_id, status, is_required")
-          .eq("clinic_id", clinicId)
-          .in("staff_member_id", ids);
-        throwOnError(error);
-
-        const progressMap: Record<string, { requiredTotal: number; requiredCompleted: number; blocked: boolean }> = {};
-        for (const id of ids) {
-          const memberItems = (items ?? []).filter((i) => i.staff_member_id === id);
-          const required = memberItems.filter((i) => i.is_required);
-          const requiredPending = required.filter((i) => i.status === "pending");
-          progressMap[id] = {
-            requiredTotal: required.length,
-            requiredCompleted: required.filter((i) => i.status === "completed").length,
-            blocked: requiredPending.length > 0,
-          };
-        }
-
-        let ready = 0;
-        let inProgress = 0;
-        let blocked = 0;
-        let notStarted = 0;
-        for (const p of Object.values(progressMap)) {
-          if (p.requiredTotal > 0 && !p.blocked) ready++;
-          else if (p.requiredTotal > 0 && p.requiredCompleted > 0 && p.blocked) inProgress++;
-          else if (p.requiredTotal > 0 && p.requiredCompleted === 0 && p.blocked) blocked++;
-          else notStarted++;
-        }
-        return { ready, inProgress, blocked, notStarted };
-      },
-      EMPTY_ONBOARDING,
+      () => getOnboardingStateByStaff(clinicId, staffRows.map((s) => s.id)),
+      null,
     ),
     safeSection(
       "recent_changes",
@@ -288,7 +253,7 @@ export async function getOverviewData(clinicId: string): Promise<OverviewData> {
     actions = await safeSection(
       "actions",
       errors,
-      () => buildComplianceActionsFromReadiness(staffRows, readinessMap, clinicId),
+      () => buildComplianceActionsFromReadiness(staffRows, readinessMap, clinicId, onboardingState),
       [] as ComplianceAction[],
     );
   }
@@ -304,7 +269,6 @@ export async function getOverviewData(clinicId: string): Promise<OverviewData> {
     actions,
     actionCounts,
     credentialHealth,
-    onboardingSummary,
     recentChanges,
     failedAlerts: failedAlerts.count > 0 ? failedAlerts : null,
     renderedAt,

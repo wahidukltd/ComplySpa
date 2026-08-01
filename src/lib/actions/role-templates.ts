@@ -387,7 +387,12 @@ export async function syncStaffToTemplate(staffMemberId: string) {
     }));
 
   if (rows.length > 0) {
-    const { error } = await supabase.from("onboarding_items").insert(rows);
+    // Upsert with ignoreDuplicates: concurrent syncs of the same staff would
+    // otherwise race against the UNIQUE (staff_member_id, credential_type_id)
+    // constraint and fail with a unique violation.
+    const { error } = await supabase
+      .from("onboarding_items")
+      .upsert(rows, { onConflict: "staff_member_id,credential_type_id", ignoreDuplicates: true });
     if (error) {
       Sentry.captureException(error);
       return { error: "Failed to sync staff to template." };
@@ -488,7 +493,11 @@ export async function syncStaffToRoleTemplate(role: string) {
   }
 
   if (rows.length > 0) {
-    const { error } = await supabase.from("onboarding_items").insert(rows);
+    // Upsert with ignoreDuplicates: concurrent role-wide syncs racing the
+    // UNIQUE (staff_member_id, credential_type_id) constraint must not fail.
+    const { error } = await supabase
+      .from("onboarding_items")
+      .upsert(rows, { onConflict: "staff_member_id,credential_type_id", ignoreDuplicates: true });
     if (error) {
       Sentry.captureException(error);
       return { error: "Failed to sync staff to template." };
