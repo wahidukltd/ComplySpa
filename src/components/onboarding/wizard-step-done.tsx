@@ -16,11 +16,11 @@ export function WizardStepDone({
   plan?: string | null;
 }) {
   const router = useRouter();
-  const planLabel = plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : plan === "multi_location" ? "Multi-Location" : null;
+  const planLabel = plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : null;
 
   async function handleSubscribe() {
     if (!plan) return;
-    const url = await getCheckoutUrl(plan as "solo" | "practice" | "multi_location");
+    const url = await getCheckoutUrl(plan as "solo" | "practice");
     if (url) {
       window.open(url, "_blank");
       router.push("/dashboard");

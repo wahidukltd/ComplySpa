@@ -17,7 +17,7 @@ const createReportSchema = z.object({
 export async function getReportData(): Promise<{
   data: ReportData | null;
   error: string | null;
-  reportTier?: "basic" | "audit" | "white_label";
+  reportTier?: "basic" | "audit";
 }> {
   const supabase = await createClient();
   const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -107,7 +107,7 @@ export async function getReportData(): Promise<{
   const byCategory = { license: 0, training: 0, insurance: 0, agreement: 0 };
   const upcoming: ReportData["upcoming"] = [];
 
-  // ponytail: no pagination — Practice cap 300 creds, Multi cap 1000
+  // ponytail: no pagination — Practice cap 300 creds
 
   const staffMembers: ReportData["staffMembers"] = staffRows.map((s) => {
     const staffCreds = credsByStaff.get(s.id) ?? [];
@@ -319,4 +319,5 @@ export async function getReportHistory(): Promise<{
 
   return { reports, error: null, clinicId: user.clinic_id };
 }
+
 

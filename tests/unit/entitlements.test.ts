@@ -3,7 +3,7 @@ import { getEntitlements, getReportTier } from "@/lib/utils/entitlements";
 import { getPlanLimits } from "@/lib/utils/plan";
 import { PlanLimitError } from "@/lib/utils/errors";
 
-describe("All 6 plan states", () => {
+describe("All 5 plan states", () => {
   it("trial: 1000/10000/100, none reports, user mgmt enabled", () => {
     const e = getEntitlements("trial");
     expect(e.maxStaff).toBe(1000);
@@ -11,7 +11,6 @@ describe("All 6 plan states", () => {
     expect(e.maxUsers).toBe(100);
     expect(e.reportTier).toBe("none");
     expect(e.canEmailReports).toBe(false);
-    expect(e.canAccessAPI).toBe(false);
     expect(e.canManageUsers).toBe(true);
     expect(e.blocked).toBe(false);
   });
@@ -23,7 +22,6 @@ describe("All 6 plan states", () => {
     expect(e.maxUsers).toBe(0);
     expect(e.reportTier).toBe("none");
     expect(e.canEmailReports).toBe(false);
-    expect(e.canAccessAPI).toBe(false);
     expect(e.canManageUsers).toBe(false);
     expect(e.blocked).toBe(true);
     expect(typeof e.blockedReason).toBe("string");
@@ -46,7 +44,6 @@ describe("All 6 plan states", () => {
     expect(e.maxUsers).toBe(1);
     expect(e.reportTier).toBe("basic");
     expect(e.canEmailReports).toBe(false);
-    expect(e.canAccessAPI).toBe(false);
     expect(e.canManageUsers).toBe(false);
     expect(e.blocked).toBe(false);
   });
@@ -58,19 +55,6 @@ describe("All 6 plan states", () => {
     expect(e.maxUsers).toBe(3);
     expect(e.reportTier).toBe("audit");
     expect(e.canEmailReports).toBe(true);
-    expect(e.canAccessAPI).toBe(false);
-    expect(e.canManageUsers).toBe(true);
-    expect(e.blocked).toBe(false);
-  });
-
-  it("multi_location: 50/1000/10, white_label, email, API", () => {
-    const e = getEntitlements("multi_location");
-    expect(e.maxStaff).toBe(50);
-    expect(e.maxCredentials).toBe(1000);
-    expect(e.maxUsers).toBe(10);
-    expect(e.reportTier).toBe("white_label");
-    expect(e.canEmailReports).toBe(true);
-    expect(e.canAccessAPI).toBe(true);
     expect(e.canManageUsers).toBe(true);
     expect(e.blocked).toBe(false);
   });
@@ -91,7 +75,6 @@ describe("getReportTier integration", () => {
     ["inactive", "none"],
     ["solo", "basic"],
     ["practice", "audit"],
-    ["multi_location", "white_label"],
   ];
 
   for (const [plan, expected] of testCases) {
@@ -129,7 +112,7 @@ describe("Blocked plan behavior", () => {
   });
 
   it("active plans never blocked", () => {
-    for (const plan of ["trial", "solo", "practice", "multi_location"]) {
+    for (const plan of ["trial", "solo", "practice"]) {
       const e = getEntitlements(plan);
       expect(e.blocked).toBe(false);
     }
@@ -137,11 +120,10 @@ describe("Blocked plan behavior", () => {
 });
 
 describe("Inspection readiness feature gate", () => {
-  it("only trial+practice+multi have inspection readiness", () => {
+  it("only trial+practice have inspection readiness", () => {
     expect(getEntitlements("trial").hasInspectionReadiness).toBe(true);
     expect(getEntitlements("solo").hasInspectionReadiness).toBe(false);
     expect(getEntitlements("practice").hasInspectionReadiness).toBe(true);
-    expect(getEntitlements("multi_location").hasInspectionReadiness).toBe(true);
     expect(getEntitlements("expired_trial").hasInspectionReadiness).toBe(false);
     expect(getEntitlements("inactive").hasInspectionReadiness).toBe(false);
   });
@@ -157,3 +139,4 @@ describe("PlanLimitError", () => {
     }
   });
 });
+

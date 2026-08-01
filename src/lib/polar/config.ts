@@ -3,7 +3,6 @@ export const polarConfig = {
   webhookSecret: process.env.POLAR_WEBHOOK_SECRET ?? "",
   soloProductPriceId: process.env.POLAR_SOLO_PRODUCT_PRICE_ID ?? "",
   practiceProductPriceId: process.env.POLAR_PRACTICE_PRODUCT_PRICE_ID ?? "",
-  multiLocationProductPriceId: process.env.POLAR_MULTI_LOCATION_PRODUCT_PRICE_ID ?? "",
   enabled: Boolean(process.env.POLAR_ACCESS_TOKEN && process.env.POLAR_WEBHOOK_SECRET),
 };
 

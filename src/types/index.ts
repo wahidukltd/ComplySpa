@@ -3,8 +3,7 @@ export type ClinicPlan =
   | "expired_trial"
   | "inactive"
   | "solo"
-  | "practice"
-  | "multi_location";
+  | "practice";
 
 export type UserRole = "owner" | "manager" | "viewer";
 

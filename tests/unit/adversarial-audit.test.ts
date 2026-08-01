@@ -38,7 +38,7 @@ describe("Atomic reconciliation invariants (verified via SQL)", () => {
     //
     // reconcile_clinic_plan() suspends oldest excess staff when downgrading,
     // restores newest previously-suspended when upgrading.
-    for (const plan of ["solo", "practice", "multi_location"] as const) {
+    for (const plan of ["solo", "practice"] as const) {
       const l = getPlanLimits(plan);
       expect(l.maxStaff).toBeGreaterThan(0);
     }
@@ -102,18 +102,6 @@ describe("Atomic reconciliation invariants (verified via SQL)", () => {
 
 describe("No privilege leak after downgrade (entitlement layer)", () => {
   const downgrades: [string, string, (e: ReturnType<typeof getEntitlements>) => void][] = [
-    ["multi_location → practice", "practice", (e) => {
-      expect(e.canAccessAPI).toBe(false);
-      expect(e.reportTier).toBe("audit");
-    }],
-    ["multi_location → solo", "solo", (e) => {
-      expect(e.canAccessAPI).toBe(false);
-      expect(e.canEmailReports).toBe(false);
-      expect(e.canManageUsers).toBe(false);
-      expect(e.canManageAlertRecipients).toBe(false);
-      expect(e.reportTier).toBe("basic");
-      expect(e.maxStaff).toBe(5);
-    }],
     ["practice → solo", "solo", (e) => {
       expect(e.canEmailReports).toBe(false);
       expect(e.canManageUsers).toBe(false);
@@ -156,11 +144,6 @@ describe("Full feature restoration after upgrade (entitlement layer)", () => {
       expect(e.canManageUsers).toBe(true);
       expect(e.reportTier).toBe("audit");
     }],
-    ["practice → multi_location", "multi_location", (e) => {
-      expect(e.canAccessAPI).toBe(true);
-      expect(e.reportTier).toBe("white_label");
-      expect(e.maxStaff).toBe(50);
-    }],
   ];
 
   for (const [name, plan, assertions] of upgrades) {
@@ -185,8 +168,7 @@ describe("Blocked plans have zero entitlements", () => {
       expect(e.maxUsers).toBe(0);
       expect(e.reportTier).toBe("none");
       expect(e.canEmailReports).toBe(false);
-      expect(e.canAccessAPI).toBe(false);
-      expect(e.canManageUsers).toBe(false);
+        expect(e.canManageUsers).toBe(false);
       expect(e.canManageAlertRecipients).toBe(false);
       expect(e.hasInspectionReadiness).toBe(false);
     });
@@ -215,7 +197,6 @@ describe("Report tiers match entitlements for all plans", () => {
     ["inactive", "none"],
     ["solo", "basic"],
     ["practice", "audit"],
-    ["multi_location", "white_label"],
     ["unknown", "none"],
   ];
   for (const [plan, expected] of cases) {
@@ -229,7 +210,7 @@ describe("Report tiers match entitlements for all plans", () => {
 // ─── CANCEL LEAVES PLAN UNCHANGED ───────────────────────────────────────────
 
 describe("Cancel does not change plan entitlement", () => {
-  for (const plan of ["solo", "practice", "multi_location"] as const) {
+  for (const plan of ["solo", "practice"] as const) {
     it(`${plan} after cancel: same as ${plan}`, () => {
       const e = getEntitlements(plan);
       expect(e.blocked).toBe(false);
@@ -243,7 +224,7 @@ describe("Cancel does not change plan entitlement", () => {
 // ─── UNCANCEL RESTORES PRE-CANCEL STATE ─────────────────────────────────────
 
 describe("Uncancel restores active state", () => {
-  for (const plan of ["solo", "practice", "multi_location"] as const) {
+  for (const plan of ["solo", "practice"] as const) {
     it(`${plan} after uncancel`, () => {
       const e = getEntitlements(plan);
       expect(e.blocked).toBe(false);
@@ -251,28 +232,20 @@ describe("Uncancel restores active state", () => {
   }
 });
 
-// ─── API ENTITLEMENT FUTURE-PROOF ───────────────────────────────────────────
-
-describe("API entitlement is future-proof", () => {
-  it("only multi_location has API access", () => {
-    for (const plan of ["trial", "expired_trial", "inactive", "solo", "practice"]) {
-      expect(getEntitlements(plan).canAccessAPI).toBe(false);
-    }
-    expect(getEntitlements("multi_location").canAccessAPI).toBe(true);
-  });
-});
-
 // ─── RN: reconciliation reads plan limits from same source as app ──────────
 
-describe("Reconciliation RPC limits match app limits (all 6 plans)", () => {
-  const plans = ["trial", "expired_trial", "inactive", "solo", "practice", "multi_location"] as const;
+describe("Reconciliation RPC limits match app limits (all 5 plans)", () => {
+  const plans = ["trial", "expired_trial", "inactive", "solo", "practice"] as const;
   for (const plan of plans) {
     it(`${plan}: app and RPC agree`, () => {
       const appLimits = getPlanLimits(plan);
       // The RPC uses the same CASE statement with the same values:
-      // trial: 1000/10000, solo: 5/50, practice: 15/300, multi: 50/1000, else: 0
-      expect(appLimits.maxStaff).toBeGreaterThanOrEqual(0);
-      expect(appLimits.maxCredentials).toBeGreaterThanOrEqual(0);
+      // trial: 1000/10000/100, solo: 5/50/1, practice: 15/300/3, else: 0
+      expect(appLimits.maxStaff).toBe(getEntitlements(plan).maxStaff);
+      expect(appLimits.maxCredentials).toBe(getEntitlements(plan).maxCredentials);
+      expect(appLimits.maxUsers).toBe(getEntitlements(plan).maxUsers);
     });
   }
 });
+
+

@@ -109,8 +109,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Emailing reports requires Practice plan or higher" }, { status: 403 });
     }
 
-    const isWhiteLabel = entitlements.reportTier === "white_label";
-
     if (!checkReportRateLimit(userRecord.email)) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
@@ -156,12 +154,11 @@ export async function POST(req: NextRequest) {
     }
 
     const base64Content = Buffer.from(pdfBuffer).toString("base64");
-    const emailSubject = buildReportSubject(clinicName, isWhiteLabel);
+    const emailSubject = buildReportSubject(clinicName);
 
     const emailHtml = buildReportEmailHtml({
       clinicName,
       reportId,
-      isWhiteLabel,
       subject: emailSubject,
     });
 
@@ -171,7 +168,7 @@ export async function POST(req: NextRequest) {
       html: emailHtml,
       attachment: {
         content: base64Content,
-        filename: `${isWhiteLabel ? "" : "compliance-"}report-${clinicName.replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "-").toLowerCase()}.pdf`,
+        filename: `compliance-report-${clinicName.replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "-").toLowerCase()}.pdf`,
       },
     });
 

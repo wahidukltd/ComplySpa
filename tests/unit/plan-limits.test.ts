@@ -18,13 +18,6 @@ describe("getPlanLimits", () => {
     expect(limits.maxUsers).toBe(3);
   });
 
-  it("multi_location: 50 staff, 1000 credentials, 10 users", () => {
-    const limits = getPlanLimits("multi_location");
-    expect(limits.maxStaff).toBe(50);
-    expect(limits.maxCredentials).toBe(1000);
-    expect(limits.maxUsers).toBe(10);
-  });
-
   it("trial: generous limits", () => {
     const limits = getPlanLimits("trial");
     expect(limits.maxStaff).toBe(1000);
@@ -67,7 +60,6 @@ describe("getEntitlements", () => {
     expect(e.maxUsers).toBe(100);
     expect(e.reportTier).toBe("none");
     expect(e.canEmailReports).toBe(false);
-    expect(e.canAccessAPI).toBe(false);
     expect(e.canManageUsers).toBe(true);
     expect(e.blocked).toBe(false);
   });
@@ -79,7 +71,6 @@ describe("getEntitlements", () => {
     expect(e.maxUsers).toBe(1);
     expect(e.reportTier).toBe("basic");
     expect(e.canEmailReports).toBe(false);
-    expect(e.canAccessAPI).toBe(false);
     expect(e.canManageUsers).toBe(false);
     expect(e.blocked).toBe(false);
   });
@@ -91,19 +82,6 @@ describe("getEntitlements", () => {
     expect(e.maxUsers).toBe(3);
     expect(e.reportTier).toBe("audit");
     expect(e.canEmailReports).toBe(true);
-    expect(e.canAccessAPI).toBe(false);
-    expect(e.canManageUsers).toBe(true);
-    expect(e.blocked).toBe(false);
-  });
-
-  it("multi_location: highest limits, white-label reports, email, API", () => {
-    const e = getEntitlements("multi_location");
-    expect(e.maxStaff).toBe(50);
-    expect(e.maxCredentials).toBe(1000);
-    expect(e.maxUsers).toBe(10);
-    expect(e.reportTier).toBe("white_label");
-    expect(e.canEmailReports).toBe(true);
-    expect(e.canAccessAPI).toBe(true);
     expect(e.canManageUsers).toBe(true);
     expect(e.blocked).toBe(false);
   });
@@ -141,9 +119,6 @@ describe("getReportTier", () => {
   it("practice returns audit", () => {
     expect(getReportTier("practice")).toBe("audit");
   });
-  it("multi_location returns white_label", () => {
-    expect(getReportTier("multi_location")).toBe("white_label");
-  });
   it("expired_trial returns none", () => {
     expect(getReportTier("expired_trial")).toBe("none");
   });
@@ -175,3 +150,4 @@ describe("PlanLimitError", () => {
     expect(err.code).toBe("USER_LIMIT");
   });
 });
+

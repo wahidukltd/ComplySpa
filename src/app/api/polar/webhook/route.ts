@@ -11,7 +11,7 @@ import * as Sentry from "@sentry/nextjs";
 //
 // ponytail: Blocks on 501 until POLAR_WEBHOOK_SECRET is configured (Polar approval).
 // Test checklist when Polar approval comes:
-//   1. Create Polar products with metadata {plan: solo|practice|multi_location}
+//   1. Create Polar products with metadata {plan: solo|practice}
 //   2. Set POLAR_WEBHOOK_SECRET, POLAR_ACCESS_TOKEN, and product price IDs
 //   3. Send test webhook events from Polar dashboard for each lifecycle event
 //   4. Verify update_clinic_subscription() RPC fires correctly
@@ -23,13 +23,11 @@ const POLAR_WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET;
 const PLAN_MAP: Record<string, string> = {
   solo: "solo",
   practice: "practice",
-  multi_location: "multi_location",
 };
 
 function mapPlan(productName: string, metadata: Record<string, string>): string | null {
   if (metadata.plan) return PLAN_MAP[metadata.plan] ?? null;
   const lower = productName.toLowerCase();
-  if (lower.includes("multi")) return "multi_location";
   if (lower.includes("practice")) return "practice";
   if (lower.includes("solo")) return "solo";
   return null;

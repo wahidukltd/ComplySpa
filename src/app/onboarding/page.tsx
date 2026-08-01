@@ -17,7 +17,7 @@ export default async function OnboardingPage(props: { searchParams: Promise<{ pl
   }
 
   const { plan } = await props.searchParams;
-  const validPlan = plan === "solo" || plan === "practice" || plan === "multi_location" ? plan as "solo" | "practice" | "multi_location" : null;
+  const validPlan = plan === "solo" || plan === "practice" ? (plan as "solo" | "practice") : null;
 
   const { data: existingUser } = await supabase
     .from("users")

@@ -27,18 +27,10 @@ describe("All subscription transitions behave correctly", () => {
     ["skip_trial_solo", "solo", { blocked: false, reportTier: "basic", maxStaff: 5, canEmailReports: false }],
     // Skip trial → subscribe to Practice
     ["skip_trial_practice", "practice", { blocked: false, reportTier: "audit", maxStaff: 15, canEmailReports: true }],
-    // Skip trial → subscribe to Multi
-    ["skip_trial_multi", "multi_location", { blocked: false, reportTier: "white_label", maxStaff: 50, canAccessAPI: true }],
     // Downgrade: Practice → Solo
     ["practice_to_solo", "solo", { blocked: false, reportTier: "basic", maxStaff: 5, canEmailReports: false, canManageUsers: false, canManageAlertRecipients: false }],
-    // Downgrade: Multi → Practice
-    ["multi_to_practice", "practice", { blocked: false, reportTier: "audit", maxStaff: 15, canAccessAPI: false, canManageUsers: true }],
-    // Downgrade: Multi → Solo
-    ["multi_to_solo", "solo", { blocked: false, reportTier: "basic", maxStaff: 5, canAccessAPI: false, canEmailReports: false, canManageAlertRecipients: false }],
     // Upgrade: Solo → Practice
     ["solo_to_practice", "practice", { blocked: false, reportTier: "audit", maxStaff: 15, canEmailReports: true, canManageUsers: true }],
-    // Upgrade: Practice → Multi
-    ["practice_to_multi", "multi_location", { blocked: false, reportTier: "white_label", maxStaff: 50, canAccessAPI: true }],
     // Cancel: plan stays unchanged
     ["cancel", "solo", { blocked: false }],
     // Revoke: plan becomes expired_trial
@@ -63,7 +55,7 @@ describe("All subscription transitions behave correctly", () => {
 // ─── ENFORCEMENT LAYER CONSISTENCY ──────────────────────────────────────
 
 describe("Cross-layer consistency: all enforcement layers agree", () => {
-  const allPlans = ["trial", "expired_trial", "inactive", "solo", "practice", "multi_location"] as const;
+  const allPlans = ["trial", "expired_trial", "inactive", "solo", "practice"] as const;
 
   for (const plan of allPlans) {
     it(`${plan}: entitlements and plan limits agree on every field`, () => {
@@ -88,10 +80,9 @@ describe("No feature leak after downgrade", () => {
     expect(solo.hasInspectionReadiness).toBe(false);
   });
 
-  it("Practice (downgraded from Multi) cannot access Multi features", () => {
+  it("Practice cannot access features above its tier", () => {
     const practice = getEntitlements("practice");
-    expect(practice.reportTier).not.toBe("white_label");
-    expect(practice.canAccessAPI).toBe(false);
+    expect(practice.reportTier).toBe("audit");
   });
 
   it("Expired_trial has zero of everything", () => {
@@ -101,7 +92,6 @@ describe("No feature leak after downgrade", () => {
     expect(et.maxUsers).toBe(0);
     expect(et.reportTier).toBe("none");
     expect(et.canEmailReports).toBe(false);
-    expect(et.canAccessAPI).toBe(false);
     expect(et.canManageUsers).toBe(false);
     expect(et.canManageAlertRecipients).toBe(false);
     expect(et.hasInspectionReadiness).toBe(false);
@@ -118,14 +108,6 @@ describe("Upgrade restores all features", () => {
     expect(p.canManageUsers).toBe(true);
     expect(p.canManageAlertRecipients).toBe(true);
     expect(p.hasInspectionReadiness).toBe(true);
-  });
-
-  it("Practice→Multi: API access, white-label, higher limits", () => {
-    const m = getEntitlements("multi_location");
-    expect(m.canAccessAPI).toBe(true);
-    expect(m.reportTier).toBe("white_label");
-    expect(m.maxStaff).toBe(50);
-    expect(m.canEmailReports).toBe(true);
   });
 
   it("Expired_trial→Practice: full restoration", () => {
@@ -147,7 +129,6 @@ describe("Report tier boundaries", () => {
     ["inactive", "none"],
     ["solo", "basic"],
     ["practice", "audit"],
-    ["multi_location", "white_label"],
   ];
 
   for (const [plan, expected] of tiers) {
@@ -175,7 +156,6 @@ describe("Unknown plan falls back safely", () => {
     expect(e.maxStaff).toBe(0);
     expect(e.reportTier).toBe("none");
     expect(e.canEmailReports).toBe(false);
-    expect(e.canAccessAPI).toBe(false);
     expect(e.canManageUsers).toBe(false);
   });
 });
@@ -184,7 +164,7 @@ describe("Unknown plan falls back safely", () => {
 
 describe("Blocked plan behavior", () => {
   it("active plans are never blocked", () => {
-    for (const plan of ["trial", "solo", "practice", "multi_location"]) {
+    for (const plan of ["trial", "solo", "practice"]) {
       expect(getEntitlements(plan).blocked).toBe(false);
     }
   });
@@ -199,27 +179,6 @@ describe("Blocked plan behavior", () => {
   });
 });
 
-// ─── API ENTITLEMENT (future-proof) ──────────────────────────────────────
-
-describe("API entitlement is future-proof", () => {
-  it("only multi_location has API access", () => {
-    for (const plan of ["trial", "expired_trial", "inactive", "solo", "practice"]) {
-      expect(getEntitlements(plan).canAccessAPI).toBe(false);
-    }
-    expect(getEntitlements("multi_location").canAccessAPI).toBe(true);
-  });
-
-  it("no other feature implies API access", () => {
-    const multi = getEntitlements("multi_location");
-    expect(multi.canAccessAPI).toBe(true);
-    expect(multi.canEmailReports).toBe(true);
-    expect(multi.canManageUsers).toBe(true);
-    const practice = getEntitlements("practice");
-    expect(practice.canAccessAPI).toBe(false);
-    expect(practice.canEmailReports).toBe(true);
-  });
-});
-
 // ─── ALERT RECIPIENT ENTITLEMENT ────────────────────────────────────────
 
 describe("Alert recipient entitlement enforced", () => {
@@ -229,18 +188,16 @@ describe("Alert recipient entitlement enforced", () => {
     }
     expect(getEntitlements("trial").canManageAlertRecipients).toBe(true);
     expect(getEntitlements("practice").canManageAlertRecipients).toBe(true);
-    expect(getEntitlements("multi_location").canManageAlertRecipients).toBe(true);
   });
 });
 
 // ─── EMAIL REPORTS ───────────────────────────────────────────────────────
 
 describe("Email report entitlement enforced", () => {
-  it("only practice+multi can email reports", () => {
+  it("only practice can email reports", () => {
     for (const plan of ["trial", "expired_trial", "inactive", "solo"]) {
       expect(getEntitlements(plan).canEmailReports).toBe(false);
     }
     expect(getEntitlements("practice").canEmailReports).toBe(true);
-    expect(getEntitlements("multi_location").canEmailReports).toBe(true);
   });
 });

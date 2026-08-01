@@ -5,47 +5,44 @@ const CATEGORIES = [
   {
     category: "Credential Tracking",
     rows: [
-      { feature: "Staff members", solo: "5", practice: "15", multi: "50" },
-      { feature: "Credentials", solo: "50", practice: "300", multi: "1,000" },
-      { feature: "Custom credential types", solo: "✓", practice: "✓", multi: "✓" },
-      { feature: "Document uploads", solo: "✓", practice: "✓", multi: "✓" },
-      { feature: "Verify Now (license URL)", solo: "✓", practice: "✓", multi: "✓" },
+      { feature: "Staff members", solo: "5", practice: "15" },
+      { feature: "Credentials", solo: "50", practice: "300" },
+      { feature: "Custom credential types", solo: "✓", practice: "✓" },
+      { feature: "Document uploads", solo: "✓", practice: "✓" },
+      { feature: "Verify Now (license URL)", solo: "✓", practice: "✓" },
     ],
   },
   {
     category: "Alerts",
     rows: [
-      { feature: "Email expiration alerts (90/60/30/7 days)", solo: "✓", practice: "✓", multi: "✓" },
-      { feature: "Escalation alerts (expired 7+ days)", solo: "✓", practice: "✓", multi: "✓" },
-      { feature: "Alert recipients", solo: "—", practice: "✓", multi: "✓" },
-      { feature: "Quarterly audit reminder", solo: "—", practice: "✓", multi: "✓" },
+      { feature: "Email expiration alerts (90/60/30/7 days)", solo: "✓", practice: "✓" },
+      { feature: "Escalation alerts (expired 7+ days)", solo: "✓", practice: "✓" },
+      { feature: "Alert recipients", solo: "—", practice: "✓" },
+      { feature: "Quarterly audit reminder", solo: "—", practice: "✓" },
     ],
   },
   {
     category: "Reports",
     rows: [
-      { feature: "Basic compliance report (PDF)", solo: "✓", practice: "✓", multi: "✓" },
-      { feature: "Audit-ready report with attachments", solo: "—", practice: "✓", multi: "✓" },
-      { feature: "Readiness report (PDF)", solo: "—", practice: "✓", multi: "✓" },
-      { feature: "White-label reports", solo: "—", practice: "—", multi: "✓" },
+      { feature: "Basic compliance report (PDF)", solo: "✓", practice: "✓" },
+      { feature: "Audit-ready report with attachments", solo: "—", practice: "✓" },
+      { feature: "Readiness report (PDF)", solo: "—", practice: "✓" },
     ],
   },
   {
     category: "Inspection Readiness",
     rows: [
-      { feature: "7-point readiness checklist", solo: "—", practice: "✓", multi: "✓" },
-      { feature: "Auto-fill from credential data", solo: "—", practice: "✓", multi: "✓" },
-      { feature: "Readiness score (0-100)", solo: "—", practice: "✓", multi: "✓" },
-      { feature: "Gap remediation tracker", solo: "—", practice: "✓", multi: "✓" },
+      { feature: "7-point readiness checklist", solo: "—", practice: "✓" },
+      { feature: "Auto-fill from credential data", solo: "—", practice: "✓" },
+      { feature: "Readiness score (0-100)", solo: "—", practice: "✓" },
+      { feature: "Gap remediation tracker", solo: "—", practice: "✓" },
     ],
   },
   {
     category: "Account",
     rows: [
-      { feature: "Users", solo: "1", practice: "3", multi: "10" },
-      { feature: "Locations", solo: "1", practice: "1", multi: "5" },
-      { feature: "User roles (owner/manager/viewer)", solo: "—", practice: "✓", multi: "✓" },
-      { feature: "API access", solo: "—", practice: "—", multi: "✓" },
+      { feature: "Users", solo: "1", practice: "3" },
+      { feature: "User roles (owner/manager/viewer)", solo: "—", practice: "✓" },
     ],
   },
 ];
@@ -59,14 +56,13 @@ export function ComparisonTable() {
             <TableHead className="w-[40%]">Feature</TableHead>
             <TableHead className="text-center">Solo</TableHead>
             <TableHead className="text-center">Practice</TableHead>
-            <TableHead className="text-center">Multi-Location</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {CATEGORIES.map((cat) => (
             <React.Fragment key={cat.category}>
               <TableRow key={cat.category} className="bg-muted/50">
-                <TableCell colSpan={4} className="font-semibold text-sm text-foreground">
+                <TableCell colSpan={3} className="font-semibold text-sm text-foreground">
                   {cat.category}
                 </TableCell>
               </TableRow>
@@ -75,7 +71,6 @@ export function ComparisonTable() {
                   <TableCell className="text-sm text-foreground">{row.feature}</TableCell>
                   <TableCell className="text-center text-sm text-muted-foreground">{row.solo}</TableCell>
                   <TableCell className="text-center text-sm text-muted-foreground">{row.practice}</TableCell>
-                  <TableCell className="text-center text-sm text-muted-foreground">{row.multi}</TableCell>
                 </TableRow>
               ))}
             </React.Fragment>

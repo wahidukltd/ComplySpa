@@ -13,18 +13,15 @@ import {
 interface ReportEmailParams {
   clinicName: string;
   reportId: string;
-  isWhiteLabel: boolean;
   subject: string;
 }
 
 export function buildReportEmailHtml(params: ReportEmailParams): string {
-  const heading = params.isWhiteLabel ? "Compliance Report" : "Compliance Audit Report";
-  const bodyBlurb = params.isWhiteLabel
-    ? "Your compliance report has been generated and is attached to this email."
-    : "Your compliance audit report has been generated and is attached to this email.";
-  const footerNote = params.isWhiteLabel
-    ? ""
-    : "This report was generated from your credential tracking system at ComplySpa. Verify all information before submitting to a regulatory body.";
+  const heading = "Compliance Audit Report";
+  const bodyBlurb =
+    "Your compliance audit report has been generated and is attached to this email.";
+  const footerNote =
+    "This report was generated from your credential tracking system at ComplySpa. Verify all information before submitting to a regulatory body.";
 
   return emailLayout({
     previewText: `${heading} for ${params.clinicName} is ready for download.`,
@@ -49,9 +46,7 @@ export function buildReportEmailHtml(params: ReportEmailParams): string {
   });
 }
 
-export function buildReportSubject(clinicName: string, isWhiteLabel: boolean): string {
+export function buildReportSubject(clinicName: string): string {
   const name = htmlEscape(clinicName);
-  return isWhiteLabel
-    ? `Compliance Report \u2014 ${name}`
-    : `Compliance Audit Report \u2014 ${name}`;
+  return `Compliance Audit Report \u2014 ${name}`;
 }

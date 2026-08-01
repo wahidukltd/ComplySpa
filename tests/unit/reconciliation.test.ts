@@ -13,25 +13,6 @@ describe("Downgrade reconciliation — resource limits", () => {
     expect(before.maxUsers).toBe(3);
     expect(after.maxUsers).toBe(1);
   });
-
-  it("Multi → Practice: staff drops to 15, creds to 300, users to 3", () => {
-    const before = getPlanLimits("multi_location");
-    const after = getPlanLimits("practice");
-    expect(before.maxStaff).toBe(50);
-    expect(after.maxStaff).toBe(15);
-    expect(before.maxCredentials).toBe(1000);
-    expect(after.maxCredentials).toBe(300);
-    expect(before.maxUsers).toBe(10);
-    expect(after.maxUsers).toBe(3);
-  });
-
-  it("Multi → Solo: limits drop to smallest paid tier", () => {
-    const multi = getPlanLimits("multi_location");
-    const solo = getPlanLimits("solo");
-    expect(multi.maxStaff).toBeGreaterThan(solo.maxStaff);
-    expect(multi.maxCredentials).toBeGreaterThan(solo.maxCredentials);
-    expect(multi.maxUsers).toBeGreaterThan(solo.maxUsers);
-  });
 });
 
 describe("Downgrade — feature tier changes", () => {
@@ -48,18 +29,8 @@ describe("Downgrade — feature tier changes", () => {
     expect(solo.canManageAlertRecipients).toBe(false);
   });
 
-  it("Multi → Practice: lose API access and white-label reports", () => {
-    const multi = getEntitlements("multi_location");
-    const practice = getEntitlements("practice");
-    expect(multi.canAccessAPI).toBe(true);
-    expect(practice.canAccessAPI).toBe(false);
-    expect(multi.reportTier).toBe("white_label");
-    expect(practice.reportTier).toBe("audit");
-  });
-
-  it("Multi → Solo: lose everything above basic", () => {
+  it("Solo: no email, no user mgmt, no alert recipients — basic tier only", () => {
     const solo = getEntitlements("solo");
-    expect(solo.canAccessAPI).toBe(false);
     expect(solo.canEmailReports).toBe(false);
     expect(solo.canManageUsers).toBe(false);
     expect(solo.canManageAlertRecipients).toBe(false);
@@ -74,19 +45,12 @@ describe("Upgrade — resource restoration", () => {
     expect(practice.canEmailReports).toBe(true);
     expect(practice.canManageUsers).toBe(true);
     expect(practice.canManageAlertRecipients).toBe(true);
-  });
-
-  it("Practice → Multi: API access granted, reports become white-label", () => {
-    const practice = getEntitlements("practice");
-    const multi = getEntitlements("multi_location");
-    expect(multi.canAccessAPI).toBe(true);
-    expect(multi.reportTier).toBe("white_label");
-    expect(multi.maxStaff).toBeGreaterThan(practice.maxStaff);
+    expect(practice.maxStaff).toBeGreaterThan(getEntitlements("solo").maxStaff);
   });
 });
 
 describe("Reconciliation — RPC boundary values", () => {
-  const allPlans = ["expired_trial", "inactive", "solo", "practice", "multi_location"] as const;
+  const allPlans = ["expired_trial", "inactive", "solo", "practice"] as const;
 
   for (const plan of allPlans) {
     it(`${plan}: limits are non-negative and consistent`, () => {
@@ -95,7 +59,7 @@ describe("Reconciliation — RPC boundary values", () => {
       expect(limits.maxCredentials).toBeGreaterThanOrEqual(0);
       expect(limits.maxUsers).toBeGreaterThanOrEqual(0);
       const e = getEntitlements(plan);
-      expect(e.reportTier).toMatch(/^(none|basic|audit|white_label)$/);
+      expect(e.reportTier).toMatch(/^(none|basic|audit)$/);
     });
   }
 });
@@ -104,11 +68,6 @@ describe("Report tier reconciliation", () => {
   it("downgrade from audit to basic: new reports are basic", () => {
     expect(getReportTier("practice")).toBe("audit");
     expect(getReportTier("solo")).toBe("basic");
-  });
-
-  it("downgrade from white_label to audit: new reports are audit", () => {
-    expect(getReportTier("multi_location")).toBe("white_label");
-    expect(getReportTier("practice")).toBe("audit");
   });
 
   it("downgrade from basic to expired_trial: no reports", () => {
@@ -124,7 +83,6 @@ describe("Every plan has deterministic report tier", () => {
     inactive: "none",
     solo: "basic",
     practice: "audit",
-    multi_location: "white_label",
   };
 
   for (const [plan, expected] of Object.entries(tiers)) {
@@ -133,3 +91,4 @@ describe("Every plan has deterministic report tier", () => {
     });
   }
 });
+

@@ -100,6 +100,26 @@ describe("Migration integrity", () => {
     });
   }
 
+  it("scan functions keep the migration-034 suspended-resource filters", () => {
+    // Regression guard: migration 034 added c.suspended_at IS NULL +
+    // sm.suspended_at IS NULL to both alert scan functions; 045 must not
+    // regress them (a re-created body from the pre-034 source would email
+    // alerts for suspended staff/credentials after a downgrade).
+    for (const fn of ["scan_expiring_credentials", "scan_escalation_alerts"]) {
+      const body = execSql(`SELECT prosrc FROM pg_proc WHERE proname = '${fn}'`);
+      expect(body).toContain("c.suspended_at IS NULL");
+      expect(body).toContain("sm.suspended_at IS NULL");
+      expect(body).not.toContain("'multi_location'");
+    }
+  });
+
+  it("scan_audit_overdue is not resurrected (feature removed in migration 023)", () => {
+    const result = execSql(
+      "SELECT count(*) FROM pg_proc WHERE proname = 'scan_audit_overdue'",
+    );
+    expect(parseInt(result, 10)).toBe(0);
+  });
+
   it("4 cron jobs are scheduled", () => {
     const result = execSql(
       `SELECT count(*) FROM cron.job WHERE jobname IN (${inList(EXPECTED_CRON_JOBS)})`,

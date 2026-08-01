@@ -27,7 +27,7 @@ const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 const APP_URL = Deno.env.get("APP_URL") || Deno.env.get("NEXT_PUBLIC_APP_URL") || "http://localhost:3000";
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Compliance Alerts <alerts@complyspa.com>";
 
-const ACTIVE_PLANS = new Set(["trial", "solo", "practice", "multi_location"]);
+const ACTIVE_PLANS = new Set(["trial", "solo", "practice"]);
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   Sentry.captureMessage("send-credential-alert: Missing Supabase credentials", { level: "error" });

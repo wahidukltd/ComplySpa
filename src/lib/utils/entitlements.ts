@@ -1,5 +1,5 @@
-export type Plan = "trial" | "expired_trial" | "inactive" | "solo" | "practice" | "multi_location";
-export type ReportTier = "none" | "basic" | "audit" | "white_label";
+export type Plan = "trial" | "expired_trial" | "inactive" | "solo" | "practice";
+export type ReportTier = "none" | "basic" | "audit";
 
 export interface Entitlements {
   maxStaff: number;
@@ -7,7 +7,6 @@ export interface Entitlements {
   maxUsers: number;
   reportTier: ReportTier;
   canEmailReports: boolean;
-  canAccessAPI: boolean;
   canManageUsers: boolean;
   canManageAlertRecipients: boolean;
   hasInspectionReadiness: boolean;
@@ -22,7 +21,6 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxUsers: 100,
     reportTier: "none",
     canEmailReports: false,
-    canAccessAPI: false,
     canManageUsers: true,
     canManageAlertRecipients: true,
     hasInspectionReadiness: true,
@@ -34,7 +32,6 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxUsers: 0,
     reportTier: "none",
     canEmailReports: false,
-    canAccessAPI: false,
     canManageUsers: false,
     canManageAlertRecipients: false,
     hasInspectionReadiness: false,
@@ -47,7 +44,6 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxUsers: 0,
     reportTier: "none",
     canEmailReports: false,
-    canAccessAPI: false,
     canManageUsers: false,
     canManageAlertRecipients: false,
     hasInspectionReadiness: false,
@@ -60,7 +56,6 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxUsers: 1,
     reportTier: "basic",
     canEmailReports: false,
-    canAccessAPI: false,
     canManageUsers: false,
     canManageAlertRecipients: false,
     hasInspectionReadiness: false,
@@ -72,19 +67,6 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxUsers: 3,
     reportTier: "audit",
     canEmailReports: true,
-    canAccessAPI: false,
-    canManageUsers: true,
-    canManageAlertRecipients: true,
-    hasInspectionReadiness: true,
-    blocked: false,
-  },
-  multi_location: {
-    maxStaff: 50,
-    maxCredentials: 1000,
-    maxUsers: 10,
-    reportTier: "white_label",
-    canEmailReports: true,
-    canAccessAPI: true,
     canManageUsers: true,
     canManageAlertRecipients: true,
     hasInspectionReadiness: true,

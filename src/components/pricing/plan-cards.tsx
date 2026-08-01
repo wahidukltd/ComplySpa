@@ -42,22 +42,6 @@ const PLANS = [
     ],
     popular: true,
   },
-  {
-    name: "Multi-Location",
-    monthly: 79,
-    annual: 790,
-    description: "For multi-location operations",
-    features: [
-      "50 staff members",
-      "1000 credentials",
-      "All Practice features",
-      "5 locations",
-      "10 users",
-      "API access",
-      "White-label reports",
-    ],
-    popular: false,
-  },
 ];
 
 export function PlanCards({ checkoutUrls }: Props) {
@@ -90,7 +74,7 @@ export function PlanCards({ checkoutUrls }: Props) {
       </div>
 
       {/* Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         {PLANS.map((plan, i) => (
           <motion.div
             key={plan.name}

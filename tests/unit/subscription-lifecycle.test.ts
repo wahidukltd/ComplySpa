@@ -41,7 +41,7 @@ describe("Purchase during trial immediately ends trial", () => {
 });
 
 describe("Upgrade path transitions", () => {
-  const plans = ["solo", "practice", "multi_location"] as const;
+  const plans = ["solo", "practice"] as const;
 
   it("solo → practice: higher limits, more users, email reports", () => {
     const solo = getEntitlements("solo");
@@ -53,33 +53,16 @@ describe("Upgrade path transitions", () => {
     expect(practice.canManageUsers).toBe(true);
   });
 
-  it("practice → multi_location: highest limits, API access", () => {
-    const practice = getEntitlements("practice");
-    const multi = getEntitlements("multi_location");
-    expect(multi.maxStaff).toBeGreaterThan(practice.maxStaff);
-    expect(multi.canAccessAPI).toBe(true);
-    expect(multi.reportTier).toBe("white_label");
-  });
-
   for (const plan of plans) {
     it(`${plan}: never blocked, has report tier`, () => {
       const e = getEntitlements(plan);
       expect(e.blocked).toBe(false);
-      expect(["basic", "audit", "white_label"]).toContain(e.reportTier);
+      expect(["basic", "audit"]).toContain(e.reportTier);
     });
   }
 });
 
 describe("Downgrade transitions", () => {
-  it("multi_location → practice: lose API, white_label → audit", () => {
-    const multi = getEntitlements("multi_location");
-    const practice = getEntitlements("practice");
-    expect(multi.canAccessAPI).toBe(true);
-    expect(practice.canAccessAPI).toBe(false);
-    expect(multi.reportTier).toBe("white_label");
-    expect(practice.reportTier).toBe("audit");
-  });
-
   it("practice → solo: lose email, audit → basic, lose user mgmt", () => {
     const practice = getEntitlements("practice");
     const solo = getEntitlements("solo");
@@ -87,6 +70,8 @@ describe("Downgrade transitions", () => {
     expect(solo.canEmailReports).toBe(false);
     expect(practice.canManageUsers).toBe(true);
     expect(solo.canManageUsers).toBe(false);
+    expect(practice.reportTier).toBe("audit");
+    expect(solo.reportTier).toBe("basic");
   });
 });
 
@@ -128,7 +113,7 @@ describe("Trial expiry transitions", () => {
 });
 
 describe("Feature entitlement consistency across all plans", () => {
-  const allPlans = ["trial", "expired_trial", "inactive", "solo", "practice", "multi_location"];
+  const allPlans = ["trial", "expired_trial", "inactive", "solo", "practice"];
 
   for (const plan of allPlans) {
     it(`${plan}: maxStaff ≥ maxUsers`, () => {
@@ -144,19 +129,11 @@ describe("Feature entitlement consistency across all plans", () => {
     });
   }
 
-  it("only multi_location has API access", () => {
-    for (const plan of ["trial", "expired_trial", "inactive", "solo", "practice"]) {
-      expect(getEntitlements(plan).canAccessAPI).toBe(false);
-    }
-    expect(getEntitlements("multi_location").canAccessAPI).toBe(true);
-  });
-
-  it("only practice+multi have email reports", () => {
+  it("only practice has email reports", () => {
     for (const plan of ["trial", "expired_trial", "inactive", "solo"]) {
       expect(getEntitlements(plan).canEmailReports).toBe(false);
     }
     expect(getEntitlements("practice").canEmailReports).toBe(true);
-    expect(getEntitlements("multi_location").canEmailReports).toBe(true);
   });
 });
 
@@ -177,7 +154,7 @@ describe("No duplicate trial protection (app layer)", () => {
 });
 
 describe("DB trigger limits match entitlements", () => {
-  const plans = ["trial", "solo", "practice", "multi_location", "expired_trial", "inactive"];
+  const plans = ["trial", "solo", "practice", "expired_trial", "inactive"];
 
   for (const plan of plans) {
     it(`${plan}: getPlanLimits matches getEntitlements`, () => {

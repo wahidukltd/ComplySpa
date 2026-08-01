@@ -12,11 +12,10 @@ const PLAN_LOOKUP: Record<string, string> = {
   trial: "Free Trial",
   solo: "Solo",
   practice: "Practice",
-  multi_location: "Multi-Location",
   expired_trial: "Expired Trial",
   inactive: "Inactive",
 };
-const PAID_PLANS = new Set(["solo", "practice", "multi_location"]);
+const PAID_PLANS = new Set(["solo", "practice"]);
 
 export default async function BillingSettingsPage() {
   const supabase = await createClient();
@@ -165,10 +164,6 @@ export default async function BillingSettingsPage() {
           <div className="flex justify-between">
             <span style={{ color: "rgba(0,0,0,0.55)" }}>Email Reports</span>
             <span style={{ color: "#000000" }}>{entitlements.canEmailReports ? "Yes" : "No"}</span>
-          </div>
-          <div className="flex justify-between">
-            <span style={{ color: "rgba(0,0,0,0.55)" }}>API Access</span>
-            <span style={{ color: "#000000" }}>{entitlements.canAccessAPI ? "Yes" : "No"}</span>
           </div>
         </div>
       </div>

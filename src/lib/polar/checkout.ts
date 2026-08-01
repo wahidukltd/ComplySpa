@@ -2,12 +2,11 @@ import { Polar } from "@polar-sh/sdk";
 import { polarConfig, APP_URL } from "./config";
 import * as Sentry from "@sentry/nextjs";
 
-export type PlanId = "solo" | "practice" | "multi_location";
+export type PlanId = "solo" | "practice";
 
 const PRODUCT_PRICE_IDS: Record<PlanId, string> = {
   solo: polarConfig.soloProductPriceId,
   practice: polarConfig.practiceProductPriceId,
-  multi_location: polarConfig.multiLocationProductPriceId,
 };
 
 export interface CheckoutLinkResult {

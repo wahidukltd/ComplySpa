@@ -31,7 +31,7 @@ const FAQS = [
   },
   {
     question: "Do you integrate with my EMR?",
-    answer: "Not yet. We focus on compliance tracking, not scheduling or patient records. EMR integration is on the roadmap for the Multi-Location plan.",
+    answer: "Not yet. We focus on compliance tracking, not scheduling or patient records. EMR integration is on the roadmap.",
   },
 ];
 

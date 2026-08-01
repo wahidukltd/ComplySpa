@@ -14,7 +14,6 @@ const SIGNED_URL_EXPIRY = 3600;
 const tierLabels: Record<string, { label: string; desc: string }> = {
   basic: { label: "Basic Compliance Report", desc: "Credential status summary and upcoming renewals. Download as PDF." },
   audit: { label: "Audit-Ready Report", desc: "Full staff credential register, executive summary, status breakdown, upcoming renewals, and attestation. Download as PDF or email directly." },
-  white_label: { label: "Enterprise Report (White-Label)", desc: "Unbranded audit-ready report suitable for sharing with partners and regulatory bodies. Download as PDF or email directly." },
 };
 
 export default async function ReportsPage() {

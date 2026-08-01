@@ -11,7 +11,6 @@ describe("Trial expiration → suspended state", () => {
     expect(e.maxUsers).toBe(0);
     expect(e.reportTier).toBe("none");
     expect(e.canEmailReports).toBe(false);
-    expect(e.canAccessAPI).toBe(false);
     expect(e.canManageUsers).toBe(false);
     expect(e.canManageAlertRecipients).toBe(false);
   });
@@ -29,7 +28,7 @@ describe("Trial expiration → suspended state", () => {
 });
 
 describe("Activation after expired_trial → full restoration", () => {
-  const paidPlans = ["solo", "practice", "multi_location"] as const;
+  const paidPlans = ["solo", "practice"] as const;
 
   for (const plan of paidPlans) {
     it(`${plan}: blocked=false, report tier active, limits restored`, () => {
@@ -84,7 +83,7 @@ describe("No duplicate account after trial", () => {
 });
 
 describe("Every plan has consistent block/limit/report state", () => {
-  const allStates = ["trial", "expired_trial", "inactive", "solo", "practice", "multi_location"] as const;
+  const allStates = ["trial", "expired_trial", "inactive", "solo", "practice"] as const;
 
   for (const plan of allStates) {
     it(`${plan}: blocked implies zero limits`, () => {
@@ -128,10 +127,12 @@ describe("Middleware redirect logic", () => {
   });
 
   it("active plans (including trial) can reach dashboard", () => {
-    const activePlans = ["trial", "solo", "practice", "multi_location"];
+    const activePlans = ["trial", "solo", "practice"];
     for (const plan of activePlans) {
       const e = getEntitlements(plan);
       expect(e.blocked).toBe(false);
     }
   });
 });
+
+

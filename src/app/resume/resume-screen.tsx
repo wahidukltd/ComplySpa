@@ -52,7 +52,7 @@ export function ResumeScreen({ clinicName, staffCount, credentialCount, plan, pl
     setLoadingPlan(planId);
     setError(null);
     try {
-      const url = await getCheckoutUrl(planId as "solo" | "practice" | "multi_location");
+      const url = await getCheckoutUrl(planId as "solo" | "practice");
       if (url) {
         window.open(url, "_blank", "noopener");
         setSubscribed(true);

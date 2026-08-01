@@ -34,7 +34,6 @@ export default async function ResumePage() {
   const plans: { id: PlanId; name: string; monthly: number }[] = [
     { id: "solo", name: "Solo", monthly: 29 },
     { id: "practice", name: "Practice", monthly: 49 },
-    { id: "multi_location", name: "Multi-Location", monthly: 79 },
   ];
 
   return (

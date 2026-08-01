@@ -13,7 +13,7 @@ import { polarConfig } from "@/lib/polar/config";
 export const metadata: Metadata = {
   title: "Plans & Pricing — Simple, Transparent Compliance Pricing",
   description:
-    "Solo $29/mo, Practice $49/mo, Multi-Location $79/mo. 14-day free trial, no credit card required.",
+    "Solo $29/mo, Practice $49/mo. 14-day free trial, no credit card required.",
   alternates: { canonical: "/pricing" },
   openGraph: {
     title: "Med Spa Compliance Pricing — $29/mo and up",
@@ -36,16 +36,9 @@ const pricingJsonLd = {
     {
       "@type": "Offer",
       name: "Practice Plan",
-      price: "79.00",
+      price: "49.00",
       priceCurrency: "USD",
       description: "15 staff, 300 credentials, email alerts, audit-ready reports, inspection-readiness engine.",
-    },
-    {
-      "@type": "Offer",
-      name: "Multi-Location Plan",
-      price: "149.00",
-      priceCurrency: "USD",
-      description: "50 staff, 1000 credentials, 5 locations, API access, white-label reports.",
     },
   ],
 };
@@ -71,7 +64,7 @@ export default async function PricingPage() {
             .single();
           if (clinic) {
             checkoutUrls = {};
-            for (const plan of ["solo", "practice", "multi_location"] as const) {
+            for (const plan of ["solo", "practice"] as const) {
               const result = await createCheckoutLink(plan, clinic.polar_customer_id ?? undefined, {
                 clinic_id: clinic.id,
                 plan,

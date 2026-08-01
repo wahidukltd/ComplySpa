@@ -32,9 +32,9 @@ describe("Plan Enforcement Logic", () => {
     expect(currentCount >= limits.maxStaff).toBe(false);
   });
 
-  it("multi_location at 10 users: count >= maxUsers → should block", () => {
-    const limits = getPlanLimits("multi_location");
-    const currentCount = 10;
+  it("practice at 3 users: count >= maxUsers → should block", () => {
+    const limits = getPlanLimits("practice");
+    const currentCount = 3;
     expect(currentCount >= limits.maxUsers).toBe(true);
   });
 

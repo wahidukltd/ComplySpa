@@ -25,6 +25,9 @@ function SignUpFormInner() {
   const [isConfirmationSent, setIsConfirmationSent] = useState(false);
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan");
+  // Only label known plans — a stale/dead ?plan= value must not render a
+  // misleading "Practice" label (onboarding/page.tsx rejects unknown values).
+  const planLabel = plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : null;
 
   const callbackUrl = `${window.location.origin}/auth/callback?next=/email-verified${plan ? `&plan=${plan}` : ""}`;
 
@@ -87,7 +90,7 @@ function SignUpFormInner() {
   return (
     <AuthCard
       title="Create an account"
-      description={`Enter your details to get started${plan ? ` with ${plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : "Multi-Location"} plan` : ""}`}
+      description={`Enter your details to get started${planLabel ? ` with ${planLabel} plan` : ""}`}
       footer={
         <>
           Already have an account?{" "}
@@ -98,9 +101,9 @@ function SignUpFormInner() {
       }
     >
       <div className="space-y-4">
-        {plan && (
+        {planLabel && (
           <p className="text-xs text-muted-foreground text-center">
-            You selected <strong>{plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : "Multi-Location"}</strong>. After verifying, you will subscribe.
+            You selected <strong>{planLabel}</strong>. After verifying, you will subscribe.
           </p>
         )}
         <button

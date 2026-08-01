@@ -15,7 +15,7 @@ interface Props {
 
 export function ReportGenerator({ clinicId, isTrial }: Props) {
   const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [reportTier, setReportTier] = useState<"basic" | "audit" | "white_label" | null>(null);
+  const [reportTier, setReportTier] = useState<"basic" | "audit" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -82,7 +82,7 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
     [reportData, reportTier],
   );
 
-  const canEmail = reportTier === "audit" || reportTier === "white_label";
+  const canEmail = reportTier === "audit";
 
   if (loading) {
     return (
@@ -118,9 +118,7 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
   }
 
   const safeName = reportData.clinic.name.replace(/\s+/g, "-").toLowerCase();
-  const fileName = reportTier === "white_label"
-    ? `${safeName}-report.pdf`
-    : `compliance-report-${safeName}.pdf`;
+  const fileName = `compliance-report-${safeName}.pdf`;
 
   return (
     <div className="space-y-4">

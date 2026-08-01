@@ -12,7 +12,7 @@ export default async function EmailVerifiedPage(props: { searchParams: Promise<{
   }
 
   const { plan } = await props.searchParams;
-  const planLabel = plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : plan === "multi_location" ? "Multi-Location" : null;
+  const planLabel = plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : null;
   const emailHtml = user.email ? user.email.replace(/(.{3}).+(@.+)/, "$1***$2") : "your email";
 
   return (
