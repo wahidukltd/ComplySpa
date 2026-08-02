@@ -9,6 +9,7 @@ import { ActionList } from "@/components/overview/action-list";
 import { formatUnresolvedStaff } from "@/lib/utils/overview-copy";
 import { RefreshButton } from "@/components/overview/refresh-button";
 import { UpdatedLabel } from "@/components/overview/updated-label";
+import { formatRelativeTime } from "@/lib/utils/date";
 import {
   Users,
   ShieldCheck,
@@ -295,18 +296,6 @@ function RecentChanges({ changes }: { changes: RecentChange[] }) {
   );
 }
 
-function formatRelativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(iso));
-}
-
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -345,19 +334,22 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {data.failedAlerts && (
-        <Card className="border-destructive/40 bg-destructive/10">
-          <CardContent className="flex items-center gap-3 py-4">
-            <AlertTriangle className="size-5 shrink-0 text-destructive" />
-            <div>
-              <p className="text-sm font-medium text-destructive">
-                {data.failedAlerts.count} alert{data.failedAlerts.count > 1 ? "s" : ""} failed to deliver
-              </p>
+      {data.systemHealth.degraded && (
+        <Card className="border-warning bg-warning-tint">
+          <CardContent className="flex items-start gap-3 py-4">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-warning-foreground">System health alert</p>
+              <ul className="mt-1 space-y-1 text-sm text-warning-foreground">
+                {data.systemHealth.issues.map((issue) => (
+                  <li key={`${issue.kind}:${issue.label}`}>{issue.label}</li>
+                ))}
+              </ul>
               <Link
-                href="/dashboard/alerts"
-                className="text-sm text-destructive underline hover:text-destructive/80"
+                href="/dashboard/settings/notifications?status=failed"
+                className="mt-1 inline-block text-xs text-primary underline-offset-4 hover:underline"
               >
-                View alert history →
+                Investigate in Notification History →
               </Link>
             </div>
           </CardContent>

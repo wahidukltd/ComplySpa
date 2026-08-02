@@ -1,42 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/layout/page-header";
-import { AlertList } from "@/components/alerts/alert-list";
 
-export const dynamic = "force-dynamic";
-
-export default async function AlertsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const userId = user?.id;
-  if (!userId) redirect("/sign-in");
-  const { data: userRecord, error: userErr } = await supabase
-    .from("users")
-    .select("clinic_id")
-    .eq("auth_user_id", userId)
-    .maybeSingle();
-
-  if (userErr || !userRecord) redirect("/onboarding");
-
-  const { data: alerts, error: alertsError } = await supabase
-    .from("alert_logs")
-    .select("id, clinic_id, credential_id, alert_type, recipient, sent_at, delivery_status, days_before_expiration, created_at, resend_webhook_id")
-    .eq("clinic_id", userRecord.clinic_id)
-    .order("sent_at", { ascending: false })
-    .limit(100);
-
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Alert History"
-        description="Record of all expiration alerts sent for your clinic's credentials."
-      />
-      {alertsError ? (
-        <p className="text-sm text-red-600">Failed to load alerts. Please try again.</p>
-      ) : (
-        <AlertList alerts={alerts ?? []} />
-      )}
-    </div>
-  );
+export default function AlertsRedirectPage() {
+  redirect("/dashboard/settings/notifications");
 }
-

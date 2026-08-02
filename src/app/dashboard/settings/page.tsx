@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, History } from "lucide-react";
 import { ClinicProfileForm } from "@/components/settings/clinic-profile-form";
 import { AlertRecipients } from "@/components/settings/alert-recipients";
 import { CustomCredentialTypes } from "@/components/settings/custom-credential-types";
@@ -59,6 +59,13 @@ export default async function SettingsPage() {
         >
           <ClipboardList className="size-4" />
           Role Templates
+        </Link>
+        <Link
+          href="/dashboard/settings/notifications"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+        >
+          <History className="size-4" />
+          Notification History
         </Link>
       </PageHeader>
 

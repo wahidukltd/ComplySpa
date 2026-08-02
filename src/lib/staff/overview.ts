@@ -5,6 +5,7 @@ import { getStaffReadinessBulk, type ReadinessResult } from "@/lib/staff/readine
 import { getOnboardingStateByStaff } from "@/lib/staff/onboarding";
 import { buildComplianceActionsFromReadiness, type ComplianceAction } from "@/lib/staff/compliance-actions";
 import { computeComplianceHealth } from "@/lib/utils/compliance-health";
+import { computeSystemHealth, CRON_JOBS, type SystemIssue } from "@/lib/utils/notification-history";
 import * as Sentry from "@sentry/nextjs";
 
 export { computeComplianceHealth } from "@/lib/utils/compliance-health";
@@ -32,7 +33,7 @@ export interface OverviewData {
   actionCounts: { critical: number; warning: number; info: number };
   credentialHealth: { total: number; valid: number; expiring: number; expired: number };
   recentChanges: RecentChange[];
-  failedAlerts: { count: number } | null;
+  systemHealth: { degraded: boolean; issues: SystemIssue[] };
   renderedAt: string;
   sectionErrors: string[];
   hasStaff: boolean;
@@ -80,7 +81,7 @@ export async function getOverviewData(clinicId: string): Promise<OverviewData> {
     [] as { id: string; name: string; role: string | null; created_at: string }[],
   );
 
-  const [credentialHealth, onboardingState, recentChanges, failedAlerts] = await Promise.all([
+  const [credentialHealth, onboardingState, recentChanges, systemHealth] = await Promise.all([
     safeSection(
       "credentials",
       errors,
@@ -202,18 +203,43 @@ export async function getOverviewData(clinicId: string): Promise<OverviewData> {
       [] as RecentChange[],
     ),
     safeSection(
-      "alerts",
+      "system_health",
       errors,
       async () => {
-        const { count, error } = await supabase
+        // Platform-level signals only: cron staleness (same jobs/windows as
+        // /api/health) + a delivery-failure burst in 24h. Individual delivery
+        // failures never surface here — they belong to Notification History.
+        // ponytail: 5 RPC calls per overview render (viewers included) — trivial
+        // indexed reads, same function the public /api/health endpoint already
+        // calls; cache/short-circuit if dashboard render volume grows.
+        // check_cron_health is granted EXECUTE to anon (027) — load-bearing for
+        // the public health endpoint; do not revoke.
+        const cronResults = await Promise.all(
+          CRON_JOBS.map(async (job) => {
+            const { data, error } = await supabase.rpc("check_cron_health", {
+              p_jobname: job.jobname,
+              p_max_stale_hours: job.maxStaleHours,
+            });
+            if (error) throw new Error(error.message);
+            // Strict coercion: the RPC contract (026/027) returns real
+            // FALSE for never-run/unknown jobs; errors throw above. NULL
+            // (future contract drift) must not fabricate a cron issue.
+            return { jobname: job.jobname, ok: data === true };
+          }),
+        );
+
+        const { count, error: burstErr } = await supabase
           .from("alert_logs")
           .select("id", { count: "exact", head: true })
           .eq("clinic_id", clinicId)
-          .eq("delivery_status", "failed");
-        throwOnError(error);
-        return { count: count ?? 0 };
+          .eq("delivery_status", "failed")
+          .gt("sent_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+        if (burstErr) throw new Error(burstErr.message);
+
+        const issues = computeSystemHealth(cronResults, count ?? 0);
+        return { degraded: issues.length > 0, issues };
       },
-      { count: 0 },
+      { degraded: false, issues: [] },
     ),
   ]);
 
@@ -270,7 +296,7 @@ export async function getOverviewData(clinicId: string): Promise<OverviewData> {
     actionCounts,
     credentialHealth,
     recentChanges,
-    failedAlerts: failedAlerts.count > 0 ? failedAlerts : null,
+    systemHealth,
     renderedAt,
     sectionErrors: errors,
     hasStaff,
