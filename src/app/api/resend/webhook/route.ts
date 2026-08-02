@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resendWebhookSchema } from "@/lib/validations/webhook";
+import { resolveWebhookTransition } from "@/lib/notifications/webhook-transitions";
 import * as Sentry from "@sentry/nextjs";
 
 const webhookRateLimit = new Map<string, { count: number; resetAt: number }>();
@@ -66,36 +67,37 @@ export async function POST(req: NextRequest) {
 
     const { type, data } = parsed.data;
 
-    const supabase = createAdminClient();
+    const transition = resolveWebhookTransition(type);
+    if (!transition) {
+      // Transient/engagement events (sent, delivery_delayed, opened, clicked)
+      // are no-ops — pending stays correct until a terminal event supersedes it.
+      return NextResponse.json({ received: true });
+    }
 
     if (type === "email.complained") {
       Sentry.captureMessage("Resend webhook: spam complaint received", {
         level: "warning",
         extra: { email_id: data.email_id, to: data.to },
       });
-      await supabase
-        .from("alert_logs")
-        .update({ delivery_status: "failed" })
-        .eq("resend_webhook_id", data.email_id)
-        .eq("delivery_status", "pending");
-      return NextResponse.json({ received: true });
     }
 
-    if (type !== "email.delivered" && type !== "email.bounced") {
-      return NextResponse.json({ received: true });
-    }
+    const supabase = createAdminClient();
 
-    const deliveryStatus = type === "email.delivered" ? "delivered" : "failed";
+    const updates: { delivery_status: string; failure_reason?: string; delivered_at?: string } = {
+      delivery_status: transition.deliveryStatus,
+    };
+    if (transition.failureReason) updates.failure_reason = transition.failureReason;
+    if (transition.deliveredAt) updates.delivered_at = new Date().toISOString();
 
     const { error } = await supabase
       .from("alert_logs")
-      .update({ delivery_status: deliveryStatus })
+      .update(updates)
       .eq("resend_webhook_id", data.email_id)
       .eq("delivery_status", "pending");
 
     if (error) {
       Sentry.captureException(error, {
-        extra: { email_id: data.email_id, delivery_status: deliveryStatus },
+        extra: { email_id: data.email_id, type, updates },
       });
       return NextResponse.json({ error: "Database update failed" }, { status: 500 });
     }

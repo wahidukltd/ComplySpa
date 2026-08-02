@@ -29,7 +29,9 @@ export default async function NotificationHistoryPage() {
         alert_type,
         recipient,
         sent_at,
+        delivered_at,
         delivery_status,
+        failure_reason,
         days_before_expiration,
         resend_webhook_id,
         credential:credentials!alert_logs_credential_id_fkey(
@@ -94,8 +96,9 @@ export default async function NotificationHistoryPage() {
       credentialLabel,
       recipient: alert.recipient,
       sentAt: alert.sent_at,
+      deliveredAt: alert.delivered_at,
       deliveryStatus: alert.delivery_status as NotificationRow["deliveryStatus"],
-      failureDetail: deriveFailureDetail(alert.delivery_status, Boolean(alert.resend_webhook_id)),
+      failureDetail: deriveFailureDetail(alert.delivery_status, alert.failure_reason, Boolean(alert.resend_webhook_id)),
     };
   });
 

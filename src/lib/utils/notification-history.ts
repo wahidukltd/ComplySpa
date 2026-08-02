@@ -14,11 +14,25 @@ export function deriveNotificationType(daysBefore: number): NotificationTypeInfo
   return { kind: "expiration", label: `Expiration reminder — ${daysBefore}d before` };
 }
 
-/** Derived failure detail from existing signals (alert_logs stores no failure
- * reason): send failures never produce a Resend message id, while
- * bounce/complaint failures arrive via the webhook with one. */
-export function deriveFailureDetail(deliveryStatus: string, hasWebhookId: boolean): string | null {
+const FAILURE_REASON_LABELS: Record<string, string> = {
+  send_failed: "Failed at send",
+  bounced: "Bounced by the recipient's server",
+  complained: "Marked as spam",
+  rejected: "Rejected after delivery attempt",
+  suppressed: "Recipient is suppressed (do-not-send list)",
+  no_delivery_confirmation: "No delivery confirmation received",
+};
+
+/** Human label for a failed delivery. Stored reasons map directly; legacy
+ * rows without a reason fall back to the closest signal (a Resend webhook id
+ * means the send was accepted and a provider event later marked it failed). */
+export function deriveFailureDetail(
+  deliveryStatus: string,
+  failureReason: string | null,
+  hasWebhookId: boolean,
+): string | null {
   if (deliveryStatus !== "failed") return null;
+  if (failureReason) return FAILURE_REASON_LABELS[failureReason] ?? failureReason;
   return hasWebhookId
     ? "Bounced or complained after delivery attempt"
     : "Failed at send";
@@ -50,6 +64,7 @@ export const CRON_JOBS = [
   { jobname: "daily-escalation-scan", maxStaleHours: 25 },
   { jobname: "daily-trial-expiry-check", maxStaleHours: 26 },
   { jobname: "daily-inactive-cleanup", maxStaleHours: 26 },
+  { jobname: "daily-stale-pending-check", maxStaleHours: 26 },
 ] as const;
 
 export function computeSystemHealth(

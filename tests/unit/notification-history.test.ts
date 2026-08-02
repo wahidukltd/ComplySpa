@@ -31,16 +31,22 @@ describe("deriveNotificationType", () => {
 
 describe("deriveFailureDetail", () => {
   it("returns null for non-failed statuses", () => {
-    expect(deriveFailureDetail("delivered", true)).toBeNull();
-    expect(deriveFailureDetail("pending", false)).toBeNull();
+    expect(deriveFailureDetail("delivered", null, true)).toBeNull();
+    expect(deriveFailureDetail("pending", null, false)).toBeNull();
   });
 
-  it("failed without a webhook id means the send itself failed", () => {
-    expect(deriveFailureDetail("failed", false)).toBe("Failed at send");
+  it("maps stored failure reasons to human labels", () => {
+    expect(deriveFailureDetail("failed", "send_failed", false)).toBe("Failed at send");
+    expect(deriveFailureDetail("failed", "bounced", true)).toBe("Bounced by the recipient's server");
+    expect(deriveFailureDetail("failed", "complained", true)).toBe("Marked as spam");
+    expect(deriveFailureDetail("failed", "rejected", true)).toBe("Rejected after delivery attempt");
+    expect(deriveFailureDetail("failed", "suppressed", true)).toBe("Recipient is suppressed (do-not-send list)");
+    expect(deriveFailureDetail("failed", "no_delivery_confirmation", true)).toBe("No delivery confirmation received");
   });
 
-  it("failed with a webhook id means bounced or complained after delivery", () => {
-    expect(deriveFailureDetail("failed", true)).toBe(
+  it("falls back to the webhook-id heuristic for legacy rows without a reason", () => {
+    expect(deriveFailureDetail("failed", null, false)).toBe("Failed at send");
+    expect(deriveFailureDetail("failed", null, true)).toBe(
       "Bounced or complained after delivery attempt",
     );
   });

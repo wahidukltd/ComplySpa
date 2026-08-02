@@ -80,11 +80,18 @@ function isAuthorizedCaller(req: Request): boolean {
   if (!CRON_SECRET) return false;
   const header = req.headers.get("x-cron-secret");
   if (!header) return false;
+  // ponytail: crypto.subtle.timingSafeEqual is Node-only and absent in the
+  // Edge Runtime — XOR-accumulate is the standard WebCrypto-safe constant-time
+  // string compare. Length is leaked (as before); contents are not.
   const enc = new TextEncoder();
   const a = enc.encode(header);
   const b = enc.encode(CRON_SECRET);
   if (a.byteLength !== b.byteLength) return false;
-  return crypto.subtle.timingSafeEqual(a, b);
+  let diff = 0;
+  for (let i = 0; i < a.byteLength; i++) {
+    diff |= a[i] ^ b[i];
+  }
+  return diff === 0;
 }
 
 function layoutHtml(previewText: string, content: string): string {
@@ -274,6 +281,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
       .eq("id", credential_id)
       .eq("clinic_id", clinic_id)
+      .is("deleted_at", null)
       .is("suspended_at", null)
       .single<CredentialWithRelations>();
 
@@ -311,6 +319,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .select("email")
       .eq("clinic_id", clinic_id)
       .eq("role", "owner")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
       .limit(1);
 
     if (ownerError || !owners || owners.length === 0) {
@@ -397,6 +407,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         days_before_expiration: days_before,
         recipient,
         delivery_status: result.success ? "pending" : "failed",
+        failure_reason: result.success ? null : "send_failed",
         resend_webhook_id: result.messageId ?? null,
       });
 
@@ -505,3 +516,5 @@ async function sendEmailWithRetry(
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+

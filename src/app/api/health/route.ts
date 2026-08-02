@@ -92,6 +92,7 @@ export async function GET(req: NextRequest) {
     { slug: "cron-escalation-scan", jobname: "daily-escalation-scan", maxStale: 25 },
     { slug: "cron-trial-expiry", jobname: "daily-trial-expiry-check", maxStale: 26 },
     { slug: "cron-inactive-cleanup", jobname: "daily-inactive-cleanup", maxStale: 26 },
+    { slug: "cron-stale-pending", jobname: "daily-stale-pending-check", maxStale: 26 },
   ];
 
   for (const job of cronJobs) {

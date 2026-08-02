@@ -24,6 +24,7 @@ export interface NotificationRow {
   credentialLabel: string | null;
   recipient: string;
   sentAt: string;
+  deliveredAt: string | null;
   deliveryStatus: "delivered" | "failed" | "pending";
   failureDetail: string | null;
 }
@@ -168,9 +169,15 @@ export function NotificationHistoryList({ rows, summary }: { rows: NotificationR
                 </TableCell>
                 <TableCell className="max-w-[200px] truncate text-sm">{row.recipient}</TableCell>
                 <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                  <time dateTime={row.sentAt} title={formatDateTime(row.sentAt)}>
-                    {formatRelativeTime(row.sentAt)}
-                  </time>
+                  {row.deliveryStatus === "delivered" && row.deliveredAt ? (
+                    <time dateTime={row.deliveredAt} title={formatDateTime(row.deliveredAt)}>
+                      Delivered {formatRelativeTime(row.deliveredAt)}
+                    </time>
+                  ) : (
+                    <time dateTime={row.sentAt} title={formatDateTime(row.sentAt)}>
+                      {formatRelativeTime(row.sentAt)}
+                    </time>
+                  )}
                 </TableCell>
                 <TableCell>
                   <DeliveryStatusBadge status={row.deliveryStatus} />

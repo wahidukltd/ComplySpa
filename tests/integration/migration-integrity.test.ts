@@ -30,8 +30,10 @@ const EXPECTED_IMMUTABILITY_TRIGGERS = [
 const EXPECTED_CRON_FUNCTIONS = [
   "update_credential_statuses",
   "scan_expiring_credentials",
+  "scan_escalation_alerts",
   "check_trial_expiry",
   "cleanup_inactive_clinics",
+  "reconcile_stale_pending_alerts",
 ] as const;
 
 const EXPECTED_FUNCTIONS = [
@@ -44,8 +46,10 @@ const EXPECTED_FUNCTIONS = [
 const EXPECTED_CRON_JOBS = [
   "daily-credential-status-update",
   "daily-credential-scan",
+  "daily-escalation-scan",
   "daily-trial-expiry-check",
   "daily-inactive-cleanup",
+  "daily-stale-pending-check",
 ] as const;
 
 /** Build a SQL IN-list string from constant array values. Never use with user input. */
@@ -120,11 +124,11 @@ describe("Migration integrity", () => {
     expect(parseInt(result, 10)).toBe(0);
   });
 
-  it("4 cron jobs are scheduled", () => {
+  it("6 cron jobs are scheduled", () => {
     const result = execSql(
       `SELECT count(*) FROM cron.job WHERE jobname IN (${inList(EXPECTED_CRON_JOBS)})`,
     );
-    expect(parseInt(result, 10)).toBe(4);
+    expect(parseInt(result, 10)).toBe(6);
   });
 
   it("credential audit trigger exists on credentials table", () => {

@@ -48,6 +48,8 @@ export const resendWebhookSchema = z.object({
     "email.bounced",
     "email.opened",
     "email.clicked",
+    "email.failed",
+    "email.suppressed",
   ]),
   data: z.object({
     email_id: z.string(),
