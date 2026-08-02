@@ -694,6 +694,7 @@ export type Database = {
             }
             Returns: undefined
           }
+      reconcile_stale_pending_alerts: { Args: never; Returns: undefined }
       update_credential_statuses: { Args: never; Returns: undefined }
     }
     Enums: {

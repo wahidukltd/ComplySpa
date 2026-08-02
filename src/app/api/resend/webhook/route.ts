@@ -79,6 +79,11 @@ export async function POST(req: NextRequest) {
         level: "warning",
         extra: { email_id: data.email_id, to: data.to },
       });
+    } else if (transition.deliveryStatus === "failed") {
+      Sentry.captureMessage(`Resend webhook: delivery failed (${type})`, {
+        level: "warning",
+        extra: { email_id: data.email_id, to: data.to },
+      });
     }
 
     const supabase = createAdminClient();
@@ -87,7 +92,14 @@ export async function POST(req: NextRequest) {
       delivery_status: transition.deliveryStatus,
     };
     if (transition.failureReason) updates.failure_reason = transition.failureReason;
-    if (transition.deliveredAt) updates.delivered_at = new Date().toISOString();
+    if (transition.deliveredAt) {
+      // Prefer the provider's event time — the audit column should record the
+      // delivery confirmation moment, not the Vercel receive time.
+      const eventTime = new Date(data.created_at);
+      updates.delivered_at = isNaN(eventTime.getTime())
+        ? new Date().toISOString()
+        : eventTime.toISOString();
+    }
 
     const { error } = await supabase
       .from("alert_logs")

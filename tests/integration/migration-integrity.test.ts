@@ -9,6 +9,7 @@ const EXPECTED_TABLES = [
   "credential_audit",
   "credential_types",
   "credentials",
+  "notification_settings",
   "onboarding_items",
   "processed_webhooks",
   "role_template_items",
@@ -62,14 +63,14 @@ describe("Migration integrity", () => {
     const result = execSql(
       `SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename IN (${inList(EXPECTED_TABLES)})`,
     );
-    expect(parseInt(result, 10)).toBe(13);
+    expect(parseInt(result, 10)).toBe(14);
   });
 
   it("all tables have RLS enabled", () => {
     const result = execSql(
       `SELECT count(*) FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity = true AND c.relname IN (${inList(EXPECTED_TABLES)})`,
     );
-    expect(parseInt(result, 10)).toBe(13);
+    expect(parseInt(result, 10)).toBe(14);
   });
 
   it(`${SEED_CREDENTIAL_TYPE_COUNT} seed credential types are present`, () => {
@@ -85,6 +86,31 @@ describe("Migration integrity", () => {
 
     const actual = execSql("SELECT auth_clinic_id()");
     expect(actual).toBe("");
+  });
+
+  it("notification_settings is deny-all (RLS on, zero policies, zero grants)", () => {
+    const policyCount = execSql(
+      "SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'notification_settings'",
+    );
+    expect(parseInt(policyCount, 10)).toBe(0);
+
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      for (const priv of ["SELECT", "INSERT", "UPDATE", "DELETE"]) {
+        const granted = execSql(
+          `SELECT has_table_privilege('${role}', 'notification_settings', '${priv}')`,
+        );
+        expect(granted).toBe("f");
+      }
+    }
+  });
+
+  it("reconcile_stale_pending_alerts is not executable by Data API roles", () => {
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      const granted = execSql(
+        `SELECT has_function_privilege('${role}', 'reconcile_stale_pending_alerts()', 'EXECUTE')`,
+      );
+      expect(granted).toBe("f");
+    }
   });
 
   it("auth_user_role() function exists and returns NULL without JWT", () => {
@@ -201,3 +227,4 @@ describe("Migration integrity", () => {
     expect(parseInt(result, 10)).toBe(1);
   });
 });
+

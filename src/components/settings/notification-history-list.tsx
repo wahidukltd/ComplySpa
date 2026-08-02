@@ -150,7 +150,7 @@ export function NotificationHistoryList({ rows, summary }: { rows: NotificationR
               <TableHead>Type</TableHead>
               <TableHead>Credential</TableHead>
               <TableHead>Recipient</TableHead>
-              <TableHead>Sent</TableHead>
+              <TableHead>Sent / Delivered</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Failure detail</TableHead>
             </TableRow>

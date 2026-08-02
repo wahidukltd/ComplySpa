@@ -321,6 +321,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq("role", "owner")
       .is("deleted_at", null)
       .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .limit(1);
 
     if (ownerError || !owners || owners.length === 0) {
@@ -516,5 +517,6 @@ async function sendEmailWithRetry(
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
 
 
