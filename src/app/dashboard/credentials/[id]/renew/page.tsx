@@ -18,12 +18,15 @@ export default async function RenewCredentialPage({
   const userId = user?.id;
   if (!userId) redirect("/sign-in");
 
-  const { data: userRecord } = await supabase
+  const { data: userRecord, error: userErr } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
-  if (!userRecord) redirect("/onboarding");
+  if (userErr || !userRecord) redirect("/onboarding");
+
+  // Renewal is a write; viewers get 404 (staff-edit pattern).
+  if (userRecord.role === "viewer") notFound();
 
   const { data: credential } = await supabase
     .from("credentials")
@@ -61,6 +64,7 @@ export default async function RenewCredentialPage({
     state: credential.state ?? "",
     verification_url: credential.verification_url ?? "",
     notes: credential.notes ?? "",
+    document_url: credential.document_url ?? null,
   };
 
   return (
@@ -85,6 +89,7 @@ export default async function RenewCredentialPage({
           credentialId={id}
           staffMemberId={credential.staff_member_id}
           renewalDays={renewalDays}
+          typeName={typeName}
           baseDefaults={baseDefaults}
         />
       </div>

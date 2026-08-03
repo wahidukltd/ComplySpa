@@ -325,4 +325,105 @@ describe("staff hardening — RLS + constraint invariants (integration)", () => 
       .single();
     expect(credBAfter!.deleted_at).toBeNull();
   });
+
+  it("migration 049: RPCs bind p_clinic_id to the CALLER's clinic — cross-tenant soft-delete is denied", async () => {
+    const { clinicId, typeId, ownerAuthId } = await setupClinic();
+    const { clinicId: otherClinicId } = await setupClinic();
+
+    // Victim setup in the OTHER clinic.
+    const { data: otherStaff } = await adminClient
+      .from("staff_members")
+      .insert({ clinic_id: otherClinicId, name: "Victim Staff" })
+      .select("id")
+      .single();
+    expect(otherStaff).not.toBeNull();
+    const { data: otherCred } = await adminClient
+      .from("credentials")
+      .insert({ staff_member_id: otherStaff!.id, credential_type_id: typeId, clinic_id: otherClinicId, license_number: "VICTIM-1" })
+      .select("id")
+      .single();
+    expect(otherCred).not.toBeNull();
+
+    // Attacker (owner of clinic A) targets clinic B's credential with clinic
+    // B's own p_clinic_id: the caller-clinic gate must reject.
+    const credRes = await fetchAsUser(ownerAuthId, "rpc/delete_credential_with_checklist_revert", {
+      method: "POST",
+      body: { p_credential_id: otherCred!.id, p_staff_member_id: otherStaff!.id, p_clinic_id: otherClinicId },
+    });
+    expect(credRes.status).toBe(200);
+    const credBody = (await credRes.json()) as { deleted?: boolean };
+    expect(credBody.deleted).toBe(false);
+
+    const { data: credAfter } = await adminClient
+      .from("credentials")
+      .select("deleted_at")
+      .eq("id", otherCred!.id)
+      .single();
+    expect(credAfter!.deleted_at).toBeNull();
+
+    // Same attack via soft_delete_staff_member.
+    const staffRes = await fetchAsUser(ownerAuthId, "rpc/soft_delete_staff_member", {
+      method: "POST",
+      body: { p_staff_id: otherStaff!.id, p_clinic_id: otherClinicId },
+    });
+    expect(staffRes.status).toBe(200);
+    expect((await staffRes.json()) as boolean).toBe(false);
+
+    const { data: staffAfter } = await adminClient
+      .from("staff_members")
+      .select("deleted_at")
+      .eq("id", otherStaff!.id)
+      .single();
+    expect(staffAfter!.deleted_at).toBeNull();
+
+    // Control: the same owner still deletes their OWN clinic's rows (the gate
+    // is caller-clinic binding, not a blanket denial).
+    const { data: ownStaff } = await adminClient
+      .from("staff_members")
+      .insert({ clinic_id: clinicId, name: "Own Staff" })
+      .select("id")
+      .single();
+    expect(ownStaff).not.toBeNull();
+    const ownRes = await fetchAsUser(ownerAuthId, "rpc/soft_delete_staff_member", {
+      method: "POST",
+      body: { p_staff_id: ownStaff!.id, p_clinic_id: clinicId },
+    });
+    expect(ownRes.status).toBe(200);
+    expect((await ownRes.json()) as boolean).toBe(true);
+  });
+
+  it("migration 049: delete RPC rejects a p_staff_member_id that does not own the credential", async () => {
+    const { clinicId, staffId, typeId, ownerAuthId } = await setupClinic();
+
+    const { data: otherStaff } = await adminClient
+      .from("staff_members")
+      .insert({ clinic_id: clinicId, name: "Non-Owner Staff" })
+      .select("id")
+      .single();
+    expect(otherStaff).not.toBeNull();
+
+    const { data: cred } = await adminClient
+      .from("credentials")
+      .insert({ staff_member_id: staffId, credential_type_id: typeId, clinic_id: clinicId, license_number: "OWNER-1" })
+      .select("id")
+      .single();
+    expect(cred).not.toBeNull();
+
+    // Same clinic, wrong staff: the staff gate must reject (no cross-staff
+    // onboarding revert possible).
+    const res = await fetchAsUser(ownerAuthId, "rpc/delete_credential_with_checklist_revert", {
+      method: "POST",
+      body: { p_credential_id: cred!.id, p_staff_member_id: otherStaff!.id, p_clinic_id: clinicId },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { deleted?: boolean };
+    expect(body.deleted).toBe(false);
+
+    const { data: credAfter } = await adminClient
+      .from("credentials")
+      .select("deleted_at")
+      .eq("id", cred!.id)
+      .single();
+    expect(credAfter!.deleted_at).toBeNull();
+  });
 });

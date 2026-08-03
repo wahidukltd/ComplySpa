@@ -4,27 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, daysUntil } from "@/lib/utils/date";
+import { formatDate, daysUntil, formatRelativeTime } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { CredentialActions } from "./credential-actions";
 import { CredentialDocument } from "./credential-document";
 import { buttonVariants } from "@/components/ui/button";
+import { STATUS_LABELS, STATUS_VARIANTS, CATEGORY_COLORS } from "@/lib/utils/credential-display";
+import { deriveAuditAction, AUDIT_ACTION_LABELS, AUDIT_ACTION_VARIANTS } from "@/lib/utils/audit-display";
 
 export const dynamic = "force-dynamic";
-
-const CATEGORY_COLORS: Record<string, string> = {
-  license: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  training: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  insurance: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  agreement: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-};
-
-const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive"> = {
-  valid: "default",
-  expiring: "secondary",
-  expired: "destructive",
-};
 
 export default async function CredentialDetailPage({
   params,
@@ -39,10 +28,12 @@ export default async function CredentialDetailPage({
 
   const { data: userRecord } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
   if (!userRecord) redirect("/onboarding");
+
+  const canEdit = userRecord.role === "owner" || userRecord.role === "manager";
 
   const { data: credential } = await supabase
     .from("credentials")
@@ -76,6 +67,41 @@ export default async function CredentialDetailPage({
   const status = credential.status;
 
   const daysRemaining = credential.expiration_date ? daysUntil(credential.expiration_date) : null;
+
+  // Change history — the official credential_audit trail (SELECT-only by RLS).
+  // changed_by holds the auth sub (migration 042); only uuid-looking values are
+  // joined to users for a display name, everything else renders as "System".
+  const { data: auditRows } = await supabase
+    .from("credential_audit")
+    .select("action, changed_at, changed_by, old_values, new_values")
+    .eq("credential_id", id)
+    .eq("clinic_id", userRecord.clinic_id)
+    .order("changed_at", { ascending: false })
+    .limit(20);
+
+  const changedByIds = [
+    ...new Set(
+      (auditRows ?? [])
+        .map((r) => r.changed_by)
+        .filter(
+          (v): v is string =>
+            typeof v === "string" &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v),
+        ),
+    ),
+  ];
+  const { data: auditUsers } =
+    changedByIds.length > 0
+      ? await supabase
+          .from("users")
+          .select("auth_user_id, email")
+          .in("auth_user_id", changedByIds)
+      : { data: [] as { auth_user_id: string | null; email: string }[] };
+  const changedByName = new Map(
+    (auditUsers ?? [])
+      .filter((u) => u.auth_user_id)
+      .map((u) => [u.auth_user_id as string, u.email]),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -117,7 +143,7 @@ export default async function CredentialDetailPage({
                 <div>
                   <p className="text-xs text-muted-foreground">Status</p>
                   <Badge variant={STATUS_VARIANTS[status] ?? "outline"} className="mt-0.5">
-                    {status}
+                    {STATUS_LABELS[status] ?? status}
                   </Badge>
                 </div>
                 <div>
@@ -208,6 +234,38 @@ export default async function CredentialDetailPage({
               </CardContent>
             </Card>
           )}
+
+          {(auditRows ?? []).length > 0 && (
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-xs font-medium text-muted-foreground">Change history</p>
+                <ul className="mt-2 divide-y divide-border">
+                  {(auditRows ?? []).map((row, i) => {
+                    const action = deriveAuditAction(
+                      row.action,
+                      (row.old_values ?? null) as Record<string, unknown> | null,
+                      (row.new_values ?? null) as Record<string, unknown> | null,
+                    );
+                    return (
+                      <li key={`${row.changed_at}-${i}`} className="flex items-center gap-3 py-2">
+                        <Badge variant={AUDIT_ACTION_VARIANTS[action] ?? "outline"} className="shrink-0">
+                          {AUDIT_ACTION_LABELS[action] ?? action}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {formatRelativeTime(row.changed_at)}
+                        </span>
+                        <span className="ml-auto truncate text-sm text-muted-foreground">
+                          {typeof row.changed_by === "string" && changedByName.has(row.changed_by)
+                            ? changedByName.get(row.changed_by)
+                            : "System"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -220,6 +278,7 @@ export default async function CredentialDetailPage({
                   staffMemberId={credential.staff_member_id}
                   verificationUrl={credential.verification_url}
                   status={credential.status}
+                  canEdit={canEdit}
                 />
               </div>
             </CardContent>

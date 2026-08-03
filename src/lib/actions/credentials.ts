@@ -3,13 +3,24 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { credentialSchema, type CredentialInput } from "@/lib/validations/staff";
+import { credentialSchema, renewalSchema, type CredentialInput, type RenewalInput } from "@/lib/validations/staff";
 import { getClinicIdAndPlan } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
 import { PlanLimitError } from "@/lib/utils/errors";
 import { getCredentialStatus } from "@/lib/utils/status";
 import { captureFlowError } from "@/lib/staff/onboarding";
 import * as Sentry from "@sentry/nextjs";
+
+// Revalidation matrix (every credential write must keep all surfaces fresh):
+// /dashboard/credentials, /dashboard, /dashboard/staff/{id},
+// /dashboard/staff/{id}/credentials. Keep this list in sync in every action.
+const REVALIDATE_PATHS = ["/dashboard/credentials", "/dashboard"] as const;
+
+function revalidateCredentialPaths(staffMemberId: string) {
+  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath(`/dashboard/staff/${staffMemberId}`);
+  revalidatePath(`/dashboard/staff/${staffMemberId}/credentials`);
+}
 
 export async function addCredential(input: CredentialInput & { document_url?: string }) {
   const clinicData = await getClinicIdAndPlan();
@@ -36,14 +47,17 @@ export async function addCredential(input: CredentialInput & { document_url?: st
   // ponytail: race window between count and insert — acceptable at current scale,
   // use SERIALIZABLE isolation or BEFORE INSERT trigger if this becomes a problem
   // ponytail: clinic-wide count, not per-staff — per-staff limits if needed later
+  // Count must MATCH enforce_plan_limits() (migration 045 counts
+  // deleted_at IS NULL only, suspended included) so the app check and the DB
+  // trigger can never disagree — a mismatch at the limit edge would surface
+  // the trigger's ND0MV as a generic error instead of the plan-limit toast.
   const limits = getPlanLimits(plan);
 
   const { count } = await supabase
     .from("credentials")
     .select("id", { count: "exact", head: true })
     .eq("clinic_id", clinicId)
-    .is("deleted_at", null)
-    .is("suspended_at", null);
+    .is("deleted_at", null);
 
   if ((count ?? 0) >= limits.maxCredentials) {
     const err = new PlanLimitError(
@@ -101,14 +115,11 @@ export async function addCredential(input: CredentialInput & { document_url?: st
     .single();
 
   if (error) {
-    Sentry.captureException(error);
+    captureFlowError(error, "add-credential");
     return { success: false, error: "Failed to add credential. Please try again." };
   }
 
-  revalidatePath(`/dashboard/staff/${parsed.data.staff_member_id}`);
-  revalidatePath(`/dashboard/staff/${parsed.data.staff_member_id}/credentials`);
-  revalidatePath("/dashboard/credentials");
-  revalidatePath("/dashboard");
+  revalidateCredentialPaths(parsed.data.staff_member_id);
   return { success: true, id: credential.id };
 }
 
@@ -170,14 +181,69 @@ export async function updateCredential(id: string, input: CredentialInput & { do
     .eq("id", id);
 
   if (error) {
-    Sentry.captureException(error);
+    captureFlowError(error, "update-credential");
     return { error: "Failed to update credential. Please try again." };
   }
 
-  revalidatePath(`/dashboard/staff/${existingCredential.staff_member_id}`);
-  revalidatePath(`/dashboard/staff/${existingCredential.staff_member_id}/credentials`);
-  revalidatePath("/dashboard/credentials");
-  revalidatePath("/dashboard");
+  revalidateCredentialPaths(existingCredential.staff_member_id);
+  return { success: true };
+}
+
+// Renewal is an in-place dates update of the SAME credential (owner decision
+// 2026-08-04). Identity fields (staff_member_id, credential_type_id) are never
+// accepted from the client — they come from the existing record — so a renewal
+// cannot mutate the record into a genuinely different credential (the "new
+// row" case is the add flow). Document history is credential_audit's job.
+export async function renewCredential(id: string, input: RenewalInput & { document_url?: string }) {
+  const supabase = await createClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const userId = authUser?.id;
+  if (!userId) return { error: "Unauthorized" };
+
+  const { document_url, ...renewInput } = input;
+  const parsed = renewalSchema.safeParse(renewInput);
+  if (!parsed.success) {
+    return { error: "Validation failed", fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("clinic_id, role")
+    .eq("auth_user_id", userId)
+    .maybeSingle();
+  if (!user) return { error: "Unauthorized" };
+  if (user.role === "viewer") return { error: "Insufficient permissions" };
+
+  const { data: existingCredential } = await supabase
+    .from("credentials")
+    .select("staff_member_id")
+    .eq("id", id)
+    .eq("clinic_id", user.clinic_id)
+    .is("deleted_at", null)
+    .is("suspended_at", null)
+    .maybeSingle();
+  if (!existingCredential) return { error: "Credential not found" };
+
+  const { error } = await supabase
+    .from("credentials")
+    .update({
+      license_number: parsed.data.license_number || null,
+      state: parsed.data.state || null,
+      issue_date: parsed.data.issue_date || null,
+      expiration_date: parsed.data.expiration_date || null,
+      verification_url: parsed.data.verification_url || null,
+      notes: parsed.data.notes || null,
+      document_url: document_url ?? null,
+      status: getCredentialStatus(parsed.data.expiration_date ?? null),
+    })
+    .eq("id", id);
+
+  if (error) {
+    captureFlowError(error, "renew-credential");
+    return { error: "Failed to renew credential. Please try again." };
+  }
+
+  revalidateCredentialPaths(existingCredential.staff_member_id);
   return { success: true };
 }
 
@@ -231,10 +297,7 @@ export async function deleteCredential(id: string, staffMemberId: string) {
     return { error: "Credential not found." };
   }
 
-  revalidatePath(`/dashboard/staff/${staffMemberId}`);
-  revalidatePath(`/dashboard/staff/${staffMemberId}/credentials`);
-  revalidatePath("/dashboard/credentials");
-  revalidatePath("/dashboard");
+  revalidateCredentialPaths(staffMemberId);
   return { success: true };
 }
 
@@ -254,7 +317,7 @@ export async function verifyCredentialNow(credentialId: string) {
 
   const { data: credential } = await supabase
     .from("credentials")
-    .select("id, expiration_date")
+    .select("id, staff_member_id, expiration_date")
     .eq("id", credentialId)
     .eq("clinic_id", user.clinic_id)
     .is("deleted_at", null)
@@ -273,12 +336,11 @@ export async function verifyCredentialNow(credentialId: string) {
     .eq("clinic_id", user.clinic_id);
 
   if (error) {
-    Sentry.captureException(error);
+    captureFlowError(error, "verify-credential");
     return { error: "Failed to log verification." };
   }
 
-  revalidatePath("/dashboard/credentials");
-  revalidatePath("/dashboard");
+  revalidateCredentialPaths(credential.staff_member_id);
   return { success: true };
 }
 

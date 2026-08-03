@@ -196,8 +196,8 @@ function NeedsAttentionSection({
               </p>
               <p className="mt-0.5 text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
                 Add credentials to start tracking expirations and compliance.{" "}
-                <Link href="/dashboard/staff" className="underline" style={{ color: "#6E97A7" }}>
-                  Go to staff
+                <Link href="/dashboard/credentials/new" className="underline" style={{ color: "#6E97A7" }}>
+                  Add credential
                 </Link>
               </p>
             </div>

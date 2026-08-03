@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import Link from "next/link";
 import { CredentialsTable } from "./credentials-table";
 
@@ -16,11 +16,22 @@ export default async function CredentialsListPage() {
   if (!userId) redirect("/sign-in");
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
 
   if (userErr || !userRecord) redirect("/onboarding");
+
+  const canEdit = userRecord.role === "owner" || userRecord.role === "manager";
+
+  const { count: staffCount } = await supabase
+    .from("staff_members")
+    .select("id", { count: "exact", head: true })
+    .eq("clinic_id", userRecord.clinic_id)
+    .is("deleted_at", null)
+    .is("suspended_at", null);
+
+  const hasStaff = (staffCount ?? 0) > 0;
 
   const { data: credentials } = await supabase
     .from("credentials")
@@ -51,14 +62,27 @@ export default async function CredentialsListPage() {
         title="Credentials"
         description="View all credentials across all staff members."
       >
-        <Link href="/dashboard/staff" className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}>
-          <Plus className="size-4" />
-          Manage staff to add credentials
-        </Link>
+        {canEdit &&
+          (hasStaff ? (
+            <Link href="/dashboard/credentials/new" className={cn(buttonVariants({ variant: "default" }), "gap-1.5")}>
+              <Plus className="size-4" />
+              Add credential
+            </Link>
+          ) : (
+            <Link href="/dashboard/staff" className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}>
+              <Users className="size-4" />
+              Create staff
+            </Link>
+          ))}
       </PageHeader>
 
-      <CredentialsTable credentials={credentials ?? []} />
+      <CredentialsTable
+        credentials={credentials ?? []}
+        context="clinic"
+        hasStaff={hasStaff}
+        canEdit={canEdit}
+        addCredentialHref="/dashboard/credentials/new"
+      />
     </div>
   );
 }
-

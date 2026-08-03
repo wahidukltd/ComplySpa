@@ -21,11 +21,13 @@ export default async function StaffCredentialsPage({
   if (!userId) redirect("/sign-in");
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
 
   if (userErr || !userRecord) redirect("/onboarding");
+
+  const canEdit = userRecord.role === "owner" || userRecord.role === "manager";
 
   const { data: staff } = await supabase
     .from("staff_members")
@@ -59,13 +61,22 @@ export default async function StaffCredentialsPage({
         title={`${staff.name} — Credentials`}
         description={`Manage ${staff.name}'s licenses, certifications, and training records.`}
       >
-        <Link href={`/dashboard/staff/${id}/credentials/new`} className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-1.5")}>
-          <Plus className="size-4" />
-          Add credential
-        </Link>
+        {canEdit && (
+          <Link href={`/dashboard/staff/${id}/credentials/new`} className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-1.5")}>
+            <Plus className="size-4" />
+            Add credential
+          </Link>
+        )}
       </PageHeader>
 
-      <CredentialsTable credentials={credentials ?? []} />
+      <CredentialsTable
+        credentials={credentials ?? []}
+        context="staff"
+        staffName={staff.name}
+        hasStaff
+        canEdit={canEdit}
+        addCredentialHref={`/dashboard/staff/${id}/credentials/new`}
+      />
     </div>
   );
 }

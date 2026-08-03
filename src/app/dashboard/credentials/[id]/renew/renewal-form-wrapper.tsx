@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { CredentialForm } from "@/components/staff/credential-form";
-import { updateCredential } from "@/lib/actions/credentials";
+import { renewCredential } from "@/lib/actions/credentials";
 import { toast } from "sonner";
 
 interface BaseDefaults {
@@ -13,17 +13,20 @@ interface BaseDefaults {
   state: string;
   verification_url: string;
   notes: string;
+  document_url?: string | null;
 }
 
 export function RenewalFormWrapper({
   credentialId,
   staffMemberId,
   renewalDays,
+  typeName,
   baseDefaults,
 }: {
   credentialId: string;
   staffMemberId: string;
   renewalDays: number | null | undefined;
+  typeName: string;
   baseDefaults: BaseDefaults;
 }) {
   const router = useRouter();
@@ -38,13 +41,16 @@ export function RenewalFormWrapper({
     ...baseDefaults,
     issue_date: today,
     expiration_date: futureExpiry,
-    notes: [baseDefaults.notes, `[Renewed on ${today}]`].filter(Boolean).join("\n"),
+    // Notes are NOT polluted with "[Renewed on ...]" — credential_audit is the
+    // official history (owner decision 2026-08-04).
+    notes: baseDefaults.notes,
+    document_url: baseDefaults.document_url ?? null,
   }), [baseDefaults, today, futureExpiry]);
 
-  async function handleSubmit(data: Parameters<typeof updateCredential>[1]) {
-    const result = await updateCredential(credentialId, data);
+  async function handleSubmit(data: Parameters<typeof renewCredential>[1]) {
+    const result = await renewCredential(credentialId, data);
     if (!result.error) {
-      toast.success("Credential renewed — status updated.");
+      toast.success("Credential renewed — dates updated.");
       router.push(`/dashboard/credentials/${credentialId}`);
     }
     return result;
@@ -56,6 +62,8 @@ export function RenewalFormWrapper({
       defaultValues={defaultValues}
       onSubmit={handleSubmit}
       submitLabel="Renew credential"
+      lockType
+      lockTypeLabel={typeName}
     />
   );
 }

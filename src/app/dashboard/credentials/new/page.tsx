@@ -1,20 +1,17 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
-import { NewCredentialFormWrapper } from "./credential-form-wrapper";
+import { NewCredentialWrapper } from "./new-credential-wrapper";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewCredentialPage({
-  params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
-  searchParams?: Promise<{ credentialTypeId?: string }>;
+  searchParams?: Promise<{ staffId?: string }>;
 }) {
-  const { id } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const credentialTypeId = resolvedSearchParams.credentialTypeId;
+  const requestedStaffId = resolvedSearchParams.staffId;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -32,25 +29,25 @@ export default async function NewCredentialPage({
   // page must not render a form that can never save (staff-edit pattern).
   if (userRecord.role === "viewer") notFound();
 
-  const { data: staff } = await supabase
+  const { data: staffRows } = await supabase
     .from("staff_members")
-    .select("name")
-    .eq("id", id)
+    .select("id, name, role")
     .eq("clinic_id", userRecord.clinic_id)
     .is("deleted_at", null)
     .is("suspended_at", null)
-    .single();
-
-  if (!staff) notFound();
+    .order("name");
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={`Add Credential — ${staff.name}`}
-        description="Enter the credential details below."
+        title="Add Credential"
+        description="Choose the staff member, then enter the credential details."
       />
       <div className="max-w-lg">
-        <NewCredentialFormWrapper staffMemberId={id} credentialTypeId={credentialTypeId} />
+        <NewCredentialWrapper
+          staffList={staffRows ?? []}
+          requestedStaffId={requestedStaffId}
+        />
       </div>
     </div>
   );

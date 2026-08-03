@@ -41,6 +41,17 @@ export const credentialSchema = z.object({
 
 export type CredentialInput = z.infer<typeof credentialSchema>;
 
+// Renewal is an in-place dates update of the SAME credential (owner decision
+// 2026-08-04): identity fields (staff, type) are never accepted from the client
+// — the server derives them from the existing record, so a renewal can never
+// mutate the record into a different credential.
+export const renewalSchema = credentialSchema.omit({
+  staff_member_id: true,
+  credential_type_id: true,
+});
+
+export type RenewalInput = z.infer<typeof renewalSchema>;
+
 export const wizardCredentialSchema = z.object({
   credential_type_id: z.string().uuid(),
   license_number: z.string().max(100).optional().or(z.literal("")),

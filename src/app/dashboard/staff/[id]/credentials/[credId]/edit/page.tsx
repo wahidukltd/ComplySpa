@@ -17,11 +17,15 @@ export default async function EditCredentialPage({
   if (!userId) redirect("/sign-in");
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
 
   if (userErr || !userRecord) redirect("/onboarding");
+
+  // Viewers cannot edit credentials; the action layer also gates, but the
+  // page must not render a form that can never save (staff-edit pattern).
+  if (userRecord.role === "viewer") notFound();
 
   const { data: staff } = await supabase
     .from("staff_members")
@@ -39,6 +43,8 @@ export default async function EditCredentialPage({
     .select("id, clinic_id, staff_member_id, credential_type_id, deleted_at, license_number, state, issue_date, expiration_date, status, verification_url, last_verified_date, document_url, notes, verified_by_user_id, created_at, updated_at, suspended_at, suspended_plan")
     .eq("id", credId)
     .eq("clinic_id", userRecord.clinic_id)
+    .eq("staff_member_id", id)
+    .is("deleted_at", null)
     .is("suspended_at", null)
     .single();
 

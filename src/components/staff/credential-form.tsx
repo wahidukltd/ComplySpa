@@ -44,6 +44,8 @@ interface CredentialFormProps {
   defaultValues?: Partial<Credential>;
   onSubmit: (data: CredentialInput & { document_url?: string }) => Promise<{ error?: string; fieldErrors?: Record<string, string[]> }>;
   submitLabel?: string;
+  lockType?: boolean;
+  lockTypeLabel?: string;
 }
 
 export function CredentialForm({
@@ -51,6 +53,8 @@ export function CredentialForm({
   defaultValues,
   onSubmit,
   submitLabel = "Save",
+  lockType = false,
+  lockTypeLabel,
 }: CredentialFormProps) {
   const [credentialTypes, setCredentialTypes] = useState<CredentialTypeOption[]>([]);
   const [typesLoading, setTypesLoading] = useState(true);
@@ -71,6 +75,7 @@ export function CredentialForm({
     handleSubmit,
     formState: { errors, isSubmitting },
     setValue,
+    setError,
   } = useForm<CredentialInput>({
     resolver: zodResolver(credentialSchema),
     defaultValues: {
@@ -192,6 +197,26 @@ export function CredentialForm({
     setValue("credential_type_id", value);
   };
 
+  // No silent failures: server-side field errors land inline (setError), any
+  // non-field error (plan limit, permissions, invalid type) becomes a toast.
+  // The form keeps its state on failure so nothing the owner typed is lost.
+  async function handleFormSubmit(data: CredentialInput) {
+    try {
+      const result = await onSubmit({ ...data, document_url: documentUrl ?? undefined });
+      if (result?.fieldErrors) {
+        for (const [field, messages] of Object.entries(result.fieldErrors)) {
+          setError(field as keyof CredentialInput, { message: messages.join(", ") });
+        }
+      } else if (result?.error) {
+        toast.error(result.error);
+      }
+    } catch {
+      // Wrappers return result objects; a thrown submission is a bug in the
+      // contract — surface it rather than leaving the form silently idle.
+      toast.error("Something went wrong. Please try again.");
+    }
+  }
+
   async function handleCreateCustom() {
     if (!customName.trim()) {
       toast.error("Name is required.");
@@ -226,14 +251,23 @@ export function CredentialForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit((data) => onSubmit({ ...data, document_url: documentUrl ?? undefined }))} className="space-y-6">
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
         <input type="hidden" {...register("credential_type_id")} />
 
         <div className="space-y-2">
           <Label htmlFor="credential_type_id">
             Credential type <span className="text-destructive">*</span>
           </Label>
-          {typesLoading ? (
+          {lockType ? (
+            <div className="space-y-2">
+              <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
+                {lockTypeLabel ?? selectedType?.name ?? "Credential"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Renewal updates this credential&apos;s dates. Changing the type requires a new credential.
+              </p>
+            </div>
+          ) : typesLoading ? (
             <div className="h-10 animate-pulse rounded-md bg-muted" />
           ) : typesError ? (
             <p className="text-sm text-destructive">{typesError}</p>
