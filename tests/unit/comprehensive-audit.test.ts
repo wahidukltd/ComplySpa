@@ -18,7 +18,7 @@ describe("Practice plan has correct limits (user specified 15)", () => {
 describe("All subscription transitions behave correctly", () => {
   const transitions: [string, string, Partial<ReturnType<typeof getEntitlements>>][] = [
     // Signup → trial
-    ["signup", "trial", { blocked: false, reportTier: "none", maxStaff: 1000, canManageUsers: true }],
+    ["signup", "trial", { blocked: false, reportTier: "audit", maxStaff: 1000, canManageUsers: true, canEmailReports: false }],
     // Trial → canceled/expired
     ["trial_expire", "expired_trial", { blocked: true, reportTier: "none", maxStaff: 0, canManageUsers: false }],
     // Expired → inactive after 30 days
@@ -124,7 +124,7 @@ describe("Upgrade restores all features", () => {
 
 describe("Report tier boundaries", () => {
   const tiers: [string, string][] = [
-    ["trial", "none"],
+    ["trial", "audit"],
     ["expired_trial", "none"],
     ["inactive", "none"],
     ["solo", "basic"],

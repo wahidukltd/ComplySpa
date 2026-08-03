@@ -107,11 +107,11 @@ describe("Every plan has consistent block/limit/report state", () => {
     });
   }
 
-  it("trial is the only active plan with 'none' report tier", () => {
+  it("no active plan has a 'none' report tier (trial now gets audit download)", () => {
     for (const plan of allStates) {
       const e = getEntitlements(plan);
-      if (!e.blocked && e.reportTier === "none") {
-        expect(plan).toBe("trial");
+      if (!e.blocked) {
+        expect(e.reportTier).not.toBe("none");
       }
     }
   });

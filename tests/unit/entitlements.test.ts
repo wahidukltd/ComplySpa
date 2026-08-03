@@ -4,12 +4,11 @@ import { getPlanLimits } from "@/lib/utils/plan";
 import { PlanLimitError } from "@/lib/utils/errors";
 
 describe("All 5 plan states", () => {
-  it("trial: 1000/10000/100, none reports, user mgmt enabled", () => {
+  it("trial: 1000/10000/100, audit reports (download only), user mgmt enabled", () => {
     const e = getEntitlements("trial");
     expect(e.maxStaff).toBe(1000);
-    expect(e.maxCredentials).toBe(10000);
     expect(e.maxUsers).toBe(100);
-    expect(e.reportTier).toBe("none");
+    expect(e.reportTier).toBe("audit");
     expect(e.canEmailReports).toBe(false);
     expect(e.canManageUsers).toBe(true);
     expect(e.blocked).toBe(false);
@@ -70,7 +69,7 @@ describe("All 5 plan states", () => {
 
 describe("getReportTier integration", () => {
   const testCases: [string, string][] = [
-    ["trial", "none"],
+    ["trial", "audit"],
     ["expired_trial", "none"],
     ["inactive", "none"],
     ["solo", "basic"],

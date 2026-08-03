@@ -232,7 +232,7 @@ export async function createReport(
   const entitlements = getEntitlements(plan);
 
   if (entitlements.reportTier === "none") {
-    return { id: null, error: "PDF reports are not available during the trial period. Upgrade to generate reports." };
+    return { id: null, error: "PDF reports are not available on your current plan. Upgrade to generate reports." };
   }
 
   const { data: report, error } = await supabase

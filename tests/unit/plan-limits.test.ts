@@ -53,12 +53,12 @@ describe("getPlanLimits", () => {
 });
 
 describe("getEntitlements", () => {
-  it("trial: generous limits, no reports, email, or API", () => {
+  it("trial: generous limits, audit reports (download only), no email, or API", () => {
     const e = getEntitlements("trial");
     expect(e.maxStaff).toBe(1000);
     expect(e.maxCredentials).toBe(10000);
     expect(e.maxUsers).toBe(100);
-    expect(e.reportTier).toBe("none");
+    expect(e.reportTier).toBe("audit");
     expect(e.canEmailReports).toBe(false);
     expect(e.canManageUsers).toBe(true);
     expect(e.blocked).toBe(false);
@@ -110,8 +110,8 @@ describe("getEntitlements", () => {
 });
 
 describe("getReportTier", () => {
-  it("trial returns none", () => {
-    expect(getReportTier("trial")).toBe("none");
+  it("trial returns audit (download only)", () => {
+    expect(getReportTier("trial")).toBe("audit");
   });
   it("solo returns basic", () => {
     expect(getReportTier("solo")).toBe("basic");

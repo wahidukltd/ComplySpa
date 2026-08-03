@@ -11,9 +11,10 @@ import { FileText, Download, Mail, Eye, Loader2, CheckCircle2, XCircle } from "l
 interface Props {
   clinicId: string;
   isTrial?: boolean;
+  canEmail?: boolean;
 }
 
-export function ReportGenerator({ clinicId, isTrial }: Props) {
+export function ReportGenerator({ clinicId, isTrial, canEmail = false }: Props) {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportTier, setReportTier] = useState<"basic" | "audit" | null>(null);
   const [loading, setLoading] = useState(false);
@@ -82,7 +83,10 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
     [reportData, reportTier],
   );
 
-  const canEmail = reportTier === "audit";
+  // Email is an entitlement (practice only), not a tier property — trial users
+  // get the audit PDF for download but must never see an email button that
+  // would 403 at the API.
+  const emailEnabled = canEmail && reportTier === "audit";
 
   if (loading) {
     return (
@@ -145,7 +149,7 @@ export function ReportGenerator({ clinicId, isTrial }: Props) {
           {previewOpen ? "Close Preview" : "Preview"}
         </Button>
 
-        {canEmail && (
+        {emailEnabled && (
           <BlobProvider document={doc!}>
             {({ blob, loading: blobLoading }) => (
               <Button

@@ -78,7 +78,7 @@ describe("Report tier reconciliation", () => {
 
 describe("Every plan has deterministic report tier", () => {
   const tiers: Record<string, string> = {
-    trial: "none",
+    trial: "audit",
     expired_trial: "none",
     inactive: "none",
     solo: "basic",

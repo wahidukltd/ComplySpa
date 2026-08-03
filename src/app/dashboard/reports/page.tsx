@@ -13,7 +13,7 @@ const SIGNED_URL_EXPIRY = 3600;
 
 const tierLabels: Record<string, { label: string; desc: string }> = {
   basic: { label: "Basic Compliance Report", desc: "Credential status summary and upcoming renewals. Download as PDF." },
-  audit: { label: "Audit-Ready Report", desc: "Full staff credential register, executive summary, status breakdown, upcoming renewals, and attestation. Download as PDF or email directly." },
+  audit: { label: "Audit-Ready Report", desc: "Full staff credential register, executive summary, status breakdown, upcoming renewals, and attestation. Download as PDF." },
 };
 
 export default async function ReportsPage() {
@@ -113,7 +113,11 @@ export default async function ReportsPage() {
                 ? "Generates a summary report with credential status counts and upcoming renewals."
                 : "Creates a comprehensive compliance report with staff credential register, executive summary, status breakdown, upcoming renewals, and attestation. Report data is live."}
             </p>
-            <ReportGenerator clinicId={clinicId} isTrial={isTrial} />
+            <ReportGenerator
+              clinicId={clinicId}
+              isTrial={isTrial}
+              canEmail={entitlements?.canEmailReports ?? false}
+            />
           </>
         )}
       </section>

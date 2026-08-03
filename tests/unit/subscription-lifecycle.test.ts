@@ -7,7 +7,8 @@ describe("Two onboarding paths", () => {
     const e = getEntitlements("trial");
     expect(e.blocked).toBe(false);
     expect(e.maxStaff).toBe(1000);
-    expect(e.reportTier).toBe("none");
+    expect(e.reportTier).toBe("audit");
+    expect(e.canEmailReports).toBe(false);
   });
 
   it("immediate subscribe path: solo plan activated, no trial", () => {
@@ -23,7 +24,7 @@ describe("Purchase during trial immediately ends trial", () => {
     const trial = getEntitlements("trial");
     const solo = getEntitlements("solo");
 
-    expect(trial.reportTier).toBe("none");
+    expect(trial.reportTier).toBe("audit");
     expect(solo.reportTier).toBe("basic");
     expect(trial.canEmailReports).toBe(false);
     expect(trial.canManageUsers).toBe(true);
@@ -34,8 +35,9 @@ describe("Purchase during trial immediately ends trial", () => {
     const trial = getEntitlements("trial");
     const practice = getEntitlements("practice");
 
-    expect(trial.reportTier).toBe("none");
+    expect(trial.reportTier).toBe("audit");
     expect(practice.reportTier).toBe("audit");
+    expect(trial.canEmailReports).toBe(false);
     expect(practice.canEmailReports).toBe(true);
   });
 });

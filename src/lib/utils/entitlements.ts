@@ -19,7 +19,9 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxStaff: 1000,
     maxCredentials: 10000,
     maxUsers: 100,
-    reportTier: "none",
+    // Trial gets the full audit-tier PDF (generate + download). Email stays
+    // practice-only — canEmailReports gates /api/reports/email at the API.
+    reportTier: "audit",
     canEmailReports: false,
     canManageUsers: true,
     canManageAlertRecipients: true,

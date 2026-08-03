@@ -110,7 +110,8 @@ describe("No privilege leak after downgrade (entitlement layer)", () => {
       expect(e.maxStaff).toBe(5);
     }],
     ["practice → trial", "trial", (e) => {
-      expect(e.reportTier).toBe("none"); // trial cannot generate reports
+      expect(e.reportTier).toBe("audit"); // trial generates + downloads audit PDFs
+      expect(e.canEmailReports).toBe(false); // but cannot email them
     }],
   ];
 
@@ -192,7 +193,7 @@ describe("Unknown plan defaults to blocked inactive", () => {
 
 describe("Report tiers match entitlements for all plans", () => {
   const cases: [string, string][] = [
-    ["trial", "none"],
+    ["trial", "audit"],
     ["expired_trial", "none"],
     ["inactive", "none"],
     ["solo", "basic"],
