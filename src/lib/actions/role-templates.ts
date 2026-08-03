@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getClinicIdAndPlan } from "@/lib/utils/clinic";
 import { ROLE_VALUES } from "@/lib/staff/role-credential-defaults";
 import { getResolvedTemplate } from "@/lib/staff/role-templates";
+import { createOnboardingItems, captureFlowError } from "@/lib/staff/onboarding";
 import * as Sentry from "@sentry/nextjs";
 
 const templateItemSchema = z.object({
@@ -327,6 +328,81 @@ export async function getTemplateSyncPreview(role: string) {
   };
 }
 
+export async function getRoleChangePreview(
+  staffMemberId: string,
+  newRole: string,
+): Promise<{
+  data?: { kept: number; added: { name: string }[]; removed: { name: string }[] };
+  error?: string;
+}> {
+  const clinicData = await getClinicIdAndPlan();
+  if (!clinicData) return { error: "Unauthorized" };
+  const { clinicId, userId } = clinicData;
+
+  // Validate the role against the known set before any data access — a
+  // malformed value must not silently render "Nothing is reset" (review
+  // 2026-08-03).
+  const parsedRole = z.enum(ROLE_VALUES).safeParse(newRole);
+  if (!parsedRole.success) return { error: "Invalid role." };
+
+  const permError = await requireOwnerOrManager(userId);
+  if (permError) return { error: permError };
+
+  const supabase = await createClient();
+
+  const { data: staff } = await supabase
+    .from("staff_members")
+    .select("id, role")
+    .eq("id", staffMemberId)
+    .eq("clinic_id", clinicId)
+    .is("deleted_at", null)
+    .is("suspended_at", null)
+    .single();
+  if (!staff || !staff.role) return { error: "Staff member not found." };
+  if (staff.role === parsedRole.data) return { data: { kept: 0, added: [], removed: [] } };
+
+  let template;
+  try {
+    template = await getResolvedTemplate(clinicId, parsedRole.data);
+  } catch (err) {
+    captureFlowError(err, "role-change-preview");
+    return { error: "Failed to load role template." };
+  }
+  // Honest error, matching the reconcile/sync paths — a role with no template
+  // row must never be presented as "nothing changes".
+  if (!template) return { error: "Role template not found." };
+
+  const templateTypeIds = new Set([
+    ...template.required.map((r) => r.credentialTypeId),
+    ...template.optional.map((o) => o.credentialTypeId),
+  ]);
+  const templateTypeNames = new Map<string, string>([
+    ...template.required.map((r) => [r.credentialTypeId, r.name] as const),
+    ...template.optional.map((o) => [o.credentialTypeId, o.name] as const),
+  ]);
+
+  const { data: items } = await supabase
+    .from("onboarding_items")
+    .select(`
+      credential_type_id,
+      credential_type:credential_types!onboarding_items_credential_type_id_fkey(name)
+    `)
+    .eq("staff_member_id", staffMemberId)
+    .eq("clinic_id", clinicId);
+
+  const itemTypeIds = new Set((items ?? []).map((i) => i.credential_type_id));
+
+  const kept = (items ?? []).filter((i) => templateTypeIds.has(i.credential_type_id)).length;
+  const added = [...templateTypeIds]
+    .filter((id) => !itemTypeIds.has(id))
+    .map((id) => ({ name: templateTypeNames.get(id) ?? "Unknown" }));
+  const removed = (items ?? [])
+    .filter((i) => !templateTypeIds.has(i.credential_type_id))
+    .map((i) => ({ name: i.credential_type?.name ?? "Unknown" }));
+
+  return { data: { kept, added, removed } };
+}
+
 export async function syncStaffToTemplate(staffMemberId: string) {
   const clinicData = await getClinicIdAndPlan();
   if (!clinicData) return { error: "Unauthorized" };
@@ -347,62 +423,18 @@ export async function syncStaffToTemplate(staffMemberId: string) {
     .single();
   if (!staff || !staff.role) return { error: "Staff member not found." };
 
-  let template;
-  try {
-    template = await getResolvedTemplate(clinicId, staff.role);
-  } catch (err) {
-    Sentry.captureException(err);
-    return { error: "Failed to load role template." };
-  }
-  if (!template) return { success: true, added: 0 };
-
-  const allItems = [...template.required, ...template.optional];
-  if (allItems.length === 0) return { success: true, added: 0 };
-
-  const requiredIds = new Set(template.required.map((r) => r.credentialTypeId));
-
-  const { data: existing } = await supabase
-    .from("onboarding_items")
-    .select("credential_type_id")
-    .eq("staff_member_id", staffMemberId);
-  const existingIds = new Set((existing ?? []).map((i) => i.credential_type_id));
-
-  const { data: heldCreds } = await supabase
-    .from("credentials")
-    .select("credential_type_id")
-    .eq("staff_member_id", staffMemberId)
-    .is("deleted_at", null)
-    .is("suspended_at", null);
-  const heldCredIds = new Set((heldCreds ?? []).map((c) => c.credential_type_id));
-
-  const rows = allItems
-    .filter((item) => !existingIds.has(item.credentialTypeId))
-    .map((item) => ({
-      staff_member_id: staffMemberId,
-      clinic_id: clinicId,
-      credential_type_id: item.credentialTypeId,
-      is_required: requiredIds.has(item.credentialTypeId),
-      status: heldCredIds.has(item.credentialTypeId) ? "completed" : "pending",
-      completed_at: heldCredIds.has(item.credentialTypeId) ? new Date().toISOString() : null,
-    }));
-
-  if (rows.length > 0) {
-    // Upsert with ignoreDuplicates: concurrent syncs of the same staff would
-    // otherwise race against the UNIQUE (staff_member_id, credential_type_id)
-    // constraint and fail with a unique violation.
-    const { error } = await supabase
-      .from("onboarding_items")
-      .upsert(rows, { onConflict: "staff_member_id,credential_type_id", ignoreDuplicates: true });
-    if (error) {
-      Sentry.captureException(error);
-      return { error: "Failed to sync staff to template." };
-    }
-  }
+  // Sync is the explicit admin path: insert-only (never removes), backfills
+  // completion from held credentials with the credential's created_at, and
+  // refreshes is_required — exactly the shared engine's no-delete executor
+  // (one algorithm with role-change regeneration, review 2026-08-03).
+  const result = await createOnboardingItems(staffMemberId, clinicId, staff.role, { requireTemplate: true, flow: "sync-staff" });
+  if (result.error) return { error: result.error };
 
   revalidatePath(`/dashboard/staff/${staffMemberId}`);
+  revalidatePath("/dashboard/staff");
   revalidatePath("/dashboard/onboarding");
   revalidatePath("/dashboard/settings/role-templates");
-  return { success: true, added: rows.length };
+  return { success: true, added: result.added ?? 0 };
 }
 
 export async function syncStaffToRoleTemplate(role: string) {
@@ -410,102 +442,41 @@ export async function syncStaffToRoleTemplate(role: string) {
   if (!clinicData) return { error: "Unauthorized" };
   const { clinicId, userId } = clinicData;
 
+  // Validate the role against the known set before any data access (parity
+  // with the other template actions, review 2026-08-03).
+  const parsedRole = z.enum(ROLE_VALUES).safeParse(role);
+  if (!parsedRole.success) return { error: "Invalid role." };
+
   const permError = await requireOwnerOrManager(userId);
   if (permError) return { error: permError };
 
   const supabase = await createClient();
 
-  let template;
-  try {
-    template = await getResolvedTemplate(clinicId, role);
-  } catch (err) {
-    Sentry.captureException(err);
-    return { error: "Failed to load role template." };
-  }
-  if (!template) return { success: true, synced: 0 };
-
-  const allItems = [...template.required, ...template.optional];
-  if (allItems.length === 0) return { success: true, synced: 0 };
-
-  const requiredIds = new Set(template.required.map((r) => r.credentialTypeId));
-
   const { data: staff } = await supabase
     .from("staff_members")
     .select("id")
     .eq("clinic_id", clinicId)
-    .eq("role", role)
+    .eq("role", parsedRole.data)
     .is("deleted_at", null)
     .is("suspended_at", null);
 
   if (!staff || staff.length === 0) return { success: true, synced: 0 };
 
-  const staffIds = staff.map((s) => s.id);
-
-  const { data: existing } = await supabase
-    .from("onboarding_items")
-    .select("staff_member_id, credential_type_id")
-    .in("staff_member_id", staffIds);
-
-  const existingByStaff: Record<string, Set<string>> = {};
-  for (const item of existing ?? []) {
-    if (!existingByStaff[item.staff_member_id]) existingByStaff[item.staff_member_id] = new Set();
-    existingByStaff[item.staff_member_id]!.add(item.credential_type_id);
-  }
-
-  const { data: heldCreds } = await supabase
-    .from("credentials")
-    .select("staff_member_id, credential_type_id")
-    .in("staff_member_id", staffIds)
-    .is("deleted_at", null)
-    .is("suspended_at", null);
-
-  const heldByStaff: Record<string, Set<string>> = {};
-  for (const c of heldCreds ?? []) {
-    if (!heldByStaff[c.staff_member_id]) heldByStaff[c.staff_member_id] = new Set();
-    heldByStaff[c.staff_member_id]!.add(c.credential_type_id);
-  }
-
-  const rows: {
-    staff_member_id: string;
-    clinic_id: string;
-    credential_type_id: string;
-    is_required: boolean;
-    status: string;
-    completed_at: string | null;
-  }[] = [];
-
-  for (const s of staff) {
-    const existingIds = existingByStaff[s.id] ?? new Set<string>();
-    const heldIds = heldByStaff[s.id] ?? new Set<string>();
-    for (const item of allItems) {
-      if (!existingIds.has(item.credentialTypeId)) {
-        const alreadyHeld = heldIds.has(item.credentialTypeId);
-        rows.push({
-          staff_member_id: s.id,
-          clinic_id: clinicId,
-          credential_type_id: item.credentialTypeId,
-          is_required: requiredIds.has(item.credentialTypeId),
-          status: alreadyHeld ? "completed" : "pending",
-          completed_at: alreadyHeld ? new Date().toISOString() : null,
-        });
-      }
+  // Span measures the acknowledged N×M backfill-loop trade-off (N staff × M
+  // template items, sequential updates): a latency spike here is visible in
+  // Sentry Performance before it becomes a user complaint, and is the signal
+  // for batching the backfill (see plan Review Findings, accepted note).
+  return Sentry.startSpan({ name: "staff.sync.role-wide", op: "db" }, async () => {
+    let synced = 0;
+    for (const s of staff) {
+      const result = await createOnboardingItems(s.id, clinicId, parsedRole.data, { requireTemplate: true, flow: "sync-role" });
+      if (result.error) return { error: result.error };
+      synced += result.added ?? 0;
     }
-  }
 
-  if (rows.length > 0) {
-    // Upsert with ignoreDuplicates: concurrent role-wide syncs racing the
-    // UNIQUE (staff_member_id, credential_type_id) constraint must not fail.
-    const { error } = await supabase
-      .from("onboarding_items")
-      .upsert(rows, { onConflict: "staff_member_id,credential_type_id", ignoreDuplicates: true });
-    if (error) {
-      Sentry.captureException(error);
-      return { error: "Failed to sync staff to template." };
-    }
-  }
-
-  revalidatePath("/dashboard/onboarding");
-  revalidatePath("/dashboard/staff");
-  revalidatePath("/dashboard/settings/role-templates");
-  return { success: true, synced: rows.length };
+    revalidatePath("/dashboard/onboarding");
+    revalidatePath("/dashboard/staff");
+    revalidatePath("/dashboard/settings/role-templates");
+    return { success: true, synced };
+  });
 }

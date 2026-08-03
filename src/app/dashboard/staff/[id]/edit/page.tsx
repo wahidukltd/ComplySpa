@@ -17,11 +17,16 @@ export default async function EditStaffPage({
   if (!userId) redirect("/sign-in");
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
 
   if (userErr || !userRecord) redirect("/onboarding");
+
+  // Viewers never reach the edit form — the detail page hides the Edit link
+  // for them; a direct URL must 404 the same way it would for a missing staff
+  // member (D8).
+  if (userRecord.role === "viewer") notFound();
 
   const { data: staff } = await supabase
     .from("staff_members")

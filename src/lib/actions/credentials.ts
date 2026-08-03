@@ -8,6 +8,7 @@ import { getClinicIdAndPlan } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
 import { PlanLimitError } from "@/lib/utils/errors";
 import { getCredentialStatus } from "@/lib/utils/status";
+import { captureFlowError } from "@/lib/staff/onboarding";
 import * as Sentry from "@sentry/nextjs";
 
 export async function addCredential(input: CredentialInput & { document_url?: string }) {
@@ -91,6 +92,10 @@ export async function addCredential(input: CredentialInput & { document_url?: st
       verification_url: parsed.data.verification_url || null,
       notes: parsed.data.notes || null,
       document_url: document_url ?? null,
+      // D5: status computed at insert — a past-date credential is expired the
+      // moment it is created, not at the next 05:00 cron (same function the
+      // update path and the daily cron use).
+      status: getCredentialStatus(parsed.data.expiration_date ?? null),
     })
     .select("id, expiration_date")
     .single();
@@ -136,6 +141,18 @@ export async function updateCredential(id: string, input: CredentialInput & { do
     .is("suspended_at", null)
     .maybeSingle();
   if (!existingCredential) return { error: "Credential not found" };
+
+  // Validate the credential type against the clinic's accessible set —
+  // mirrors addCredential; a cross-clinic custom type id must not be written
+  // on update (D9).
+  const { data: typeRows, error: typeErr } = await supabase
+    .from("credential_types")
+    .select("id")
+    .eq("id", parsed.data.credential_type_id)
+    .or(`clinic_id.is.null,clinic_id.eq.${user.clinic_id}`);
+  if (typeErr || !typeRows || typeRows.length === 0) {
+    return { error: "Invalid credential type." };
+  }
 
   const { error } = await supabase
     .from("credentials")
@@ -183,21 +200,35 @@ export async function deleteCredential(id: string, staffMemberId: string) {
     .select("staff_member_id")
     .eq("id", id)
     .eq("clinic_id", user.clinic_id)
+    .is("deleted_at", null)
     .is("suspended_at", null)
     .maybeSingle();
 
   if (!cred) return { error: "Credential not found." };
   if (cred.staff_member_id !== staffMemberId) return { error: "Credential does not belong to this staff member." };
 
-  const { error } = await supabase
-    .from("credentials")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("clinic_id", user.clinic_id);
+  // D10 (single transaction, migration 048): soft-delete + remaining-live-
+  // credential check + conditional checklist revert run atomically, so the
+  // item can never be reverted under a live credential (race) and a revert
+  // failure can never leave the credential deleted while the action reports
+  // an error (failure-atomicity). SECURITY INVOKER — RLS still applies.
+  const { data: rpcRaw, error: rpcError } = await supabase.rpc(
+    "delete_credential_with_checklist_revert",
+    {
+      p_credential_id: id,
+      p_staff_member_id: staffMemberId,
+      p_clinic_id: user.clinic_id,
+    },
+  );
 
-  if (error) {
-    Sentry.captureException(error);
+  if (rpcError) {
+    captureFlowError(rpcError, "credential-delete");
     return { error: "Failed to delete credential. Please try again." };
+  }
+
+  const rpcResult = rpcRaw as { deleted?: boolean } | null;
+  if (!rpcResult || rpcResult.deleted !== true) {
+    return { error: "Credential not found." };
   }
 
   revalidatePath(`/dashboard/staff/${staffMemberId}`);

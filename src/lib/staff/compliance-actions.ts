@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { ReadinessResult } from "@/lib/staff/readiness";
 import type { OnboardingStaffState } from "@/lib/staff/onboarding";
+import { hasPendingOnboardingItems } from "@/lib/utils/work-status";
 import type { ActionUrgency } from "@/types";
 
 export interface ComplianceAction {
@@ -114,20 +115,27 @@ export async function buildComplianceActionsFromReadiness(
       if (onboardingState == null) continue;
 
       const state = onboardingState[id];
+      // Same vocabulary as the staff-list CTA (D2/D13): "Continue onboarding"
+      // requires genuinely outstanding checklist items (required OR optional);
+      // a pending-readiness employee with no items gets "Start onboarding".
+      const hasPending = state ? hasPendingOnboardingItems(state) : false;
       const pendingNames = state?.missingNames ?? [];
       const requiredPending = state?.requiredPending ?? 0;
+      const optionalPending = state?.optionalPending ?? 0;
 
       let description: string;
       let actionLabel: string;
-      if (requiredPending > 0) {
+      if (hasPending) {
         if (pendingNames.length > 0) {
           const shown = pendingNames.slice(0, 3).join(", ");
           const more = pendingNames.length > 3 ? ` +${pendingNames.length - 3} more` : "";
           description = `Onboarding incomplete — ${shown}${more} pending`;
         } else {
-          // Pending items whose credential type name is unknown — fall back to
-          // a count rather than rendering an empty list.
-          description = `Onboarding incomplete — ${requiredPending} requirement${requiredPending === 1 ? "" : "s"} pending`;
+          // Pending items whose credential type name is unknown (or
+          // optional-only pending) — fall back to a count rather than
+          // rendering an empty list.
+          const pendingCount = requiredPending + optionalPending;
+          description = `Onboarding incomplete — ${pendingCount} requirement${pendingCount === 1 ? "" : "s"} pending`;
         }
         actionLabel = "Continue onboarding";
       } else {

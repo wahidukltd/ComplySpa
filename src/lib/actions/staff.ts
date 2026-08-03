@@ -4,9 +4,10 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { staffMemberSchema, addStaffWithCredentialsSchema, type StaffMemberInput, type AddStaffWithCredentialsInput } from "@/lib/validations/staff";
-import { createOnboardingItems } from "@/lib/staff/onboarding";
+import { createOnboardingItems, reconcileOnboardingItemsToRole } from "@/lib/staff/onboarding";
 import { getClinicIdAndPlan } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
+import { getCredentialStatus } from "@/lib/utils/status";
 import { PlanLimitError } from "@/lib/utils/errors";
 import * as Sentry from "@sentry/nextjs";
 
@@ -72,7 +73,15 @@ export async function addStaffMember(input: StaffMemberInput) {
 
   const staffRole = parsed.data.role;
   if (staffRole) {
-    await createOnboardingItems(staff.id, clinicId, staffRole);
+    const onboardingResult = await createOnboardingItems(staff.id, clinicId, staffRole, { flow: "add-staff" });
+    if (onboardingResult.error) {
+      // Roll back the staff row — a hire whose requirements failed to
+      // generate must not linger as a half-created record. Clean up any items
+      // created before the failure so no orphan rows accumulate.
+      await supabase.rpc("soft_delete_staff_member", { p_staff_id: staff.id, p_clinic_id: clinicId });
+      await supabase.from("onboarding_items").delete().eq("staff_member_id", staff.id).eq("clinic_id", clinicId);
+      return { success: false, error: onboardingResult.error };
+    }
   }
 
   revalidatePath("/dashboard/staff");
@@ -111,7 +120,18 @@ export async function updateStaffMember(id: string, input: StaffMemberInput) {
   const oldRole = currentStaff.role;
   const newRole = parsed.data.role;
 
-  const { error } = await supabase
+  // Role-clear guard (D6): a staff member with a role cannot have it cleared
+  // via the API — their requirements would orphan with no recovery surface
+  // (sync is insert-only and the checklist depends on a role).
+  if (!newRole && oldRole) {
+    return { error: "A role cannot be cleared. Select a role to continue." };
+  }
+
+  // Optimistic concurrency (review 2026-08-03): guard the UPDATE on the role
+  // as read, so a concurrent admin's committed role change is never clobbered
+  // and items are never reconciled against a stale template. 0 rows = someone
+  // else changed the record — fail with a reload instruction, not silence.
+  const updateBuilder = supabase
     .from("staff_members")
     .update({
       ...parsed.data,
@@ -120,25 +140,58 @@ export async function updateStaffMember(id: string, input: StaffMemberInput) {
       phone: parsed.data.phone || null,
     })
     .eq("id", id)
-    .eq("clinic_id", user.clinic_id)
-    .is("deleted_at", null);
+    .eq("clinic_id", user.clinic_id);
+
+  const guardedUpdate = oldRole
+    ? updateBuilder.eq("role", oldRole)
+    : updateBuilder.is("role", null);
+
+  const { data: updated, error } = await guardedUpdate
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     Sentry.captureException(error);
     return { error: "Failed to update staff member. Please try again." };
   }
+  if (!updated) {
+    return { error: "This staff member was changed by someone else. Reload and try again." };
+  }
 
   if (newRole && oldRole !== newRole) {
-    const { error: delErr } = await supabase
-      .from("onboarding_items")
-      .delete()
-      .eq("staff_member_id", id)
-      .eq("clinic_id", user.clinic_id);
-    if (delErr) {
-      Sentry.captureException(delErr);
-      return { error: "Failed to update role. Please try again." };
+    // D3: additive-preserving regeneration — retained items keep their
+    // completion history, new requirements are inserted (backfilled when a
+    // live credential is held), obsolete requirements are removed.
+    const result = await reconcileOnboardingItemsToRole(id, user.clinic_id, newRole, "role-change");
+    if (result.error) {
+      // D11 failure atomicity: the role UPDATE already succeeded — revert it
+      // ONLY if the role is still what we set (never clobber a concurrent
+      // change), then surface a distinct recovery error so a retry is never
+      // silently treated as converged.
+      const { data: reverted, error: revertErr } = await supabase
+        .from("staff_members")
+        .update({ role: oldRole })
+        .eq("id", id)
+        .eq("clinic_id", user.clinic_id)
+        .eq("role", newRole)
+        .is("deleted_at", null)
+        .select("id")
+        .maybeSingle();
+      if (revertErr) Sentry.captureException(revertErr);
+      if (revertErr || !reverted) {
+        return {
+          error:
+            "Role updated, but requirements could not be regenerated and the role could not be restored. Reload the page and use \"Sync to role template\" to recover.",
+        };
+      }
+      return { error: result.error };
     }
-    await createOnboardingItems(id, user.clinic_id, newRole);
+
+    revalidatePath("/dashboard/staff");
+    revalidatePath(`/dashboard/staff/${id}`);
+    revalidatePath("/dashboard");
+    return { success: true, added: result.added, removed: result.removed, backfilled: result.backfilled };
   }
 
   revalidatePath("/dashboard/staff");
@@ -162,17 +215,20 @@ export async function deleteStaffMember(id: string) {
   if (!user) return { error: "Unauthorized" };
   if (user.role === "viewer") return { error: "Insufficient permissions" };
 
-  const { error } = await supabase
-    .from("staff_members")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("clinic_id", user.clinic_id)
-    .is("deleted_at", null);
+  // Soft-delete via a scoped SECURITY DEFINER function (migration 048): a
+  // direct UPDATE of deleted_at fails RLS (the SELECT policies filter
+  // deleted_at IS NULL, and Postgres rejects an UPDATE whose new row becomes
+  // invisible under SELECT policies). RPC is pinned to the session clinic.
+  const { data: deleted, error } = await supabase.rpc("soft_delete_staff_member", {
+    p_staff_id: id,
+    p_clinic_id: user.clinic_id,
+  });
 
   if (error) {
     Sentry.captureException(error);
     return { error: "Failed to remove staff member. Please try again." };
   }
+  if (!deleted) return { error: "Staff member not found." };
 
   revalidatePath("/dashboard/staff");
   revalidatePath("/dashboard");
@@ -222,6 +278,21 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
 
   const wizardCount = parsed.data.credentials.length;
   if (wizardCount > 0) {
+    // Validate every credential type against the clinic's accessible set
+    // (global defaults + own custom types) before any insert — mirrors
+    // addCredential; a client-supplied id referencing another clinic's custom
+    // type must not reach the INSERT (D6). The Set comparison also rejects
+    // duplicate type ids as defense-in-depth behind the schema refine.
+    const credentialTypeIds = parsed.data.credentials.map((c) => c.credential_type_id);
+    const { data: typeRows, error: typeErr } = await supabase
+      .from("credential_types")
+      .select("id")
+      .in("id", credentialTypeIds)
+      .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
+    if (typeErr || !typeRows || typeRows.length !== new Set(credentialTypeIds).size) {
+      return { success: false, error: "Invalid credential type." };
+    }
+
     const { count: credCount } = await supabase
       .from("credentials")
       .select("id", { count: "exact", head: true })
@@ -267,9 +338,10 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
 
   const role = parsed.data.role;
   if (role) {
-    const onboardingResult = await createOnboardingItems(staff.id, clinicId, role);
+    const onboardingResult = await createOnboardingItems(staff.id, clinicId, role, { flow: "add-staff-wizard" });
     if (onboardingResult.error) {
-      await supabase.from("staff_members").update({ deleted_at: new Date().toISOString() }).eq("id", staff.id);
+      await supabase.rpc("soft_delete_staff_member", { p_staff_id: staff.id, p_clinic_id: clinicId });
+      await supabase.from("onboarding_items").delete().eq("staff_member_id", staff.id).eq("clinic_id", clinicId);
       return { success: false, error: onboardingResult.error };
     }
   }
@@ -283,6 +355,9 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
       state: c.state || null,
       issue_date: c.issue_date || null,
       expiration_date: c.expiration_date || null,
+      // D5: status computed at insert — a past-date credential is expired the
+      // moment it is created, not at the next 05:00 cron.
+      status: getCredentialStatus(c.expiration_date || null),
     }));
 
     const { error: credError } = await supabase
@@ -291,7 +366,8 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
 
     if (credError) {
       Sentry.captureException(credError);
-      await supabase.from("staff_members").update({ deleted_at: new Date().toISOString() }).eq("id", staff.id);
+      await supabase.rpc("soft_delete_staff_member", { p_staff_id: staff.id, p_clinic_id: clinicId });
+      await supabase.from("onboarding_items").delete().eq("staff_member_id", staff.id).eq("clinic_id", clinicId);
       return { success: false, error: "Failed to add credentials. Staff member was not created." };
     }
   }

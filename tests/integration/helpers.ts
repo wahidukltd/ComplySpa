@@ -116,6 +116,23 @@ export async function patchAsUser(
   });
 }
 
+/** DELETE a PostgREST resource as a specific Clerk user with a filter */
+export async function deleteAsUser(
+  authUserId: string,
+  table: string,
+  filter: string,
+): Promise<Response> {
+  const jwt = createJwt({ sub: authUserId, role: "authenticated" });
+  return fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      apikey: anonKeyJwt,
+      "Content-Type": "application/json",
+    },
+  });
+}
+
 /** Service role client (bypasses RLS) — for test setup/teardown only */
 export function getServiceClient(): SupabaseClient {
   return createClient(SUPABASE_URL, serviceKeyJwt);

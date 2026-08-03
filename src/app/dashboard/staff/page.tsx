@@ -20,7 +20,7 @@ export default async function StaffListPage() {
   if (!userId) redirect("/sign-in");
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
 
@@ -75,6 +75,7 @@ export default async function StaffListPage() {
         readinessMap={readinessMap}
         onboardingState={onboardingState}
         dataUnavailable={dataUnavailable}
+        canEdit={userRecord.role !== "viewer"}
       />
     </div>
   );

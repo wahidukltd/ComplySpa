@@ -159,6 +159,18 @@ export async function restoreExistingAccount(authUserId: string): Promise<{ redi
 
 // ── New onboarding progress functions ──
 
+/** Resolve the staff member an onboarding item belongs to (RLS-scoped), so
+ * mark actions can revalidate the correct staff detail path. */
+async function resolveOnboardingItemStaff(itemId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("onboarding_items")
+    .select("staff_member_id")
+    .eq("id", itemId)
+    .maybeSingle();
+  return data?.staff_member_id ?? null;
+}
+
 export async function getStaffOnboarding(staffId: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -192,13 +204,15 @@ export async function markOnboardingItemComplete(itemId: string) {
   if (!userRecord) return { error: "Unauthorized" };
   if (userRecord.role === "viewer") return { error: "Insufficient permissions" };
 
-  const result = await updateOnboardingItemStatus(itemId, "completed", userRecord.id);
+  const result = await updateOnboardingItemStatus(itemId, "completed", userRecord.id, "onboarding-item");
   if (result.error) {
     Sentry.captureException(result.error);
     return { error: "Failed to complete onboarding item." };
   }
 
+  const staffMemberId = await resolveOnboardingItemStaff(itemId);
   revalidatePath("/dashboard/staff");
+  if (staffMemberId) revalidatePath(`/dashboard/staff/${staffMemberId}`);
   revalidatePath("/dashboard/onboarding");
   return { success: true };
 }
@@ -216,13 +230,15 @@ export async function markOnboardingItemSkipped(itemId: string) {
   if (!userRecord) return { error: "Unauthorized" };
   if (userRecord.role === "viewer") return { error: "Insufficient permissions" };
 
-  const result = await updateOnboardingItemStatus(itemId, "skipped", userRecord.id);
+  const result = await updateOnboardingItemStatus(itemId, "skipped", userRecord.id, "onboarding-item");
   if (result.error) {
     Sentry.captureException(result.error);
     return { error: "Failed to skip onboarding item." };
   }
 
+  const staffMemberId = await resolveOnboardingItemStaff(itemId);
   revalidatePath("/dashboard/staff");
+  if (staffMemberId) revalidatePath(`/dashboard/staff/${staffMemberId}`);
   revalidatePath("/dashboard/onboarding");
   return { success: true };
 }

@@ -3,6 +3,15 @@ import type { OnboardingStaffState } from "@/lib/staff/onboarding";
 
 export type WorkStatus = "work_ready" | "in_progress" | "blocked";
 
+/** True when the staff member's checklist has outstanding items (required or
+ * optional). Single source for the "Continue onboarding" CTA rule (staff list
+ * and Overview cards) — a CTA must never appear for an employee whose
+ * checklist is fully addressed (e.g. In Progress from a lapsed credential).
+ * Pure (no server deps) so client components can import it. */
+export function hasPendingOnboardingItems(state: OnboardingStaffState): boolean {
+  return state.requiredPending > 0 || state.optionalPending > 0;
+}
+
 export const WORK_STATUS_META: Record<
   WorkStatus,
   { label: string; color: string; icon: "check" | "alert" | "warning" }

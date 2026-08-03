@@ -52,7 +52,13 @@ export const wizardCredentialSchema = z.object({
 export type WizardCredentialInput = z.input<typeof wizardCredentialSchema>;
 
 export const addStaffWithCredentialsSchema = staffMemberSchema.extend({
-  credentials: z.array(wizardCredentialSchema).default([]),
+  credentials: z
+    .array(wizardCredentialSchema)
+    .default([])
+    .refine(
+      (creds) => new Set(creds.map((c) => c.credential_type_id)).size === creds.length,
+      { message: "Duplicate credential types are not allowed." },
+    ),
 });
 
 export type AddStaffWithCredentialsInput = z.input<typeof addStaffWithCredentialsSchema>;

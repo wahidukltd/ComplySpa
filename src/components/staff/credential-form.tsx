@@ -414,7 +414,16 @@ export function CredentialForm({
             </div>
             <div className="space-y-2">
               <Label htmlFor="custom-category">Category</Label>
-              <Select value={customCategory} onValueChange={(v) => v && setCustomCategory(v)}>
+              <Select
+                value={customCategory}
+                onValueChange={(v) => v && setCustomCategory(v)}
+                items={[
+                  { value: "license", label: "License" },
+                  { value: "training", label: "Training" },
+                  { value: "insurance", label: "Insurance" },
+                  { value: "agreement", label: "Agreement" },
+                ]}
+              >
                 <SelectTrigger id="custom-category">
                   <SelectValue />
                 </SelectTrigger>

@@ -80,6 +80,7 @@ export function StaffWizard() {
     register,
     formState: { errors },
     getValues,
+    setError,
   } = useForm({
     defaultValues: {
       name: "",
@@ -133,6 +134,21 @@ export function StaffWizard() {
     () => credentialTypes.filter((ct) => !wizardCredentials.some((wc) => wc.credential_type_id === ct.id)),
     [credentialTypes, wizardCredentials],
   );
+
+  // Per-row type options: every type except ones already chosen by ANOTHER
+  // row (the row's own current type stays selectable) — duplicate credential
+  // types are impossible in the wizard (D7/D13c).
+  function rowAvailableTypes(index: number) {
+    return credentialTypes.filter(
+      (ct) =>
+        ct.id === wizardCredentials[index]?.credential_type_id ||
+        !wizardCredentials.some((wc, i) => i !== index && wc.credential_type_id === ct.id),
+    );
+  }
+
+  function rowSelectItems(index: number) {
+    return rowAvailableTypes(index).map((ct) => ({ value: ct.id, label: ct.name }));
+  }
 
   async function handleRoleSelect(role: string) {
     setSelectedRole(role);
@@ -279,8 +295,27 @@ export function StaffWizard() {
     if (result.success && result.id) {
       toast.success("Staff member added successfully.");
       router.push(`/dashboard/staff/${result.id}`);
-    } else if (result.error) {
-      toast.error(result.error);
+      return;
+    }
+
+    if (result.error) {
+      // Surface server-side field errors inline (never a vague toast alone);
+      // errors for non-form fields (e.g. the credentials array) fall back to
+      // the toast so nothing is silently dropped.
+      let surfacedInline = false;
+      if (result.fieldErrors) {
+        for (const [field, messages] of Object.entries(result.fieldErrors)) {
+          if (["name", "email", "phone", "location", "department", "hire_date", "manager"].includes(field)) {
+            setError(field as "name" | "email" | "phone" | "location" | "department" | "hire_date" | "manager", {
+              message: messages.join(", "),
+            });
+            surfacedInline = true;
+          } else {
+            toast.error(messages.join(", "));
+          }
+        }
+      }
+      if (!surfacedInline) toast.error(result.error);
     }
   }
 
@@ -334,7 +369,17 @@ export function StaffWizard() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="wiz-email">Email</Label>
-            <Input id="wiz-email" type="email" {...register("email")} placeholder="jane@clinic.com" />
+            <Input
+              id="wiz-email"
+              type="email"
+              placeholder="jane@clinic.com"
+              aria-invalid={!!errors.email}
+              {...register("email", {
+                validate: (value) =>
+                  !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? true : "Enter a valid email address",
+              })}
+            />
+            {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="wiz-phone">Phone</Label>
@@ -484,6 +529,10 @@ export function StaffWizard() {
               </Button>
             )}
           </div>
+          <p className="text-xs text-muted-foreground">
+            Requirements are generated automatically from the role template. Unchecking a credential only skips
+            creating it now — it stays on the employee&apos;s checklist.
+          </p>
 
           {typesLoading ? (
             <div className="h-20 animate-pulse rounded-lg bg-muted" />
@@ -530,12 +579,13 @@ export function StaffWizard() {
                           <Select
                             value={cred.credential_type_id}
                             onValueChange={(v) => v && handleCredentialTypeChange(index, v)}
+                            items={rowSelectItems(index)}
                           >
                             <SelectTrigger className="h-8 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {credentialTypes.map((ct) => (
+                              {rowAvailableTypes(index).map((ct) => (
                                 <SelectItem key={ct.id} value={ct.id}>
                                   {ct.name}
                                 </SelectItem>

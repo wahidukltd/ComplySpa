@@ -22,7 +22,7 @@ import {
 import { MoreHorizontal, Pencil, Trash2, Search, CheckCircle2, AlertTriangle, ClipboardCheck } from "lucide-react";
 import { formatDate } from "@/lib/utils/date";
 import { ROLE_DISPLAY_LABELS, ROLE_VALUES } from "@/lib/staff/role-credential-defaults";
-import { deriveWorkStatus, WORK_STATUS_META, WORK_STATUS_FILTER, type WorkStatus } from "@/lib/utils/work-status";
+import { deriveWorkStatus, hasPendingOnboardingItems, WORK_STATUS_META, WORK_STATUS_FILTER, type WorkStatus } from "@/lib/utils/work-status";
 import type { OnboardingStaffState } from "@/lib/staff/onboarding";
 import type { Tables } from "@/types/database";
 import type { ReadinessResult } from "@/lib/staff/readiness";
@@ -35,7 +35,15 @@ const EMPTY_ONBOARDING_STATE: OnboardingStaffState = {
   requiredPending: 0,
   optionalTotal: 0,
   optionalCompleted: 0,
+  optionalPending: 0,
   missingNames: [],
+};
+
+const EMPTY_READINESS: ReadinessResult = {
+  status: "pending",
+  missingCredentials: [],
+  expiredCredentials: [],
+  expiringCredentials: [],
 };
 
 const ROLE_KEYS = ["", ...ROLE_VALUES] as const;
@@ -46,6 +54,7 @@ interface StaffTableProps {
   readinessMap?: Record<string, ReadinessResult>;
   onboardingState?: Record<string, OnboardingStaffState>;
   dataUnavailable?: boolean;
+  canEdit?: boolean;
 }
 
 function StatusIcon({ type }: { type: "check" | "alert" | "warning" }) {
@@ -77,7 +86,7 @@ function formatReadinessDetails(r: ReadinessResult): string {
   return parts.join(" · ");
 }
 
-export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState = {}, dataUnavailable = false }: StaffTableProps) {
+export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState = {}, dataUnavailable = false, canEdit = true }: StaffTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -93,7 +102,7 @@ export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState
       }
       if (roleFilter && member.role !== roleFilter) return false;
       if (statusFilter) {
-        const readiness = readinessMap[member.id] ?? { status: "pending", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
+        const readiness = readinessMap[member.id] ?? EMPTY_READINESS;
         const onboarding = onboardingState[member.id] ?? EMPTY_ONBOARDING_STATE;
         if (deriveWorkStatus(readiness, onboarding) !== statusFilter) return false;
       }
@@ -188,10 +197,19 @@ export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState
             </TableRow>
           ) : (
             filteredStaff.map((member) => {
-              const readiness = readinessMap[member.id] ?? { status: "pending", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
+              const readiness = readinessMap[member.id] ?? EMPTY_READINESS;
               const onboarding = onboardingState[member.id] ?? EMPTY_ONBOARDING_STATE;
               const status = deriveWorkStatus(readiness, onboarding);
               const meta = WORK_STATUS_META[status];
+              // D2/D13 CTA rule: the button exists only when there is genuine
+              // onboarding work — pending checklist items (Continue) or a
+              // legacy employee with no items generated yet (Start). An
+              // In-Progress employee whose only issue is a lapsed credential
+              // gets no onboarding CTA; the Details column names the gap.
+              const hasPendingItems = hasPendingOnboardingItems(onboarding);
+              const showOnboardingCta =
+                status !== "work_ready" && (hasPendingItems || readiness.status === "pending");
+              const onboardingCtaLabel = hasPendingItems ? "Continue onboarding" : "Start onboarding";
               return (
                 <TableRow
                   key={member.id}
@@ -235,50 +253,53 @@ export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      {status !== "work_ready" && (
+                      {showOnboardingCta && (
                         <Button
                           variant={status === "blocked" ? "default" : "secondary"}
                           size="sm"
                           onClick={() => router.push(`/dashboard/staff/${member.id}#onboarding`)}
                           className="h-7 gap-1 text-xs"
+                          aria-label={`${onboardingCtaLabel} for ${member.name}`}
                         >
                           <ClipboardCheck className="size-3.5" />
-                          Continue onboarding
+                          {onboardingCtaLabel}
                         </Button>
                       )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label="Actions"
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/dashboard/staff/${member.id}/edit`);
-                            }}
-                          >
-                            <Pencil className="mr-2 size-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDelete(member.id);
-                            }}
-                          >
-                            <Trash2 className="mr-2 size-4" />
-                            Remove
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {canEdit && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="Actions"
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/dashboard/staff/${member.id}/edit`);
+                              }}
+                            >
+                              <Pencil className="mr-2 size-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(member.id);
+                              }}
+                            >
+                              <Trash2 className="mr-2 size-4" />
+                              Remove
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

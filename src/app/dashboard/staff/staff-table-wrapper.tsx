@@ -15,11 +15,13 @@ export function StaffTableWrapper({
   readinessMap = {},
   onboardingState = {},
   dataUnavailable = false,
+  canEdit = true,
 }: {
   staff: StaffMember[];
   readinessMap?: Record<string, ReadinessResult>;
   onboardingState?: Record<string, OnboardingStaffState>;
   dataUnavailable?: boolean;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
 
@@ -40,6 +42,7 @@ export function StaffTableWrapper({
       readinessMap={readinessMap}
       onboardingState={onboardingState}
       dataUnavailable={dataUnavailable}
+      canEdit={canEdit}
     />
   );
 }

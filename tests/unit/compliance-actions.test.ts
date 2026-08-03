@@ -25,6 +25,7 @@ function onboardingState(overrides: Partial<OnboardingStaffState>): OnboardingSt
     requiredPending: 0,
     optionalTotal: 0,
     optionalCompleted: 0,
+    optionalPending: 0,
     missingNames: [],
     ...overrides,
   };
@@ -80,6 +81,19 @@ describe("buildComplianceActionsFromReadiness — onboarding cards", () => {
     expect(actions[0]!).toMatchObject({
       actionLabel: "Start onboarding",
       description: "Onboarding not started — no requirements generated yet",
+    });
+  });
+
+  it("emits Continue onboarding for optional-only pending items (vocabulary parity with the staff list)", async () => {
+    const actions = await buildComplianceActionsFromReadiness(
+      staffRows,
+      { s1: readiness("pending") },
+      "clinic-1",
+      { s1: onboardingState({ optionalTotal: 2, optionalPending: 2 }) },
+    );
+    expect(actions[0]!).toMatchObject({
+      actionLabel: "Continue onboarding",
+      description: "Onboarding incomplete — 2 requirements pending",
     });
   });
 

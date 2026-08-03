@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   public: {
     Tables: {
       alert_logs: {
@@ -368,6 +363,24 @@ export type Database = {
           },
         ]
       }
+      notification_settings: {
+        Row: {
+          description: string | null
+          key: string
+          value: string
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          value: string
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
       onboarding_items: {
         Row: {
           clinic_id: string
@@ -668,12 +681,25 @@ export type Database = {
         }
         Returns: string
       }
+      delete_credential_with_checklist_revert: {
+        Args: {
+          p_clinic_id: string
+          p_credential_id: string
+          p_staff_member_id: string
+        }
+        Returns: Json
+      }
       reconcile_clinic_plan: {
         Args: { p_clinic_id: string; p_plan: string }
         Returns: undefined
       }
+      reconcile_stale_pending_alerts: { Args: never; Returns: undefined }
       scan_escalation_alerts: { Args: never; Returns: undefined }
       scan_expiring_credentials: { Args: never; Returns: undefined }
+      soft_delete_staff_member: {
+        Args: { p_clinic_id: string; p_staff_id: string }
+        Returns: boolean
+      }
       update_clinic_subscription:
         | {
             Args: {
@@ -694,7 +720,6 @@ export type Database = {
             }
             Returns: undefined
           }
-      reconcile_stale_pending_alerts: { Args: never; Returns: undefined }
       update_credential_statuses: { Args: never; Returns: undefined }
     }
     Enums: {

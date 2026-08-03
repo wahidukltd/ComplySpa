@@ -35,8 +35,14 @@ describe("deriveWorkStatus", () => {
   });
 
   it("returns work_ready when only optional items remain (required all complete)", () => {
-    const optionalOnly = { ...EMPTY_ONBOARDING_STATE, optionalTotal: 1, optionalCompleted: 0 };
+    const optionalOnly = { ...EMPTY_ONBOARDING_STATE, optionalTotal: 1, optionalCompleted: 0, optionalPending: 1 };
     expect(deriveWorkStatus(readiness("ready"), optionalOnly)).toBe("work_ready");
+  });
+
+  it("never reports blocked for pending optional items (optional work is not a gate)", () => {
+    const optionalPending = { ...EMPTY_ONBOARDING_STATE, optionalTotal: 2, optionalPending: 2 };
+    expect(deriveWorkStatus(readiness("pending"), optionalPending)).toBe("in_progress");
+    expect(deriveWorkStatus(readiness("at_risk"), optionalPending)).toBe("in_progress");
   });
 
   it("does not treat a skipped required item as blocked (requiredPending only counts pending)", () => {
