@@ -24,9 +24,9 @@ const CATEGORIES = [
   {
     category: "Reports",
     rows: [
-      { feature: "Basic compliance report (PDF)", solo: "✓", practice: "✓" },
-      { feature: "Audit-ready report with attachments", solo: "—", practice: "✓" },
-      { feature: "Readiness report (PDF)", solo: "—", practice: "✓" },
+      { feature: "Basic compliance report (preview, download, email)", solo: "✓", practice: "✓" },
+      { feature: "Audit-ready report — cover, staff register, attestation (preview, download, email)", solo: "—", practice: "✓" },
+      { feature: "Email report to yourself", solo: "✓", practice: "✓" },
     ],
   },
   {

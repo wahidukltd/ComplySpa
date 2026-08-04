@@ -1,19 +1,21 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ReportGenerator } from "@/components/reports/report-generator";
-import { getReportHistory } from "@/lib/actions/reports";
 import { getEntitlements } from "@/lib/utils/entitlements";
-import { formatDateTime } from "@/lib/utils/date";
 import { FileText, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-const SIGNED_URL_EXPIRY = 3600;
-
 const tierLabels: Record<string, { label: string; desc: string }> = {
-  basic: { label: "Basic Compliance Report", desc: "Credential status summary and upcoming renewals. Download as PDF." },
-  audit: { label: "Audit-Ready Report", desc: "Full staff credential register, executive summary, status breakdown, upcoming renewals, and attestation. Download as PDF." },
+  basic: {
+    label: "Basic Compliance Report",
+    desc: "Credential status summary and upcoming renewals. Preview, download, and email to yourself.",
+  },
+  audit: {
+    label: "Audit-Ready Compliance Report",
+    desc: "Full staff credential register, executive summary, status breakdown, upcoming renewals, and attestation. Preview, download, and email to yourself.",
+  },
 };
 
 export default async function ReportsPage() {
@@ -23,43 +25,32 @@ export default async function ReportsPage() {
 
   const { data: userRecord } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", user.id)
     .single();
 
   let entitlements: ReturnType<typeof getEntitlements> | null = null;
+  let userRole: string | null = null;
   if (userRecord) {
+    userRole = userRecord.role;
     const { data: clinic } = await supabase
       .from("clinics")
-      .select("plan")
+      .select("plan, trial_plan")
       .eq("id", userRecord.clinic_id)
       .single();
     if (clinic) {
-      entitlements = getEntitlements(clinic.plan);
+      entitlements = getEntitlements(clinic.plan, clinic.trial_plan);
     }
   }
 
-  const history = await getReportHistory();
-  const clinicId = history.clinicId ?? "";
-
-  const reportsWithUrls = await Promise.all(
-    (history.reports ?? []).map(async (r) => {
-      if (r.reportUrl && !r.reportUrl.includes("://")) {
-        const { data } = await supabase.storage
-          .from("documents")
-          .createSignedUrl(r.reportUrl, SIGNED_URL_EXPIRY);
-        return { ...r, reportUrl: data?.signedUrl ?? null };
-      }
-      if (r.reportUrl?.includes("://")) {
-        return { ...r, reportUrl: null };
-      }
-      return r;
-    }),
-  );
-
-  const isTrial = entitlements?.reportTier === "none";
+  const isBlocked = entitlements?.reportTier === "none";
   const currentTier = entitlements?.reportTier ?? "none";
   const tierInfo = currentTier !== "none" ? tierLabels[currentTier] : null;
+
+  // Viewers may generate and download (read-only assembly) but never email —
+  // the button is hidden so no storage upload is ever triggered for them; the
+  // API route also 403s viewers as defense-in-depth.
+  const canEmail = userRole !== "viewer" && !isBlocked;
 
   return (
     <div className="space-y-8">
@@ -87,16 +78,16 @@ export default async function ReportsPage() {
           )}
         </div>
 
-        {isTrial ? (
+        {isBlocked ? (
           <div className="rounded-lg p-8 text-center" style={{ backgroundColor: "#F0F4F5" }}>
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: "#FFFFFF" }}>
               <FileText className="h-6 w-6" style={{ color: "#6E97A7" }} />
             </div>
             <h3 className="text-lg font-semibold mb-2" style={{ color: "#000000" }}>
-              Upgrade to Generate Reports
+              Choose a Plan to Generate Reports
             </h3>
             <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: "rgba(0,0,0,0.55)" }}>
-              PDF compliance reports are available on all paid plans. Choose a plan that fits your clinic size and start generating professional reports.
+              PDF compliance reports are available on both plans. Choose a plan that fits your clinic size and start generating professional reports.
             </p>
             <Link
               href="/pricing"
@@ -110,75 +101,21 @@ export default async function ReportsPage() {
           <>
             <p className="text-sm mb-4" style={{ color: "rgba(0,0,0,0.55)" }}>
               {currentTier === "basic"
-                ? "Generates a summary report with credential status counts and upcoming renewals."
+                ? "Generates a summary report with credential status counts and upcoming renewals. Report data is live."
                 : "Creates a comprehensive compliance report with staff credential register, executive summary, status breakdown, upcoming renewals, and attestation. Report data is live."}
             </p>
             <ReportGenerator
-              clinicId={clinicId}
-              isTrial={isTrial}
-              canEmail={entitlements?.canEmailReports ?? false}
+              clinicId={userRecord?.clinic_id ?? ""}
+              canEmail={canEmail}
+              reportTier={currentTier === "none" ? null : (currentTier as "basic" | "audit")}
             />
           </>
         )}
       </section>
 
-      {!isTrial && (
-      <section className="rounded-lg border p-6" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
-        <h2 className="text-lg font-medium mb-4" style={{ color: "#000000" }}>
-          Report History
-        </h2>
-
-        {history.error ? (
-          <p className="text-sm text-red-600">Failed to load report history.</p>
-        ) : reportsWithUrls.length === 0 ? (
-          <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
-            No reports generated yet. Generate your first report above.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b" style={{ borderColor: "rgba(0,0,0,0.12)" }}>
-                  <th className="py-2.5 text-left font-medium" style={{ color: "#000000" }}>Date</th>
-                  <th className="py-2.5 text-left font-medium" style={{ color: "#000000" }}>Generated By</th>
-                  <th className="py-2.5 text-right font-medium" style={{ color: "#000000" }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reportsWithUrls.map((r) => (
-                  <tr key={r.id} className="border-b" style={{ borderColor: "#F0F4F5" }}>
-                    <td className="py-2.5" style={{ color: "#000000" }}>
-                      {formatDateTime(r.generatedAt)}
-                    </td>
-                    <td className="py-2.5" style={{ color: "rgba(0,0,0,0.55)" }}>
-                      {r.generatedBy}
-                    </td>
-                    <td className="py-2.5 text-right">
-                      {r.reportUrl ? (
-                        <a
-                          href={r.reportUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-80"
-                          style={{ color: "#6E97A7" }}
-                        >
-                          <FileText className="h-4 w-4" />
-                          Download
-                        </a>
-                      ) : (
-                        <span className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
-                          No file
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-      )}
+      <p className="text-xs" style={{ color: "rgba(0,0,0,0.45)" }}>
+        Reports are generated from your live compliance data and are not stored. Generate a new report anytime.
+      </p>
     </div>
   );
 }

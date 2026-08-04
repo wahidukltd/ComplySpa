@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getEntitlements } from "@/lib/utils/entitlements";
 import { polarConfig } from "@/lib/polar/config";
@@ -21,14 +21,14 @@ export default async function ResumePage() {
   if (!userRecord) redirect("/onboarding");
 
   const [clinicRes, staffRes, credRes] = await Promise.all([
-    supabase.from("clinics").select("name, plan").eq("id", userRecord.clinic_id).single(),
+    supabase.from("clinics").select("name, plan, trial_plan").eq("id", userRecord.clinic_id).single(),
     supabase.from("staff_members").select("id", { count: "exact", head: true }).eq("clinic_id", userRecord.clinic_id).is("deleted_at", null).is("suspended_at", null),
     supabase.from("credentials").select("id", { count: "exact", head: true }).eq("clinic_id", userRecord.clinic_id).is("deleted_at", null).is("suspended_at", null),
   ]);
 
   if (clinicRes.error) redirect("/onboarding");
   const clinic = clinicRes.data;
-  const entitlements = getEntitlements(clinic.plan);
+  const entitlements = getEntitlements(clinic.plan, clinic.trial_plan);
   if (!entitlements.blocked) redirect("/dashboard");
 
   const plans: { id: PlanId; name: string; monthly: number }[] = [

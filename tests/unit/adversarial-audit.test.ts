@@ -31,7 +31,8 @@ describe("Webhook dedup: system cannot process duplicate events", () => {
 
 describe("Atomic reconciliation invariants (verified via SQL)", () => {
   it("Staff count never exceeds plan limit", () => {
-    // enforce_plan_limits() BEFORE INSERT trigger:
+    // enforce_plan_limits() BEFORE INSERT trigger (migration 050 resolves
+    // trial → trial_plan so DB-layer limits match the app):
     //   PERFORM pg_advisory_xact_lock('plan_limit_staff_members_' || clinic_id)
     //   COUNT(*) WHERE deleted_at IS NULL AND suspended_at IS NULL
     //   Raises EXCEPTION if >= limit
@@ -49,8 +50,10 @@ describe("Atomic reconciliation invariants (verified via SQL)", () => {
   });
 
   it("Credential count never exceeds plan limit (same mechanism)", () => {
-    const trial = getPlanLimits("trial");
-    expect(trial.maxCredentials).toBe(10000);
+    // Trial limits resolve to the evaluated plan (5/50/1 or 15/300/3), not a
+    // blanket 10000 — DB trigger and RPC were aligned in migration 050.
+    expect(getPlanLimits("trial", "solo").maxCredentials).toBe(50);
+    expect(getPlanLimits("trial", "practice").maxCredentials).toBe(300);
     const solo = getPlanLimits("solo");
     expect(solo.maxCredentials).toBe(50);
     const inactive = getPlanLimits("inactive");
@@ -101,23 +104,32 @@ describe("Atomic reconciliation invariants (verified via SQL)", () => {
 // features from the higher tier.
 
 describe("No privilege leak after downgrade (entitlement layer)", () => {
-  const downgrades: [string, string, (e: ReturnType<typeof getEntitlements>) => void][] = [
-    ["practice → solo", "solo", (e) => {
-      expect(e.canEmailReports).toBe(false);
+  const downgrades: [string, string, string | null | undefined, (e: ReturnType<typeof getEntitlements>) => void][] = [
+    ["practice → solo", "solo", undefined, (e) => {
+      expect(e.reportTier).toBe("basic");
+      // Email to self is not a differentiator — the report is.
+      expect(e.canEmailReports).toBe(true);
       expect(e.canManageUsers).toBe(false);
       expect(e.canManageAlertRecipients).toBe(false);
-      expect(e.hasInspectionReadiness).toBe(false);
       expect(e.maxStaff).toBe(5);
     }],
-    ["practice → trial", "trial", (e) => {
-      expect(e.reportTier).toBe("audit"); // trial generates + downloads audit PDFs
-      expect(e.canEmailReports).toBe(false); // but cannot email them
+    ["practice → trial of practice", "trial", "practice", (e) => {
+      expect(e.reportTier).toBe("audit");
+      expect(e.canEmailReports).toBe(true);
+      expect(e.canManageUsers).toBe(true);
+      expect(e.maxStaff).toBe(15);
+    }],
+    ["practice → trial of solo", "trial", "solo", (e) => {
+      expect(e.reportTier).toBe("basic");
+      expect(e.canEmailReports).toBe(true);
+      expect(e.canManageUsers).toBe(false);
+      expect(e.maxStaff).toBe(5);
     }],
   ];
 
-  for (const [name, plan, assertions] of downgrades) {
+  for (const [name, plan, trialPlan, assertions] of downgrades) {
     it(name, () => {
-      const e = getEntitlements(plan);
+      const e = getEntitlements(plan, trialPlan);
       assertions(e);
     });
   }
@@ -169,9 +181,8 @@ describe("Blocked plans have zero entitlements", () => {
       expect(e.maxUsers).toBe(0);
       expect(e.reportTier).toBe("none");
       expect(e.canEmailReports).toBe(false);
-        expect(e.canManageUsers).toBe(false);
+      expect(e.canManageUsers).toBe(false);
       expect(e.canManageAlertRecipients).toBe(false);
-      expect(e.hasInspectionReadiness).toBe(false);
     });
   }
 });
@@ -191,19 +202,20 @@ describe("Unknown plan defaults to blocked inactive", () => {
 
 // ─── REPORT TIER CONSISTENCY ────────────────────────────────────────────────
 
-describe("Report tiers match entitlements for all plans", () => {
-  const cases: [string, string][] = [
-    ["trial", "audit"],
-    ["expired_trial", "none"],
-    ["inactive", "none"],
-    ["solo", "basic"],
-    ["practice", "audit"],
-    ["unknown", "none"],
+describe("Report tiers match entitlements for all states", () => {
+  const cases: [string, string | null | undefined, string][] = [
+    ["trial", "solo", "basic"],
+    ["trial", "practice", "audit"],
+    ["expired_trial", undefined, "none"],
+    ["inactive", undefined, "none"],
+    ["solo", undefined, "basic"],
+    ["practice", undefined, "audit"],
+    ["unknown", undefined, "none"],
   ];
-  for (const [plan, expected] of cases) {
-    it(`${plan} → ${expected}`, () => {
-      expect(getReportTier(plan)).toBe(expected);
-      expect(getEntitlements(plan).reportTier).toBe(expected);
+  for (const [plan, trialPlan, expected] of cases) {
+    it(`${plan}${trialPlan ? ` (trial of ${trialPlan})` : ""} → ${expected}`, () => {
+      expect(getReportTier(plan, trialPlan)).toBe(expected);
+      expect(getEntitlements(plan, trialPlan).reportTier).toBe(expected);
     });
   }
 });
@@ -233,20 +245,25 @@ describe("Uncancel restores active state", () => {
   }
 });
 
-// ─── RN: reconciliation reads plan limits from same source as app ──────────
+// ─── DB LAYER PARITY: TRIGGER/RPC RESOLVE TRIAL VIA TRIAL_PLAN ──────────────
+// Migration 050 aligned enforce_plan_limits() and reconcile_clinic_plan() to
+// the app model (trial → trial_plan). The app must agree with those values.
 
-describe("Reconciliation RPC limits match app limits (all 5 plans)", () => {
-  const plans = ["trial", "expired_trial", "inactive", "solo", "practice"] as const;
-  for (const plan of plans) {
-    it(`${plan}: app and RPC agree`, () => {
-      const appLimits = getPlanLimits(plan);
-      // The RPC uses the same CASE statement with the same values:
-      // trial: 1000/10000/100, solo: 5/50/1, practice: 15/300/3, else: 0
-      expect(appLimits.maxStaff).toBe(getEntitlements(plan).maxStaff);
-      expect(appLimits.maxCredentials).toBe(getEntitlements(plan).maxCredentials);
-      expect(appLimits.maxUsers).toBe(getEntitlements(plan).maxUsers);
+describe("DB-layer limits match app limits (migration 050 parity)", () => {
+  const states: [string, string | null, { staff: number; creds: number; users: number }][] = [
+    ["trial", "solo", { staff: 5, creds: 50, users: 1 }],
+    ["trial", "practice", { staff: 15, creds: 300, users: 3 }],
+    ["expired_trial", null, { staff: 0, creds: 0, users: 0 }],
+    ["inactive", null, { staff: 0, creds: 0, users: 0 }],
+    ["solo", null, { staff: 5, creds: 50, users: 1 }],
+    ["practice", null, { staff: 15, creds: 300, users: 3 }],
+  ];
+  for (const [plan, trialPlan, expected] of states) {
+    it(`${plan}${trialPlan ? ` (trial of ${trialPlan})` : ""}: app limits equal DB CASE values`, () => {
+      const l = getPlanLimits(plan, trialPlan);
+      expect(l.maxStaff).toBe(expected.staff);
+      expect(l.maxCredentials).toBe(expected.creds);
+      expect(l.maxUsers).toBe(expected.users);
     });
   }
 });
-
-

@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
@@ -32,7 +32,7 @@ export default async function SettingsPage() {
 
   const { data: clinic } = await supabase
     .from("clinics")
-    .select("name, address, state, plan")
+    .select("name, address, state, plan, trial_plan")
     .eq("id", userRecord.clinic_id)
     .maybeSingle();
 
@@ -44,7 +44,7 @@ export default async function SettingsPage() {
     getClinicUsers(),
   ]);
 
-  const { canManageUsers, canManageAlertRecipients } = getEntitlements(clinic.plan);
+  const { canManageUsers, canManageAlertRecipients } = getEntitlements(clinic.plan, clinic.trial_plan);
   const ownerEmail = usersResult.users.find((u) => u.role === "owner")?.email ?? null;
 
   return (

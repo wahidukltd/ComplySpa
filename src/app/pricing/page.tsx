@@ -31,14 +31,14 @@ const pricingJsonLd = {
       name: "Solo Plan",
       price: "29.00",
       priceCurrency: "USD",
-      description: "5 staff, 50 credentials, email alerts, basic reports. 14-day free trial.",
+      description: "5 staff, 50 credentials, email alerts, basic compliance report with email to yourself. 14-day free trial.",
     },
     {
       "@type": "Offer",
       name: "Practice Plan",
       price: "49.00",
       priceCurrency: "USD",
-      description: "15 staff, 300 credentials, email alerts, audit-ready reports, inspection-readiness engine.",
+      description: "15 staff, 300 credentials, email alerts, audit-ready compliance report with email to yourself, inspection-readiness engine.",
     },
   ],
 };
@@ -90,7 +90,9 @@ export default async function PricingPage() {
         </p>
       </div>
 
-      <PlanCards checkoutUrls={checkoutUrls} />
+      <div id="plans">
+        <PlanCards checkoutUrls={checkoutUrls} />
+      </div>
 
       <div className="mt-16">
         <h2 className="mb-6 text-center text-2xl font-semibold" style={{ color: "#000000" }}>
@@ -108,13 +110,13 @@ export default async function PricingPage() {
 
       <ScrollReveal className="mt-16 text-center">
         <h2 className="text-2xl font-semibold" style={{ color: "#000000" }}>
-          Start your 14-day free trial.
+          Choose a plan to start your 14-day free trial.
         </h2>
         <p className="mt-2 text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
           No credit card. Cancel anytime. Data preserved for 30 days after trial.
         </p>
         <Link
-          href="/sign-up"
+          href="#plans"
           className={cn(buttonVariants({ variant: "default", size: "lg" }), "mt-6")}
         >
           Get started

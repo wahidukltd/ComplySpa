@@ -14,12 +14,15 @@ interface ReportEmailParams {
   clinicName: string;
   reportId: string;
   subject: string;
+  tier: "basic" | "audit";
 }
 
 export function buildReportEmailHtml(params: ReportEmailParams): string {
-  const heading = "Compliance Audit Report";
+  const heading = params.tier === "audit" ? "Compliance Audit Report" : "Compliance Report";
   const bodyBlurb =
-    "Your compliance audit report has been generated and is attached to this email.";
+    params.tier === "audit"
+      ? "Your compliance audit report has been generated and is attached to this email."
+      : "Your compliance report has been generated and is attached to this email.";
   const footerNote =
     "This report was generated from your credential tracking system at ComplySpa. Verify all information before submitting to a regulatory body.";
 
@@ -37,7 +40,7 @@ export function buildReportEmailHtml(params: ReportEmailParams): string {
             { label: "Clinic", value: htmlEscape(params.clinicName) },
             { label: "Report ID", value: params.reportId, mono: true },
           ])}
-          ${emailText("The PDF is attached to this email. You can also access past reports from your dashboard.")}
+          ${emailText("Reports are generated from your live compliance data and are not stored. Generate a new report anytime from your dashboard.")}
           ${footerNote ? emailText(footerNote) : ""}
         `,
       })}
@@ -46,7 +49,8 @@ export function buildReportEmailHtml(params: ReportEmailParams): string {
   });
 }
 
-export function buildReportSubject(clinicName: string): string {
+export function buildReportSubject(clinicName: string, tier: "basic" | "audit"): string {
   const name = htmlEscape(clinicName);
-  return `Compliance Audit Report \u2014 ${name}`;
+  const prefix = tier === "audit" ? "Compliance Audit Report" : "Compliance Report";
+  return `${prefix} \u2014 ${name}`;
 }

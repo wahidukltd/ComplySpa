@@ -17,6 +17,8 @@ export const createClinicSchema = z.object({
     .optional()
     .or(z.literal(""))
     .transform(val => val === "" ? undefined : val),
+  // Required: a trial always evaluates a specific plan — never defaulted.
+  trialPlan: z.enum(["solo", "practice"]),
 });
 
 export type CreateClinicInput = z.infer<typeof createClinicSchema>;

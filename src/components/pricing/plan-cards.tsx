@@ -22,7 +22,7 @@ const PLANS = [
       "5 staff members",
       "50 credentials",
       "Email expiration alerts",
-      "Basic compliance reports",
+      "Basic compliance reports (email to yourself)",
       "1 user",
     ],
     popular: false,
@@ -36,7 +36,7 @@ const PLANS = [
       "15 staff members",
       "300 credentials",
       "Email expiration alerts",
-      "Audit-ready reports",
+      "Audit-ready reports (email to yourself)",
       "Inspection-readiness engine",
       "3 users",
     ],
@@ -122,13 +122,13 @@ export function PlanCards({ checkoutUrls }: Props) {
                 </ul>
                 <div className="flex flex-col gap-2">
                   <Link
-                    href="/sign-up"
+                    href={`/sign-up?plan=${plan.name.toLowerCase().replace("-", "_")}`}
                     className={cn(
                       buttonVariants({ variant: plan.popular ? "default" : "outline" }),
                       "w-full"
                     )}
                   >
-                    Start free trial
+                    Start {plan.name} free trial
                   </Link>
                   {checkoutUrls?.[plan.name.toLowerCase().replace("-", "_")] ? (
                     <a

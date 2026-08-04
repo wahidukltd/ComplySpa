@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   Accordion,
@@ -15,7 +15,7 @@ const FAQS = [
   },
   {
     question: "What happens after the trial?",
-    answer: "Your 14-day trial includes all Practice plan features. After 14 days, choose the plan that fits your clinic. Your data is preserved for 30 days.",
+    answer: "Your 14-day trial evaluates the plan you choose — Solo or Practice — and includes all of that plan's features. After 14 days, choose the plan that fits your clinic. Your data is preserved for 30 days.",
   },
   {
     question: "Do you store patient health records?",

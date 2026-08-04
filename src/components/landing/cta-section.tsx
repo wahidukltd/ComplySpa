@@ -1,4 +1,4 @@
-import { ScrollReveal } from "./scroll-reveal";
+﻿import { ScrollReveal } from "./scroll-reveal";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -14,7 +14,7 @@ export function CTASection() {
           No credit card. Cancel anytime. Data preserved for 30 days after trial.
         </p>
         <Link
-          href="/sign-up"
+          href="/pricing"
           className={cn(buttonVariants({ variant: "default", size: "lg" }), "mt-6")}
         >
           Start free trial

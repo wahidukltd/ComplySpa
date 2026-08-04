@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from "vitest";
+﻿import { describe, it, expect, afterAll } from "vitest";
 import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import "./helpers";
@@ -18,7 +18,7 @@ describe("notification hardening (migration 046)", () => {
   it("reconcile_stale_pending_alerts marks pending rows older than 48h as failed with a reason", async () => {
     const { data: clinic } = await adminClient
       .from("clinics")
-      .insert({ name: testClinicName })
+      .insert({ name: testClinicName, trial_plan: "practice" })
       .select("id")
       .single();
     createdClinicIds.push(clinic!.id);
@@ -92,7 +92,7 @@ describe("notification hardening (migration 046)", () => {
   it("webhook-style delivered transition records delivered_at", async () => {
     const { data: clinic } = await adminClient
       .from("clinics")
-      .insert({ name: `${testClinicName}-delivered` })
+      .insert({ name: `${testClinicName}-delivered`, trial_plan: "practice" })
       .select("id")
       .single();
     createdClinicIds.push(clinic!.id);
@@ -148,7 +148,7 @@ describe("notification hardening (migration 046)", () => {
   it("webhook-style failed transition records failure_reason", async () => {
     const { data: clinic } = await adminClient
       .from("clinics")
-      .insert({ name: `${testClinicName}-failed` })
+      .insert({ name: `${testClinicName}-failed`, trial_plan: "practice" })
       .select("id")
       .single();
     createdClinicIds.push(clinic!.id);

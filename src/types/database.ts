@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -107,51 +107,6 @@ export type Database = {
           },
         ]
       }
-      audit_reports: {
-        Row: {
-          clinic_id: string
-          created_at: string
-          generated_at: string
-          generated_by_user_id: string | null
-          id: string
-          report_data_snapshot: Json | null
-          report_url: string | null
-        }
-        Insert: {
-          clinic_id: string
-          created_at?: string
-          generated_at?: string
-          generated_by_user_id?: string | null
-          id?: string
-          report_data_snapshot?: Json | null
-          report_url?: string | null
-        }
-        Update: {
-          clinic_id?: string
-          created_at?: string
-          generated_at?: string
-          generated_by_user_id?: string | null
-          id?: string
-          report_data_snapshot?: Json | null
-          report_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_reports_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_reports_generated_by_user_id_fkey"
-            columns: ["generated_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       clinics: {
         Row: {
           address: string | null
@@ -164,6 +119,7 @@ export type Database = {
           polar_subscription_id: string | null
           state: string | null
           trial_end_date: string
+          trial_plan: string
           updated_at: string
         }
         Insert: {
@@ -177,6 +133,7 @@ export type Database = {
           polar_subscription_id?: string | null
           state?: string | null
           trial_end_date?: string
+          trial_plan: string
           updated_at?: string
         }
         Update: {
@@ -190,6 +147,7 @@ export type Database = {
           polar_subscription_id?: string | null
           state?: string | null
           trial_end_date?: string
+          trial_plan?: string
           updated_at?: string
         }
         Relationships: []
@@ -677,6 +635,7 @@ export type Database = {
           p_email: string
           p_name: string
           p_state?: string
+          p_trial_plan?: string
           p_user_id: string
         }
         Returns: string

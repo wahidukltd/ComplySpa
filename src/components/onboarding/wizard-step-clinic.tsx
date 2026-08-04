@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClinicOnboarding } from "@/lib/actions/onboarding";
 import { createClinicSchema } from "@/lib/validations/clinic";
 import { Button } from "@/components/ui/button";
@@ -9,10 +10,39 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Building2 } from "lucide-react";
 
-export function WizardStepClinic({ onNext }: { onNext: (clinicId: string) => void }) {
+export function WizardStepClinic({ onNext, plan }: { onNext: (clinicId: string) => void; plan?: string | null }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const planLabel = plan === "solo" ? "Solo" : plan === "practice" ? "Practice" : null;
+  const trialPlan: "solo" | "practice" | undefined =
+    plan === "solo" ? "solo" : plan === "practice" ? "practice" : undefined;
+
+  if (!trialPlan) {
+    // Direct /onboarding visits without a chosen plan get a recovery path
+    // instead of a dead-end error (the gated sign-up normally prevents this).
+    return (
+      <Card className="w-full max-w-md">
+        <CardContent className="pt-8 pb-8 text-center">
+          <div className="mx-auto mb-4 flex size-10 items-center justify-center rounded-full bg-[#F0F4F5]">
+            <Building2 className="size-5 text-[#6E97A7]" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2 text-black">Choose a plan to start your free trial</h3>
+          <p className="text-sm mb-6 text-[rgba(0,0,0,0.55)]">
+            Every trial evaluates a plan — Solo or Practice. Select one to continue setting up your clinic.
+          </p>
+          <Link
+            href="/pricing?reason=select_plan"
+            className="inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-sm font-medium transition-opacity hover:opacity-90"
+            style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
+          >
+            View Plans
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -20,11 +50,16 @@ export function WizardStepClinic({ onNext }: { onNext: (clinicId: string) => voi
     setServerError(null);
     setIsSubmitting(true);
 
+    // Unreachable: the no-plan card above replaces the form when trialPlan is
+    // missing. Guarded for the type system (closure typing can't see it).
+    if (!trialPlan) return;
+
     const formData = new FormData(event.currentTarget);
     const input = {
       name: (formData.get("name") as string)?.trim() ?? "",
       address: (formData.get("address") as string)?.trim() ?? "",
       state: (formData.get("state") as string)?.trim().toUpperCase() ?? "",
+      trialPlan,
     };
 
     const parsed = createClinicSchema.safeParse(input);
@@ -76,6 +111,14 @@ export function WizardStepClinic({ onNext }: { onNext: (clinicId: string) => voi
         <CardDescription className="text-[rgba(0,0,0,0.55)]">
           Enter your clinic details to get started.
         </CardDescription>
+        {planLabel && (
+          <p
+            className="mx-auto inline-flex items-center rounded-full px-3 py-1 text-xs font-medium"
+            style={{ backgroundColor: "#F0F4F5", color: "#6E97A7" }}
+          >
+            Evaluating {planLabel} — 14-day free trial
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

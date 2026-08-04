@@ -16,31 +16,35 @@ describe("Practice plan has correct limits (user specified 15)", () => {
 // ─── EVERY SUBSCRIPTION TRANSITION ──────────────────────────────────────
 
 describe("All subscription transitions behave correctly", () => {
-  const transitions: [string, string, Partial<ReturnType<typeof getEntitlements>>][] = [
-    // Signup → trial
-    ["signup", "trial", { blocked: false, reportTier: "audit", maxStaff: 1000, canManageUsers: true, canEmailReports: false }],
+  // Trial is a state on the selected plan: signup transitions resolve through
+  // the plan being evaluated (trial_plan), paid plans resolve directly.
+  const transitions: [string, string, string | null | undefined, Partial<ReturnType<typeof getEntitlements>>][] = [
+    // Signup → trial of the selected plan (e.g. Practice)
+    ["signup (trial of practice)", "trial", "practice", { blocked: false, reportTier: "audit", maxStaff: 15, canManageUsers: true, canEmailReports: true }],
+    // Signup → trial of Solo
+    ["signup (trial of solo)", "trial", "solo", { blocked: false, reportTier: "basic", maxStaff: 5, canManageUsers: false, canEmailReports: true }],
     // Trial → canceled/expired
-    ["trial_expire", "expired_trial", { blocked: true, reportTier: "none", maxStaff: 0, canManageUsers: false }],
+    ["trial_expire", "expired_trial", undefined, { blocked: true, reportTier: "none", maxStaff: 0, canManageUsers: false }],
     // Expired → inactive after 30 days
-    ["expired_to_inactive", "inactive", { blocked: true, reportTier: "none", maxStaff: 0, canManageUsers: false }],
+    ["expired_to_inactive", "inactive", undefined, { blocked: true, reportTier: "none", maxStaff: 0, canManageUsers: false }],
     // Skip trial → subscribe to Solo
-    ["skip_trial_solo", "solo", { blocked: false, reportTier: "basic", maxStaff: 5, canEmailReports: false }],
+    ["skip_trial_solo", "solo", undefined, { blocked: false, reportTier: "basic", maxStaff: 5, canEmailReports: true }],
     // Skip trial → subscribe to Practice
-    ["skip_trial_practice", "practice", { blocked: false, reportTier: "audit", maxStaff: 15, canEmailReports: true }],
+    ["skip_trial_practice", "practice", undefined, { blocked: false, reportTier: "audit", maxStaff: 15, canEmailReports: true }],
     // Downgrade: Practice → Solo
-    ["practice_to_solo", "solo", { blocked: false, reportTier: "basic", maxStaff: 5, canEmailReports: false, canManageUsers: false, canManageAlertRecipients: false }],
+    ["practice_to_solo", "solo", undefined, { blocked: false, reportTier: "basic", maxStaff: 5, canEmailReports: true, canManageUsers: false, canManageAlertRecipients: false }],
     // Upgrade: Solo → Practice
-    ["solo_to_practice", "practice", { blocked: false, reportTier: "audit", maxStaff: 15, canEmailReports: true, canManageUsers: true }],
+    ["solo_to_practice", "practice", undefined, { blocked: false, reportTier: "audit", maxStaff: 15, canEmailReports: true, canManageUsers: true }],
     // Cancel: plan stays unchanged
-    ["cancel", "solo", { blocked: false }],
+    ["cancel", "solo", undefined, { blocked: false }],
     // Revoke: plan becomes expired_trial
-    ["revoke", "expired_trial", { blocked: true, maxStaff: 0, reportTier: "none" }],
+    ["revoke", "expired_trial", undefined, { blocked: true, maxStaff: 0, reportTier: "none" }],
   ];
 
-  for (const [name, plan, expected] of transitions) {
+  for (const [name, plan, trialPlan, expected] of transitions) {
     it(name, () => {
-      const e = getEntitlements(plan);
-      const l = getPlanLimits(plan);
+      const e = getEntitlements(plan, trialPlan);
+      const l = getPlanLimits(plan, trialPlan);
       for (const [key, value] of Object.entries(expected)) {
         if (key === "maxStaff" || key === "maxCredentials" || key === "maxUsers") {
           expect(l[key as keyof typeof l]).toBe(value);
@@ -55,12 +59,19 @@ describe("All subscription transitions behave correctly", () => {
 // ─── ENFORCEMENT LAYER CONSISTENCY ──────────────────────────────────────
 
 describe("Cross-layer consistency: all enforcement layers agree", () => {
-  const allPlans = ["trial", "expired_trial", "inactive", "solo", "practice"] as const;
+  const allStates: [string, string | null][] = [
+    ["trial", "solo"],
+    ["trial", "practice"],
+    ["expired_trial", null],
+    ["inactive", null],
+    ["solo", null],
+    ["practice", null],
+  ];
 
-  for (const plan of allPlans) {
-    it(`${plan}: entitlements and plan limits agree on every field`, () => {
-      const e = getEntitlements(plan);
-      const l = getPlanLimits(plan);
+  for (const [plan, trialPlan] of allStates) {
+    it(`${plan}${trialPlan ? ` (trial of ${trialPlan})` : ""}: entitlements and plan limits agree on every field`, () => {
+      const e = getEntitlements(plan, trialPlan);
+      const l = getPlanLimits(plan, trialPlan);
       expect(l.maxStaff).toBe(e.maxStaff);
       expect(l.maxCredentials).toBe(e.maxCredentials);
       expect(l.maxUsers).toBe(e.maxUsers);
@@ -71,13 +82,14 @@ describe("Cross-layer consistency: all enforcement layers agree", () => {
 // ─── NO HIGHER-TIER FEATURE LEAKS AFTER DOWNGRADE ────────────────────────
 
 describe("No feature leak after downgrade", () => {
-  it("Solo (downgraded) cannot access Practice features", () => {
+  it("Solo (downgraded) cannot access Practice report tier", () => {
     const solo = getEntitlements("solo");
     expect(solo.reportTier).not.toBe("audit");
-    expect(solo.canEmailReports).toBe(false);
+    expect(solo.reportTier).toBe("basic");
+    // Email to self is not a differentiator — the report is.
+    expect(solo.canEmailReports).toBe(true);
     expect(solo.canManageUsers).toBe(false);
     expect(solo.canManageAlertRecipients).toBe(false);
-    expect(solo.hasInspectionReadiness).toBe(false);
   });
 
   it("Practice cannot access features above its tier", () => {
@@ -94,7 +106,6 @@ describe("No feature leak after downgrade", () => {
     expect(et.canEmailReports).toBe(false);
     expect(et.canManageUsers).toBe(false);
     expect(et.canManageAlertRecipients).toBe(false);
-    expect(et.hasInspectionReadiness).toBe(false);
   });
 });
 
@@ -107,7 +118,6 @@ describe("Upgrade restores all features", () => {
     expect(p.canEmailReports).toBe(true);
     expect(p.canManageUsers).toBe(true);
     expect(p.canManageAlertRecipients).toBe(true);
-    expect(p.hasInspectionReadiness).toBe(true);
   });
 
   it("Expired_trial→Practice: full restoration", () => {
@@ -123,17 +133,19 @@ describe("Upgrade restores all features", () => {
 // ─── REPORT TIER BOUNDARY TESTING ────────────────────────────────────────
 
 describe("Report tier boundaries", () => {
-  const tiers: [string, string][] = [
-    ["trial", "audit"],
-    ["expired_trial", "none"],
-    ["inactive", "none"],
-    ["solo", "basic"],
-    ["practice", "audit"],
+  const tiers: [string, string | null | undefined, string][] = [
+    ["trial", "solo", "basic"],
+    ["trial", "practice", "audit"],
+    ["trial", null, "none"],
+    ["expired_trial", undefined, "none"],
+    ["inactive", undefined, "none"],
+    ["solo", undefined, "basic"],
+    ["practice", undefined, "audit"],
   ];
 
-  for (const [plan, expected] of tiers) {
-    it(`${plan} → ${expected}`, () => {
-      expect(getReportTier(plan)).toBe(expected);
+  for (const [plan, trialPlan, expected] of tiers) {
+    it(`${plan}${trialPlan ? ` (trial of ${trialPlan})` : ""} → ${expected}`, () => {
+      expect(getReportTier(plan, trialPlan)).toBe(expected);
     });
   }
 
@@ -163,9 +175,14 @@ describe("Unknown plan falls back safely", () => {
 // ─── BLOCKED PLANS ───────────────────────────────────────────────────────
 
 describe("Blocked plan behavior", () => {
-  it("active plans are never blocked", () => {
-    for (const plan of ["trial", "solo", "practice"]) {
-      expect(getEntitlements(plan).blocked).toBe(false);
+  it("active states are never blocked", () => {
+    for (const [plan, trialPlan] of [
+      ["trial", "solo"],
+      ["trial", "practice"],
+      ["solo", undefined],
+      ["practice", undefined],
+    ] as const) {
+      expect(getEntitlements(plan, trialPlan).blocked).toBe(false);
     }
   });
 
@@ -186,7 +203,7 @@ describe("Alert recipient entitlement enforced", () => {
     for (const plan of ["expired_trial", "inactive", "solo"]) {
       expect(getEntitlements(plan).canManageAlertRecipients).toBe(false);
     }
-    expect(getEntitlements("trial").canManageAlertRecipients).toBe(true);
+    expect(getEntitlements("trial", "practice").canManageAlertRecipients).toBe(true);
     expect(getEntitlements("practice").canManageAlertRecipients).toBe(true);
   });
 });
@@ -194,10 +211,12 @@ describe("Alert recipient entitlement enforced", () => {
 // ─── EMAIL REPORTS ───────────────────────────────────────────────────────
 
 describe("Email report entitlement enforced", () => {
-  it("only practice can email reports", () => {
-    for (const plan of ["trial", "expired_trial", "inactive", "solo"]) {
-      expect(getEntitlements(plan).canEmailReports).toBe(false);
-    }
+  it("every active plan can email to self; blocked plans cannot", () => {
+    expect(getEntitlements("trial", "solo").canEmailReports).toBe(true);
+    expect(getEntitlements("trial", "practice").canEmailReports).toBe(true);
+    expect(getEntitlements("solo").canEmailReports).toBe(true);
     expect(getEntitlements("practice").canEmailReports).toBe(true);
+    expect(getEntitlements("expired_trial").canEmailReports).toBe(false);
+    expect(getEntitlements("inactive").canEmailReports).toBe(false);
   });
 });

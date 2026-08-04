@@ -9,34 +9,23 @@ export interface Entitlements {
   canEmailReports: boolean;
   canManageUsers: boolean;
   canManageAlertRecipients: boolean;
-  hasInspectionReadiness: boolean;
   blocked: boolean;
   blockedReason?: string;
 }
 
-const ENTITLEMENTS: Record<Plan, Entitlements> = {
-  trial: {
-    maxStaff: 1000,
-    maxCredentials: 10000,
-    maxUsers: 100,
-    // Trial gets the full audit-tier PDF (generate + download). Email stays
-    // practice-only — canEmailReports gates /api/reports/email at the API.
-    reportTier: "audit",
-    canEmailReports: false,
-    canManageUsers: true,
-    canManageAlertRecipients: true,
-    hasInspectionReadiness: true,
-    blocked: false,
-  },
+// Trial is a subscription state, not a capability source. The selected plan
+// (clinics.trial_plan) carries the capabilities while plan='trial'; solo and
+// practice resolve directly. canEmailReports is DERIVED here (email to self is
+// available on every active plan — the report itself is the differentiator),
+// never stored or set per-row.
+const ENTITLEMENTS: Record<"expired_trial" | "inactive" | "solo" | "practice", Omit<Entitlements, "canEmailReports">> = {
   expired_trial: {
     maxStaff: 0,
     maxCredentials: 0,
     maxUsers: 0,
     reportTier: "none",
-    canEmailReports: false,
     canManageUsers: false,
     canManageAlertRecipients: false,
-    hasInspectionReadiness: false,
     blocked: true,
     blockedReason: "Your trial has expired. Choose a plan to continue.",
   },
@@ -45,10 +34,8 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxCredentials: 0,
     maxUsers: 0,
     reportTier: "none",
-    canEmailReports: false,
     canManageUsers: false,
     canManageAlertRecipients: false,
-    hasInspectionReadiness: false,
     blocked: true,
     blockedReason: "Your account is inactive. Reactivate to continue.",
   },
@@ -57,10 +44,8 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxCredentials: 50,
     maxUsers: 1,
     reportTier: "basic",
-    canEmailReports: false,
     canManageUsers: false,
     canManageAlertRecipients: false,
-    hasInspectionReadiness: false,
     blocked: false,
   },
   practice: {
@@ -68,18 +53,31 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxCredentials: 300,
     maxUsers: 3,
     reportTier: "audit",
-    canEmailReports: true,
     canManageUsers: true,
     canManageAlertRecipients: true,
-    hasInspectionReadiness: true,
     blocked: false,
   },
 };
 
-export function getEntitlements(plan: string): Entitlements {
-  return ENTITLEMENTS[plan as Plan] ?? { ...ENTITLEMENTS.inactive, blockedReason: "Unknown plan" };
+export function getEntitlements(plan: string, trialPlan?: string | null): Entitlements {
+  let base: Omit<Entitlements, "canEmailReports">;
+
+  if (plan === "trial") {
+    // Trial inherits the capabilities of the plan being evaluated. The NULL
+    // case is defense-in-depth only (column NOT NULL + signup gates plan
+    // selection) — a trial with no selected plan is treated as blocked.
+    if (trialPlan === "solo" || trialPlan === "practice") {
+      base = ENTITLEMENTS[trialPlan];
+    } else {
+      base = { ...ENTITLEMENTS.inactive, blockedReason: "No plan selected" };
+    }
+  } else {
+    base = ENTITLEMENTS[plan as keyof typeof ENTITLEMENTS] ?? { ...ENTITLEMENTS.inactive, blockedReason: "Unknown plan" };
+  }
+
+  return { ...base, canEmailReports: base.reportTier !== "none" };
 }
 
-export function getReportTier(plan: string): ReportTier {
-  return getEntitlements(plan).reportTier;
+export function getReportTier(plan: string, trialPlan?: string | null): ReportTier {
+  return getEntitlements(plan, trialPlan).reportTier;
 }

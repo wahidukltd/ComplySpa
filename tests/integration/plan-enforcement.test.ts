@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 import { getPlanLimits } from "@/lib/utils/plan";
 
 describe("Plan Enforcement Logic", () => {
@@ -52,15 +52,15 @@ describe("Plan Enforcement Logic", () => {
     expect(0 >= limits.maxUsers).toBe(true);
   });
 
-  it("trial at 1000 staff: count >= maxStaff → should block", () => {
-    const limits = getPlanLimits("trial");
-    const currentCount = 1000;
+  it("trial of practice at 15 staff: count >= maxStaff → should block", () => {
+    const limits = getPlanLimits("trial", "practice");
+    const currentCount = 15;
     expect(currentCount >= limits.maxStaff).toBe(true);
   });
 
-  it("trial at 999 staff: count < maxStaff → should allow", () => {
-    const limits = getPlanLimits("trial");
-    const currentCount = 999;
+  it("trial of practice at 14 staff: count < maxStaff → should allow", () => {
+    const limits = getPlanLimits("trial", "practice");
+    const currentCount = 14;
     expect(currentCount >= limits.maxStaff).toBe(false);
   });
 });

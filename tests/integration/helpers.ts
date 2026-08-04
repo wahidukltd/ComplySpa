@@ -48,7 +48,9 @@ try {
 
 /** Run SQL directly via psql (for pg_catalog / cron.job queries not exposed via PostgREST) */
 export function execSql(sql: string, params?: string[]): string {
-  let cmd = `docker exec -i ${DB_CONTAINER} psql -U postgres -d postgres -t -A`;
+  // -q suppresses command tags (e.g. "INSERT 0 1") so INSERT..RETURNING
+  // results come back as a single value; ON_ERROR_STOP makes SQL errors throw.
+  let cmd = `docker exec -i ${DB_CONTAINER} psql -U postgres -d postgres -t -A -q -v ON_ERROR_STOP=1`;
   if (params && params.length > 0) {
     const args = params.map((p, i) => `-v p${i + 1}='${p.replace(/'/g, "'\\''")}'`).join(" ");
     cmd += ` ${args}`;

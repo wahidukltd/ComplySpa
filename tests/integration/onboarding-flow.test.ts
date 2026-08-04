@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from "vitest";
+﻿import { describe, it, expect, afterAll } from "vitest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import "./helpers";
 import { getServiceClient, fetchAsUser, patchAsUser } from "./helpers";
@@ -49,7 +49,7 @@ describe("onboarding flow", () => {
   it("creates a clinic and user record via the admin client", async () => {
     const { data: clinic, error: clinicError } = await adminClient
       .from("clinics")
-      .insert({ name: testClinicName })
+      .insert({ name: testClinicName, trial_plan: "practice" })
       .select("id")
       .single();
 
@@ -81,7 +81,7 @@ describe("onboarding flow", () => {
   it("auth_user_id UNIQUE rejects duplicate insert", async () => {
     const { data: clinic } = await adminClient
       .from("clinics")
-      .insert({ name: `Duplicate Test ${Date.now()}` })
+      .insert({ name: `Duplicate Test ${Date.now()}`, trial_plan: "practice" })
       .select("id")
       .single();
     trackClinic(clinic!.id);
@@ -110,7 +110,7 @@ describe("onboarding flow", () => {
   it("sets clinic plan to trial with 14-day expiry on creation", async () => {
     const { data: clinic } = await adminClient
       .from("clinics")
-      .insert({ name: `Trial Test ${Date.now()}` })
+      .insert({ name: `Trial Test ${Date.now()}`, trial_plan: "practice" })
       .select("plan, trial_end_date")
       .single();
     trackClinic(clinic!.id);
@@ -132,6 +132,7 @@ describe("onboarding flow", () => {
         p_user_id: rpcUserId,
         p_email: rpcEmail,
         p_name: "RPC Test Clinic",
+        p_trial_plan: "practice",
       }
     );
     expect(firstErr).toBeNull();
@@ -155,6 +156,7 @@ describe("onboarding flow", () => {
         p_user_id: rpcUserId,
         p_email: rpcEmail,
         p_name: "RPC Test Clinic Duplicate",
+        p_trial_plan: "practice",
       }
     );
     expect(secondErr).toBeNull();
@@ -175,7 +177,7 @@ describe("onboarding flow", () => {
   it("auto-complete trigger completes skipped required items; viewers cannot write onboarding_items (migration 044)", async () => {
     const { data: clinic } = await adminClient
       .from("clinics")
-      .insert({ name: `Trigger Test ${Date.now()}` })
+      .insert({ name: `Trigger Test ${Date.now()}`, trial_plan: "practice" })
       .select("id")
       .single();
     trackClinic(clinic!.id);

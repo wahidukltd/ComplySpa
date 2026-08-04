@@ -34,6 +34,7 @@ export async function getClinicIdAndUser(): Promise<{
 export async function getClinicIdAndPlan(): Promise<{
   clinicId: string;
   plan: string;
+  trialPlan: string | null;
   userId: string;
 } | null> {
   const supabase = await createClient();
@@ -52,7 +53,7 @@ export async function getClinicIdAndPlan(): Promise<{
 
   const { data: clinic, error: clinicErr } = await supabase
     .from("clinics")
-    .select("plan")
+    .select("plan, trial_plan")
     .eq("id", userData.clinic_id)
     .maybeSingle();
 
@@ -65,6 +66,6 @@ export async function getClinicIdAndPlan(): Promise<{
     Sentry.captureMessage("Clinic not found for user", { extra: { clinicId: userData.clinic_id } });
     return null;
   }
-  return { clinicId: userData.clinic_id, plan: clinic.plan, userId: authUser.id };
+  return { clinicId: userData.clinic_id, plan: clinic.plan, trialPlan: clinic.trial_plan, userId: authUser.id };
 }
 

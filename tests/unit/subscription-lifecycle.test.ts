@@ -3,12 +3,16 @@ import { getEntitlements, getReportTier } from "@/lib/utils/entitlements";
 import { getPlanLimits } from "@/lib/utils/plan";
 
 describe("Two onboarding paths", () => {
-  it("14-day trial path: trial plan with end date, capped limits", () => {
-    const e = getEntitlements("trial");
-    expect(e.blocked).toBe(false);
-    expect(e.maxStaff).toBe(1000);
-    expect(e.reportTier).toBe("audit");
-    expect(e.canEmailReports).toBe(false);
+  it("14-day trial path: trial of the selected plan, capabilities from it", () => {
+    const soloTrial = getEntitlements("trial", "solo");
+    expect(soloTrial.blocked).toBe(false);
+    expect(soloTrial.maxStaff).toBe(5);
+    expect(soloTrial.reportTier).toBe("basic");
+
+    const practiceTrial = getEntitlements("trial", "practice");
+    expect(practiceTrial.blocked).toBe(false);
+    expect(practiceTrial.maxStaff).toBe(15);
+    expect(practiceTrial.reportTier).toBe("audit");
   });
 
   it("immediate subscribe path: solo plan activated, no trial", () => {
@@ -20,24 +24,24 @@ describe("Two onboarding paths", () => {
 });
 
 describe("Purchase during trial immediately ends trial", () => {
-  it("trial → solo: limits become solo, no trial benefits remain", () => {
-    const trial = getEntitlements("trial");
+  it("trial of practice → solo: limits become solo, no trial benefits remain", () => {
+    const trial = getEntitlements("trial", "practice");
     const solo = getEntitlements("solo");
 
     expect(trial.reportTier).toBe("audit");
     expect(solo.reportTier).toBe("basic");
-    expect(trial.canEmailReports).toBe(false);
+    expect(trial.canEmailReports).toBe(true);
     expect(trial.canManageUsers).toBe(true);
     expect(solo.canManageUsers).toBe(false);
   });
 
-  it("trial → practice: full audit reports activated", () => {
-    const trial = getEntitlements("trial");
+  it("trial of solo → practice: full audit reports activated", () => {
+    const trial = getEntitlements("trial", "solo");
     const practice = getEntitlements("practice");
 
-    expect(trial.reportTier).toBe("audit");
+    expect(trial.reportTier).toBe("basic");
     expect(practice.reportTier).toBe("audit");
-    expect(trial.canEmailReports).toBe(false);
+    expect(trial.canEmailReports).toBe(true);
     expect(practice.canEmailReports).toBe(true);
   });
 });
@@ -45,14 +49,16 @@ describe("Purchase during trial immediately ends trial", () => {
 describe("Upgrade path transitions", () => {
   const plans = ["solo", "practice"] as const;
 
-  it("solo → practice: higher limits, more users, email reports", () => {
+  it("solo → practice: higher limits, more users, email to self on both", () => {
     const solo = getEntitlements("solo");
     const practice = getEntitlements("practice");
     expect(practice.maxStaff).toBeGreaterThan(solo.maxStaff);
     expect(practice.maxCredentials).toBeGreaterThan(solo.maxCredentials);
     expect(practice.maxUsers).toBeGreaterThan(solo.maxUsers);
     expect(practice.canEmailReports).toBe(true);
+    expect(solo.canEmailReports).toBe(true);
     expect(practice.canManageUsers).toBe(true);
+    expect(solo.canManageUsers).toBe(false);
   });
 
   for (const plan of plans) {
@@ -65,11 +71,11 @@ describe("Upgrade path transitions", () => {
 });
 
 describe("Downgrade transitions", () => {
-  it("practice → solo: lose email, audit → basic, lose user mgmt", () => {
+  it("practice → solo: audit → basic; email to self remains (report is the differentiator)", () => {
     const practice = getEntitlements("practice");
     const solo = getEntitlements("solo");
     expect(practice.canEmailReports).toBe(true);
-    expect(solo.canEmailReports).toBe(false);
+    expect(solo.canEmailReports).toBe(true);
     expect(practice.canManageUsers).toBe(true);
     expect(solo.canManageUsers).toBe(false);
     expect(practice.reportTier).toBe("audit");
@@ -114,28 +120,36 @@ describe("Trial expiry transitions", () => {
   });
 });
 
-describe("Feature entitlement consistency across all plans", () => {
-  const allPlans = ["trial", "expired_trial", "inactive", "solo", "practice"];
+describe("Feature entitlement consistency across all states", () => {
+  const allStates: [string, string | null][] = [
+    ["trial", "solo"],
+    ["trial", "practice"],
+    ["expired_trial", null],
+    ["inactive", null],
+    ["solo", null],
+    ["practice", null],
+  ];
 
-  for (const plan of allPlans) {
-    it(`${plan}: maxStaff ≥ maxUsers`, () => {
-      const e = getEntitlements(plan);
+  for (const [plan, trialPlan] of allStates) {
+    it(`${plan}${trialPlan ? ` (trial of ${trialPlan})` : ""}: maxStaff ≥ maxUsers`, () => {
+      const e = getEntitlements(plan, trialPlan);
       expect(e.maxStaff).toBeGreaterThanOrEqual(e.maxUsers);
     });
 
-    it(`${plan}: reportTier matches access flags`, () => {
-      const e = getEntitlements(plan);
+    it(`${plan}${trialPlan ? ` (trial of ${trialPlan})` : ""}: reportTier matches access flags`, () => {
+      const e = getEntitlements(plan, trialPlan);
       if (!e.blocked) {
-        expect(getReportTier(plan)).toBe(e.reportTier);
+        expect(getReportTier(plan, trialPlan)).toBe(e.reportTier);
       }
     });
   }
 
-  it("only practice has email reports", () => {
-    for (const plan of ["trial", "expired_trial", "inactive", "solo"]) {
-      expect(getEntitlements(plan).canEmailReports).toBe(false);
+  it("every active state can email to self; blocked states cannot", () => {
+    for (const [plan, trialPlan] of [["trial", "solo"], ["trial", "practice"], ["solo", null], ["practice", null]] as const) {
+      expect(getEntitlements(plan, trialPlan).canEmailReports).toBe(true);
     }
-    expect(getEntitlements("practice").canEmailReports).toBe(true);
+    expect(getEntitlements("expired_trial").canEmailReports).toBe(false);
+    expect(getEntitlements("inactive").canEmailReports).toBe(false);
   });
 });
 
@@ -156,12 +170,21 @@ describe("No duplicate trial protection (app layer)", () => {
 });
 
 describe("DB trigger limits match entitlements", () => {
-  const plans = ["trial", "solo", "practice", "expired_trial", "inactive"];
+  // Migration 050 aligned the DB CASE values with the app resolver, including
+  // trial resolution via trial_plan.
+  const states: [string, string | null][] = [
+    ["trial", "solo"],
+    ["trial", "practice"],
+    ["solo", null],
+    ["practice", null],
+    ["expired_trial", null],
+    ["inactive", null],
+  ];
 
-  for (const plan of plans) {
-    it(`${plan}: getPlanLimits matches getEntitlements`, () => {
-      const limits = getPlanLimits(plan);
-      const e = getEntitlements(plan);
+  for (const [plan, trialPlan] of states) {
+    it(`${plan}${trialPlan ? ` (trial of ${trialPlan})` : ""}: getPlanLimits matches getEntitlements`, () => {
+      const limits = getPlanLimits(plan, trialPlan);
+      const e = getEntitlements(plan, trialPlan);
       expect(limits.maxStaff).toBe(e.maxStaff);
       expect(limits.maxCredentials).toBe(e.maxCredentials);
       expect(limits.maxUsers).toBe(e.maxUsers);

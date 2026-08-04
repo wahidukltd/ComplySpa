@@ -1,18 +1,11 @@
 "use server";
 import "server-only";
 
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import * as Sentry from "@sentry/nextjs";
-import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
-import type { Json } from "@/types/database";
 import type { ReportData } from "@/lib/pdf/report-template";
-import { getEntitlements, getReportTier } from "@/lib/utils/entitlements";
-
-const createReportSchema = z.object({
-  reportUrl: z.string().nullable(),
-});
+import { getReportTier } from "@/lib/utils/entitlements";
 
 export async function getReportData(): Promise<{
   data: ReportData | null;
@@ -32,13 +25,13 @@ export async function getReportData(): Promise<{
 
   if (userErr || !user) {
     Sentry.captureException(userErr ?? new Error("User not found"));
-    return { data: null, error: userErr?.message ?? "User not found" };
+    return { data: null, error: "User not found" };
   }
 
   const clinicId = user.clinic_id;
 
   const [clinicResult, staffResult] = await Promise.all([
-    supabase.from("clinics").select("name, address, state, plan").eq("id", clinicId).single(),
+    supabase.from("clinics").select("name, address, state, plan, trial_plan").eq("id", clinicId).single(),
     supabase.from("staff_members").select("id, name, role, hire_date").eq("clinic_id", clinicId).is("deleted_at", null).is("suspended_at", null).order("name"),
   ]);
 
@@ -187,137 +180,10 @@ export async function getReportData(): Promise<{
     generatedAt: new Date().toISOString(),
   };
 
-  const reportTier = getReportTier(clinic.plan);
+  // Trial is a subscription state — the report tier comes from the plan being
+  // evaluated (clinics.trial_plan), resolved through the single entitlement path.
+  const reportTier = getReportTier(clinic.plan, clinic.trial_plan);
   const tier = reportTier !== "none" ? reportTier : undefined;
 
   return { data, error: null, reportTier: tier };
 }
-
-export async function createReport(
-  reportUrl: string | null,
-  snapshot: ReportData,
-): Promise<{ id: string | null; error: string | null }> {
-  const supabase = await createClient();
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  const userId = authUser?.id;
-  if (!userId) return { id: null, error: "Unauthorized" };
-
-  const { data: userRecord, error: userErr } = await supabase
-    .from("users")
-    .select("id, clinic_id, role")
-    .eq("auth_user_id", userId)
-    .single();
-
-  if (userErr || !userRecord) {
-    Sentry.captureException(userErr ?? new Error("User not found"));
-    return { id: null, error: "User not found" };
-  }
-
-  if (userRecord.role === "viewer") {
-    return { id: null, error: "Viewers cannot generate reports" };
-  }
-
-  const parsed = createReportSchema.safeParse({ reportUrl });
-  if (!parsed.success) {
-    return { id: null, error: "Invalid report URL" };
-  }
-
-  const { data: clinicRow } = await supabase
-    .from("clinics")
-    .select("plan")
-    .eq("id", userRecord.clinic_id)
-    .single();
-
-  const plan = clinicRow?.plan ?? "trial";
-  const entitlements = getEntitlements(plan);
-
-  if (entitlements.reportTier === "none") {
-    return { id: null, error: "PDF reports are not available on your current plan. Upgrade to generate reports." };
-  }
-
-  const { data: report, error } = await supabase
-    .from("audit_reports")
-    .insert({
-      clinic_id: userRecord.clinic_id,
-      generated_by_user_id: userRecord.id,
-      report_url: reportUrl,
-      report_data_snapshot: JSON.parse(JSON.stringify(snapshot)) as Json,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    Sentry.captureException(error);
-    return { id: null, error: "Failed to save report record" };
-  }
-
-  revalidatePath("/dashboard/reports");
-  return { id: report.id, error: null };
-}
-
-export async function getReportHistory(): Promise<{
-  reports: Array<{
-    id: string;
-    generatedAt: string;
-    generatedBy: string;
-    reportUrl: string | null;
-  }>;
-  error: string | null;
-  clinicId: string | null;
-}> {
-  const supabase = await createClient();
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  const userId = authUser?.id;
-  if (!userId) return { reports: [], error: "Unauthorized", clinicId: null };
-
-  const { data: user, error: userErr } = await supabase
-    .from("users")
-    .select("clinic_id")
-    .eq("auth_user_id", userId)
-    .single();
-
-  if (userErr || !user) {
-    Sentry.captureException(userErr ?? new Error("User not found"));
-    return { reports: [], error: "Failed to load user", clinicId: null };
-  }
-
-  const { data: clinicRow } = await supabase
-    .from("clinics")
-    .select("plan")
-    .eq("id", user.clinic_id)
-    .single();
-
-  const plan = clinicRow?.plan ?? "trial";
-  if (getEntitlements(plan).reportTier === "none") {
-    return { reports: [], error: null, clinicId: user.clinic_id };
-  }
-
-  const { data: reportRows, error } = await supabase
-    .from("audit_reports")
-    .select(`
-      id, generated_at, report_url,
-      users!audit_reports_generated_by_user_id_fkey ( email )
-    `)
-    .eq("clinic_id", user.clinic_id)
-    .order("generated_at", { ascending: false })
-    .limit(50);
-
-  if (error) {
-    Sentry.captureException(error);
-    return { reports: [], error: "Failed to load report history", clinicId: null };
-  }
-
-  const reports = (reportRows ?? []).map((r) => {
-    const userEmail = (r.users as { email: string } | null)?.email ?? "";
-    return {
-      id: r.id,
-      generatedAt: r.generated_at,
-      generatedBy: userEmail,
-      reportUrl: r.report_url,
-    };
-  });
-
-  return { reports, error: null, clinicId: user.clinic_id };
-}
-
-

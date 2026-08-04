@@ -15,7 +15,7 @@ export async function addStaffMember(input: StaffMemberInput) {
   const clinicData = await getClinicIdAndPlan();
   if (!clinicData) return { success: false, error: "Unauthorized" };
 
-  const { clinicId, plan, userId } = clinicData;
+  const { clinicId, plan, trialPlan, userId } = clinicData;
 
   const parsed = staffMemberSchema.safeParse(input);
   if (!parsed.success) {
@@ -34,7 +34,7 @@ export async function addStaffMember(input: StaffMemberInput) {
 
   // ponytail: race window between count and insert — acceptable at current scale,
   // use SERIALIZABLE isolation or BEFORE INSERT trigger if this becomes a problem
-  const limits = getPlanLimits(plan);
+  const limits = getPlanLimits(plan, trialPlan);
 
   const { count } = await supabase
     .from("staff_members")
@@ -239,7 +239,7 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
   const clinicData = await getClinicIdAndPlan();
   if (!clinicData) return { success: false, error: "Unauthorized" };
 
-  const { clinicId, plan, userId } = clinicData;
+  const { clinicId, plan, trialPlan, userId } = clinicData;
 
   const parsed = addStaffWithCredentialsSchema.safeParse(input);
   if (!parsed.success) {
@@ -256,7 +256,7 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
   if (!user) return { success: false, error: "Unauthorized" };
   if (user.role === "viewer") return { success: false, error: "Insufficient permissions" };
 
-  const limits = getPlanLimits(plan);
+  const limits = getPlanLimits(plan, trialPlan);
 
   const { count: staffCount } = await supabase
     .from("staff_members")

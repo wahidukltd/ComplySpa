@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from "vitest";
+﻿import { describe, it, expect, afterAll } from "vitest";
 import "./helpers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAsUser, patchAsUser, deleteAsUser } from "./helpers";
@@ -24,7 +24,7 @@ describe("staff hardening — RLS + constraint invariants (integration)", () => 
 
     const { data: clinic } = await adminClient
       .from("clinics")
-      .insert({ name: `Hardening ${Date.now()}` })
+      .insert({ name: `Hardening ${Date.now()}`, trial_plan: "practice" })
       .select("id")
       .single();
     if (!clinic) throw new Error("Failed to create test clinic");

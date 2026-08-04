@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import "server-only";
 import { revalidatePath } from "next/cache";
@@ -26,7 +26,7 @@ export async function addCredential(input: CredentialInput & { document_url?: st
   const clinicData = await getClinicIdAndPlan();
   if (!clinicData) return { success: false, error: "Unauthorized" };
 
-  const { clinicId, plan, userId } = clinicData;
+  const { clinicId, plan, trialPlan, userId } = clinicData;
 
   const { document_url, ...credInput } = input;
   const parsed = credentialSchema.safeParse(credInput);
@@ -51,7 +51,7 @@ export async function addCredential(input: CredentialInput & { document_url?: st
   // deleted_at IS NULL only, suspended included) so the app check and the DB
   // trigger can never disagree — a mismatch at the limit edge would surface
   // the trigger's ND0MV as a generic error instead of the plan-limit toast.
-  const limits = getPlanLimits(plan);
+  const limits = getPlanLimits(plan, trialPlan);
 
   const { count } = await supabase
     .from("credentials")

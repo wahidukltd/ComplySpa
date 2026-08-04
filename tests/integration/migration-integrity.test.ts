@@ -4,7 +4,6 @@ import { execSql } from "./helpers";
 const EXPECTED_TABLES = [
   "alert_logs",
   "alert_recipients",
-  "audit_reports",
   "clinics",
   "credential_audit",
   "credential_types",
@@ -63,14 +62,14 @@ describe("Migration integrity", () => {
     const result = execSql(
       `SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename IN (${inList(EXPECTED_TABLES)})`,
     );
-    expect(parseInt(result, 10)).toBe(14);
+    expect(parseInt(result, 10)).toBe(13);
   });
 
   it("all tables have RLS enabled", () => {
     const result = execSql(
       `SELECT count(*) FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity = true AND c.relname IN (${inList(EXPECTED_TABLES)})`,
     );
-    expect(parseInt(result, 10)).toBe(14);
+    expect(parseInt(result, 10)).toBe(13);
   });
 
   it(`${SEED_CREDENTIAL_TYPE_COUNT} seed credential types are present`, () => {
@@ -213,18 +212,72 @@ describe("Migration integrity", () => {
     expect(parseInt(result, 10)).toBe(1);
   });
 
-  it("set_audit_report_author trigger exists (008 regression guard)", () => {
-    const result = execSql(
+  it("audit_reports is gone and reports are ephemeral (050 regression guard)", () => {
+    const tableCount = execSql(
+      "SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename = 'audit_reports'",
+    );
+    expect(parseInt(tableCount, 10)).toBe(0);
+    const triggerCount = execSql(
       "SELECT count(*) FROM pg_trigger WHERE tgname = 'trigger_set_audit_report_author'",
     );
-    expect(parseInt(result, 10)).toBe(1);
+    expect(parseInt(triggerCount, 10)).toBe(0);
+    const fnCount = execSql(
+      "SELECT count(*) FROM pg_proc WHERE proname = 'set_audit_report_author'",
+    );
+    expect(parseInt(fnCount, 10)).toBe(0);
   });
 
-  it("create_clinic_for_user RPC function exists (009 regression guard)", () => {
+  it("clinics.trial_plan is NOT NULL with a solo|practice CHECK (050)", () => {
+    const notNull = execSql(
+      "SELECT count(*) FROM information_schema.columns WHERE table_name = 'clinics' AND column_name = 'trial_plan' AND is_nullable = 'NO'",
+    );
+    expect(parseInt(notNull, 10)).toBe(1);
+    const check = execSql(
+      "SELECT count(*) FROM pg_constraint WHERE conname = 'clinics_trial_plan_check'",
+    );
+    expect(parseInt(check, 10)).toBe(1);
+  });
+
+  it("enforce_plan_limits resolves trial via trial_plan (050 parity)", () => {
+    const body = execSql("SELECT prosrc FROM pg_proc WHERE proname = 'enforce_plan_limits'");
+    expect(body).toContain("trial_plan");
+    expect(body).not.toContain("'multi_location'");
+  });
+
+  it("reconcile_clinic_plan resolves trial via trial_plan and keeps the cascade (050 parity)", () => {
+    const body = execSql("SELECT prosrc FROM pg_proc WHERE proname = 'reconcile_clinic_plan'");
+    expect(body).toContain("trial_plan");
+    expect(body).not.toContain("'multi_location'");
+    // 033 cascade behaviors preserved by the 050 re-creation
+    expect(body).toContain("Cascade: restore credentials of newly restored staff");
+    expect(body).toContain("suspended_at = NULL, suspended_plan = NULL");
+  });
+
+  it("create_clinic_for_user RPC takes 6 args incl. p_trial_plan (050)", () => {
     const result = execSql(
       "SELECT count(*) FROM pg_proc WHERE proname = 'create_clinic_for_user'",
     );
     expect(parseInt(result, 10)).toBe(1);
+    const args = execSql(
+      "SELECT pg_get_function_identity_arguments('create_clinic_for_user(text,text,text,text,text,text)'::regprocedure)",
+    );
+    expect(args).toContain("p_user_id text");
+    expect(args).toContain("p_email text");
+    expect(args).toContain("p_name text");
+    expect(args).toContain("p_trial_plan text");
+  });
+
+  it("create_clinic_for_user is executable by authenticated + service_role only", () => {
+    for (const role of ["authenticated", "service_role"]) {
+      const granted = execSql(
+        `SELECT has_function_privilege('${role}', 'create_clinic_for_user(text,text,text,text,text,text)', 'EXECUTE')`,
+      );
+      expect(granted).toBe("t");
+    }
+    const anon = execSql(
+      "SELECT has_function_privilege('anon', 'create_clinic_for_user(text,text,text,text,text,text)', 'EXECUTE')",
+    );
+    expect(anon).toBe("f");
   });
 });
 

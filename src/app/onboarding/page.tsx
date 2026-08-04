@@ -29,12 +29,17 @@ export default async function OnboardingPage(props: { searchParams: Promise<{ pl
     if (validPlan) {
       const { data: clinic } = await supabase
         .from("clinics")
-        .select("plan, polar_customer_id")
+        .select("plan, trial_plan, polar_customer_id")
         .eq("id", existingUser.clinic_id)
         .single();
 
       if (clinic) {
-        if (clinic.plan === validPlan) {
+        // Already on the chosen plan, or already evaluating it in a trial —
+        // either way the user is set; send them to the dashboard.
+        if (
+          clinic.plan === validPlan ||
+          (clinic.plan === "trial" && clinic.trial_plan === validPlan)
+        ) {
           redirect("/dashboard");
         }
         const result = await createCheckoutLink(validPlan, clinic.polar_customer_id ?? undefined, {

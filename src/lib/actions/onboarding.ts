@@ -2,7 +2,6 @@
 
 import "server-only";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -25,7 +24,7 @@ async function createClinicInternal(input: CreateClinicInput) {
     return { clinicId: null, error: "Validation failed", fieldErrors };
   }
 
-  const { name, address, state } = parsed.data;
+  const { name, address, state, trialPlan } = parsed.data;
   const userEmail = authUser?.email ?? null;
 
   if (!authUser?.email_confirmed_at) {
@@ -36,6 +35,12 @@ async function createClinicInternal(input: CreateClinicInput) {
     return { clinicId: null, error: "Your account must have a verified email address to continue.", fieldErrors: undefined };
   }
 
+  // Trial is a state on a chosen plan — never defaulted. The schema requires
+  // trialPlan; this is defense-in-depth for callers that skip validation.
+  if (trialPlan !== "solo" && trialPlan !== "practice") {
+    return { clinicId: null, error: "Please select a plan to evaluate.", fieldErrors: undefined };
+  }
+
   const { data: clinicId, error: rpcError } = await supabase.rpc(
     "create_clinic_for_user",
     {
@@ -44,6 +49,7 @@ async function createClinicInternal(input: CreateClinicInput) {
       p_name: name,
       p_address: address || undefined,
       p_state: state || undefined,
+      p_trial_plan: trialPlan,
     }
   );
 
@@ -75,13 +81,6 @@ async function createClinicInternal(input: CreateClinicInput) {
   }
 
   return { clinicId, error: null, fieldErrors: undefined };
-}
-
-export async function createClinic(input: CreateClinicInput) {
-  const result = await createClinicInternal(input);
-  if (result.error) return result;
-  revalidatePath("/dashboard");
-  redirect("/dashboard");
 }
 
 export async function createClinicOnboarding(input: CreateClinicInput) {
@@ -138,7 +137,7 @@ export async function restoreExistingAccount(authUserId: string): Promise<{ redi
 
   const { data: clinic } = await supabaseAdmin
     .from("clinics")
-    .select("id, plan")
+    .select("id, plan, trial_plan")
     .eq("id", existing.clinic_id)
     .maybeSingle();
 
@@ -154,7 +153,7 @@ export async function restoreExistingAccount(authUserId: string): Promise<{ redi
     return { redirectTo: null, error: "Failed to restore account" };
   }
 
-  return { redirectTo: getEntitlements(clinic.plan).blocked ? "/resume" : "/dashboard", error: null };
+  return { redirectTo: getEntitlements(clinic.plan, clinic.trial_plan).blocked ? "/resume" : "/dashboard", error: null };
 }
 
 // ── New onboarding progress functions ──

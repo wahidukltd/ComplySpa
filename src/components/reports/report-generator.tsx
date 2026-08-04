@@ -1,22 +1,26 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useCallback } from "react";
 import { BlobProvider, PDFDownloadLink, PDFViewer } from "@react-pdf/renderer";
 import { ComplianceReport, type ReportData } from "@/lib/pdf/report-template";
-import { getReportData, createReport } from "@/lib/actions/reports";
+import { getReportData } from "@/lib/actions/reports";
 import { uploadDocument } from "@/lib/utils/upload";
 import { Button } from "@/components/ui/button";
 import { FileText, Download, Mail, Eye, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 interface Props {
   clinicId: string;
-  isTrial?: boolean;
   canEmail?: boolean;
+  // Page-resolved tier (from entitlements) — used as the fallback when the
+  // action returns no tier. Never default to the highest tier: a missing tier
+  // means "none" (blocked plan), and rendering the audit layout for a solo or
+  // expired user would be a lie.
+  reportTier?: "basic" | "audit" | null;
 }
 
-export function ReportGenerator({ clinicId, isTrial, canEmail = false }: Props) {
+export function ReportGenerator({ clinicId, canEmail = false, reportTier = null }: Props) {
   const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [reportTier, setReportTier] = useState<"basic" | "audit" | null>(null);
+  const [reportTierState, setReportTierState] = useState<"basic" | "audit" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -33,9 +37,10 @@ export function ReportGenerator({ clinicId, isTrial, canEmail = false }: Props) 
       return;
     }
     setReportData(result.data);
-    setReportTier(result.reportTier ?? "audit");
+    // Server tier wins; fall back to the page-resolved tier; null = blocked.
+    setReportTierState(result.reportTier ?? reportTier);
     setLoading(false);
-  }, []);
+  }, [reportTier]);
 
   const handleEmail = useCallback(async (blob: Blob | null) => {
     if (!blob || !reportData) return;
@@ -51,17 +56,12 @@ export function ReportGenerator({ clinicId, isTrial, canEmail = false }: Props) 
         throw new Error(uploadResult.error ?? "Upload failed");
       }
 
-      const saveResult = await createReport(uploadResult.filePath, reportData);
-      if (saveResult.error) {
-        throw new Error(saveResult.error);
-      }
-
       const response = await fetch("/api/reports/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reportUrl: uploadResult.filePath,
-          reportId: saveResult.id,
+          filePath: uploadResult.filePath,
+          reportId: reportData.reportId,
           clinicName: reportData.clinic.name,
         }),
       });
@@ -79,14 +79,13 @@ export function ReportGenerator({ clinicId, isTrial, canEmail = false }: Props) 
   }, [reportData, clinicId]);
 
   const doc = useMemo(
-    () => (reportData && reportTier ? <ComplianceReport data={reportData} tier={reportTier} /> : null),
-    [reportData, reportTier],
+    () => (reportData && reportTierState ? <ComplianceReport data={reportData} tier={reportTierState} /> : null),
+    [reportData, reportTierState],
   );
 
-  // Email is an entitlement (practice only), not a tier property — trial users
-  // get the audit PDF for download but must never see an email button that
-  // would 403 at the API.
-  const emailEnabled = canEmail && reportTier === "audit";
+  // Email is available on every active plan (role-gated by the page for
+  // viewers); the report content itself is the plan differentiator.
+  const emailEnabled = canEmail && reportTierState !== null;
 
   if (loading) {
     return (
@@ -108,16 +107,25 @@ export function ReportGenerator({ clinicId, isTrial, canEmail = false }: Props) 
     );
   }
 
-  if (isTrial) {
-    return null;
-  }
-
   if (!reportData) {
     return (
       <Button onClick={handleGenerate} disabled={loading} className="gap-2">
         <FileText className="h-4 w-4" />
         Generate Report
       </Button>
+    );
+  }
+
+  // Defense-in-depth: data loaded but no tier (plan flipped to a blocked state
+  // between the page render and this action). Never render a PDF for a plan
+  // that cannot generate reports.
+  if (!reportTierState) {
+    return (
+      <div className="rounded-md p-4" style={{ backgroundColor: "#FEF2F2", border: "1px solid #FEE2E2" }}>
+        <p className="text-sm" style={{ color: "#B8443A" }}>
+          Reports are not available on your current plan.
+        </p>
+      </div>
     );
   }
 
@@ -141,7 +149,7 @@ export function ReportGenerator({ clinicId, isTrial, canEmail = false }: Props) 
 
         <Button variant="outline" onClick={handleGenerate} className="gap-2">
           <FileText className="h-4 w-4" />
-          Generate New
+          Refresh Data
         </Button>
 
         <Button variant="outline" onClick={() => setPreviewOpen(!previewOpen)} className="gap-2">
@@ -165,7 +173,7 @@ export function ReportGenerator({ clinicId, isTrial, canEmail = false }: Props) 
                 ) : emailStatus === "sent" ? (
                   <><CheckCircle2 className="h-4 w-4" style={{ color: "#4A8C5C" }} /> Sent</>
                 ) : (
-                  <><Mail className="h-4 w-4" /> Email Report</>
+                  <><Mail className="h-4 w-4" /> Email to Yourself</>
                 )}
               </Button>
             )}

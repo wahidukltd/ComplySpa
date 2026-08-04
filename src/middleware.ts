@@ -81,7 +81,7 @@ export default async function middleware(req: NextRequest) {
 
   const { data: clinics, error: clinicError } = await supabase
     .from("clinics")
-    .select("plan")
+    .select("plan, trial_plan")
     .eq("id", users[0].clinic_id);
 
   if (clinicError) {
@@ -90,7 +90,8 @@ export default async function middleware(req: NextRequest) {
   }
 
   const plan = clinics?.[0]?.plan ?? "trial";
-  const { blocked, canManageUsers } = getEntitlements(plan);
+  const trialPlan = clinics?.[0]?.trial_plan ?? null;
+  const { blocked, canManageUsers } = getEntitlements(plan, trialPlan);
 
   if (blocked && pathname !== "/resume" && !pathname.startsWith("/api/")) {
     return NextResponse.redirect(new URL("/resume", req.url));

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import Image from "next/image";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -46,7 +46,7 @@ export function Navbar() {
             Sign in
           </Link>
           <Link
-            href="/sign-up"
+            href="/pricing"
             className={cn(buttonVariants({ variant: "default", size: "sm" }))}
           >
             Start free trial

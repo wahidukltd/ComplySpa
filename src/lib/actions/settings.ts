@@ -93,8 +93,8 @@ export async function getAlertRecipients() {
 
 async function checkAlertRecipientEntitlement(clinicId: string): Promise<boolean> {
   const supabase = await createClient();
-  const { data: clinic } = await supabase.from("clinics").select("plan").eq("id", clinicId).maybeSingle();
-  return clinic ? getEntitlements(clinic.plan).canManageAlertRecipients : false;
+  const { data: clinic } = await supabase.from("clinics").select("plan, trial_plan").eq("id", clinicId).maybeSingle();
+  return clinic ? getEntitlements(clinic.plan, clinic.trial_plan).canManageAlertRecipients : false;
 }
 
 export async function addAlertRecipient(input: AlertRecipientInput) {
@@ -252,15 +252,16 @@ export async function inviteUser(input: InviteUserInput) {
       .eq("clinic_id", user.clinic_id),
     supabase
       .from("clinics")
-      .select("plan")
+      .select("plan, trial_plan")
       .eq("id", user.clinic_id)
       .maybeSingle(),
   ]);
 
   const plan = clinicResult.data?.plan ?? "trial";
-  const limits = getPlanLimits(plan);
+  const trialPlan = clinicResult.data?.trial_plan ?? null;
+  const limits = getPlanLimits(plan, trialPlan);
 
-  if (getEntitlements(plan).blocked) {
+  if (getEntitlements(plan, trialPlan).blocked) {
     return { success: false, error: "Your plan is inactive. Reactivate to invite users." };
   }
 

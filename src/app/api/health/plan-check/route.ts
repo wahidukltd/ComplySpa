@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getEntitlements } from "@/lib/utils/entitlements";
 
@@ -19,11 +19,11 @@ export async function GET() {
 
   const { data: clinic } = await supabase
     .from("clinics")
-    .select("plan")
+    .select("plan, trial_plan")
     .eq("id", userRecord.clinic_id)
     .maybeSingle();
 
   if (!clinic) return NextResponse.json({ blocked: true });
 
-  return NextResponse.json({ blocked: getEntitlements(clinic.plan).blocked });
+  return NextResponse.json({ blocked: getEntitlements(clinic.plan, clinic.trial_plan).blocked });
 }

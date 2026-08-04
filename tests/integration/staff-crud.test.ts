@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+﻿import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import "./helpers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -9,7 +9,7 @@ describe("staff CRUD", () => {
   async function setup() {
     const { data: clinic } = await admin
       .from("clinics")
-      .insert({ name: `Test Clinic ${Date.now()}` })
+      .insert({ name: `Test Clinic ${Date.now()}`, trial_plan: "practice" })
       .select("id")
       .single();
     if (!clinic) throw new Error("Failed to create test clinic");

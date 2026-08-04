@@ -18,11 +18,25 @@ describe("getPlanLimits", () => {
     expect(limits.maxUsers).toBe(3);
   });
 
-  it("trial: generous limits", () => {
+  it("trial of solo: solo limits (5/50/1)", () => {
+    const limits = getPlanLimits("trial", "solo");
+    expect(limits.maxStaff).toBe(5);
+    expect(limits.maxCredentials).toBe(50);
+    expect(limits.maxUsers).toBe(1);
+  });
+
+  it("trial of practice: practice limits (15/300/3)", () => {
+    const limits = getPlanLimits("trial", "practice");
+    expect(limits.maxStaff).toBe(15);
+    expect(limits.maxCredentials).toBe(300);
+    expect(limits.maxUsers).toBe(3);
+  });
+
+  it("trial without a selected plan: all limits zero", () => {
     const limits = getPlanLimits("trial");
-    expect(limits.maxStaff).toBe(1000);
-    expect(limits.maxCredentials).toBe(10000);
-    expect(limits.maxUsers).toBe(100);
+    expect(limits.maxStaff).toBe(0);
+    expect(limits.maxCredentials).toBe(0);
+    expect(limits.maxUsers).toBe(0);
   });
 
   it("expired_trial: all limits zero", () => {
@@ -53,29 +67,40 @@ describe("getPlanLimits", () => {
 });
 
 describe("getEntitlements", () => {
-  it("trial: generous limits, audit reports (download only), no email, or API", () => {
-    const e = getEntitlements("trial");
-    expect(e.maxStaff).toBe(1000);
-    expect(e.maxCredentials).toBe(10000);
-    expect(e.maxUsers).toBe(100);
+  it("trial of solo: solo caps, basic reports, email to self, no user mgmt", () => {
+    const e = getEntitlements("trial", "solo");
+    expect(e.maxStaff).toBe(5);
+    expect(e.maxCredentials).toBe(50);
+    expect(e.maxUsers).toBe(1);
+    expect(e.reportTier).toBe("basic");
+    expect(e.canEmailReports).toBe(true);
+    expect(e.canManageUsers).toBe(false);
+    expect(e.blocked).toBe(false);
+  });
+
+  it("trial of practice: practice caps, audit reports, email, user mgmt", () => {
+    const e = getEntitlements("trial", "practice");
+    expect(e.maxStaff).toBe(15);
+    expect(e.maxCredentials).toBe(300);
+    expect(e.maxUsers).toBe(3);
     expect(e.reportTier).toBe("audit");
-    expect(e.canEmailReports).toBe(false);
+    expect(e.canEmailReports).toBe(true);
     expect(e.canManageUsers).toBe(true);
     expect(e.blocked).toBe(false);
   });
 
-  it("solo: capped limits, basic reports, no email, no API", () => {
+  it("solo: capped limits, basic reports, email to self, no user mgmt", () => {
     const e = getEntitlements("solo");
     expect(e.maxStaff).toBe(5);
     expect(e.maxCredentials).toBe(50);
     expect(e.maxUsers).toBe(1);
     expect(e.reportTier).toBe("basic");
-    expect(e.canEmailReports).toBe(false);
+    expect(e.canEmailReports).toBe(true);
     expect(e.canManageUsers).toBe(false);
     expect(e.blocked).toBe(false);
   });
 
-  it("practice: mid limits, audit reports, email, no API", () => {
+  it("practice: mid limits, audit reports, email, user mgmt", () => {
     const e = getEntitlements("practice");
     expect(e.maxStaff).toBe(15);
     expect(e.maxCredentials).toBe(300);
@@ -110,8 +135,14 @@ describe("getEntitlements", () => {
 });
 
 describe("getReportTier", () => {
-  it("trial returns audit (download only)", () => {
-    expect(getReportTier("trial")).toBe("audit");
+  it("trial of solo returns basic", () => {
+    expect(getReportTier("trial", "solo")).toBe("basic");
+  });
+  it("trial of practice returns audit", () => {
+    expect(getReportTier("trial", "practice")).toBe("audit");
+  });
+  it("trial without selected plan returns none", () => {
+    expect(getReportTier("trial")).toBe("none");
   });
   it("solo returns basic", () => {
     expect(getReportTier("solo")).toBe("basic");
@@ -150,4 +181,3 @@ describe("PlanLimitError", () => {
     expect(err.code).toBe("USER_LIMIT");
   });
 });
-

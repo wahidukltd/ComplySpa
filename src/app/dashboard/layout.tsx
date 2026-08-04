@@ -26,13 +26,13 @@ export default async function DashboardLayout({
 
   const { data: clinic } = await supabase
     .from("clinics")
-    .select("plan")
+    .select("plan, trial_plan")
     .eq("id", userRecord.clinic_id)
     .maybeSingle();
 
   if (!clinic) redirect("/onboarding");
 
-  const { blocked, canManageUsers } = getEntitlements(clinic.plan);
+  const { blocked, canManageUsers } = getEntitlements(clinic.plan, clinic.trial_plan);
 
   if (blocked) {
     redirect("/resume");

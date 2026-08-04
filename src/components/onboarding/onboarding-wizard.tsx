@@ -29,6 +29,7 @@ export function OnboardingWizard({ plan }: { plan?: string | null }) {
 
       {currentStep === 1 && (
         <WizardStepClinic
+          plan={plan}
           onNext={(id) => {
             clinicId.current = id;
             setCurrentStep(2);

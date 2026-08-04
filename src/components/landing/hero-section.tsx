@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -33,7 +33,7 @@ export function HeroSection() {
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
-            href="/sign-up"
+            href="/pricing"
             className={cn(
               buttonVariants({ variant: "default", size: "lg" }),
               "transition-opacity duration-200 hover:opacity-90"
