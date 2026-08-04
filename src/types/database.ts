@@ -648,6 +648,13 @@ export type Database = {
         }
         Returns: Json
       }
+      get_alert_windows: {
+        Args: { p_clinic_id: string }
+        Returns: {
+          credential_id: string
+          days_before_expiration: number
+        }[]
+      }
       reconcile_clinic_plan: {
         Args: { p_clinic_id: string; p_plan: string }
         Returns: undefined

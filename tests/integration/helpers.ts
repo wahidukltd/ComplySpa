@@ -139,3 +139,21 @@ export async function deleteAsUser(
 export function getServiceClient(): SupabaseClient {
   return createClient(SUPABASE_URL, serviceKeyJwt);
 }
+
+/** Call an RPC as a specific user (RLS-enforced) */
+export async function rpcAsUser(
+  authUserId: string,
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<Response> {
+  const jwt = createJwt({ sub: authUserId, role: "authenticated" });
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      apikey: anonKeyJwt,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(args),
+  });
+}

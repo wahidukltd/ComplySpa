@@ -86,4 +86,53 @@ describe("Report pipeline: no loophole wiring (grep guards)", () => {
     });
     expect(offenders.map((o) => `${o.f}:${o.i}: ${o.line.trim()}`)).toEqual([]);
   });
+
+  it("no legacy report copy strings remain anywhere in src (2026-08-05 copy pass)", () => {
+    const banned = [
+      "Compliance Audit Report",
+      "Compliance Score",
+      "Refresh Data",
+      "Loading report data...",
+    ];
+    const offenders = srcFiles.flatMap((f) => {
+      const content = readFileSync(f, "utf8");
+      return content
+        .split("\n")
+        .map((line, i) => ({ line: line.trim(), i: i + 1, f }))
+        .filter(({ line }) => banned.some((b) => line.includes(b)));
+    });
+    expect(offenders.map((o) => `${o.f}:${o.i}: ${o.line}`)).toEqual([]);
+  });
+
+  it("report delivery never touches storage (ephemeral architecture guard, 2026-08-05)", () => {
+    const reportScope = srcFiles.filter((f) =>
+      /api[\\/]reports|components[\\/]reports|lib[\\/]report|actions[\\/]reports/.test(f),
+    );
+    const banned = [
+      "uploadDocument",
+      "storage.from",
+      "createSignedUrl",
+      "isClinicScopedReportPath",
+      "deleteReportFileFromStorage",
+      "report-file",
+    ];
+    const offenders = reportScope.flatMap((f) => {
+      const content = readFileSync(f, "utf8");
+      return content
+        .split("\n")
+        .map((line, i) => ({ line: line.trim(), i: i + 1, f }))
+        .filter(({ line }) => banned.some((b) => line.includes(b)));
+    });
+    expect(offenders.map((o) => `${o.f}:${o.i}: ${o.line}`)).toEqual([]);
+  });
+
+  it("report delivery is a single server-side pipeline (no client @react-pdf in the generator)", () => {
+    const generator = srcFiles.find((f) => f.includes("report-generator"));
+    if (!generator) throw new Error("report-generator.tsx not found");
+    const content = readFileSync(generator, "utf8");
+    expect(content).not.toContain("@react-pdf");
+    expect(content).not.toContain("BlobProvider");
+    expect(content).not.toContain("PDFDownloadLink");
+    expect(content).not.toContain("PDFViewer");
+  });
 });

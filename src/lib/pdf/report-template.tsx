@@ -1,43 +1,16 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import {
+  buildAttentionItems,
+  formatAlertWindows,
+  formatReportDate,
+  formatReportDateTime,
+  splitUpcoming,
+  summarizeStaffCredentials,
+  type ReportData,
+} from "./report-content";
+import { REPORT_DOC_TITLE } from "@/lib/report/copy";
 
-export interface ReportData {
-  clinic: { name: string; address: string | null; state: string | null };
-  medicalDirector: string | null;
-  generatedBy: string;
-  staffMembers: Array<{
-    id: string;
-    name: string;
-    role: string | null;
-    hireDate: string | null;
-    credentials: Array<{
-      type: string;
-      licenseNumber: string | null;
-      state: string | null;
-      issueDate: string | null;
-      expirationDate: string | null;
-      status: string;
-      lastVerified: string | null;
-    }>;
-  }>;
-  summary: {
-    total: number;
-    valid: number;
-    expiring: number;
-    expired: number;
-    noExpiration: number;
-    byCategory: { license: number; training: number; insurance: number; agreement: number };
-  };
-  upcoming: Array<{
-    staffName: string;
-    credentialType: string;
-    expirationDate: string;
-    daysLeft: number;
-    status: string;
-    alertsSent: string[];
-  }>;
-  reportId: string;
-  generatedAt: string;
-}
+export type { ReportData } from "./report-content";
 
 const C = {
   ink: "#000000",
@@ -87,6 +60,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 8,
   },
+  coverSubtitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: C.ink,
+    textAlign: "center",
+    marginBottom: 8,
+  },
   coverMeta: {
     fontSize: 9,
     color: C.muted,
@@ -104,6 +84,18 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: C.hairline,
     marginVertical: 28,
+  },
+  coverScope: {
+    fontSize: 7.5,
+    color: C.muted,
+    textAlign: "center",
+    marginTop: 4,
+    lineHeight: 1.5,
+  },
+  coverPrepared: {
+    fontSize: 7,
+    color: C.muted,
+    textAlign: "center",
   },
   footer: {
     position: "absolute",
@@ -133,6 +125,28 @@ const styles = StyleSheet.create({
     color: C.action,
     fontWeight: "bold",
   },
+  letterhead: {
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: C.hairline,
+    paddingBottom: 10,
+  },
+  letterheadClinic: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: C.ink,
+    marginBottom: 2,
+  },
+  letterheadTitle: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: C.action,
+    marginBottom: 2,
+  },
+  letterheadMeta: {
+    fontSize: 8,
+    color: C.muted,
+  },
   section: {
     marginBottom: 20,
   },
@@ -151,13 +165,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "bold",
     color: C.action,
-    marginBottom: 12,
+    marginBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: C.action,
     paddingBottom: 5,
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
+  },
+  sectionSub: {
+    fontSize: 7.5,
+    color: C.muted,
+    marginBottom: 6,
   },
   subsectionTitle: {
     fontSize: 10,
@@ -257,6 +278,30 @@ const styles = StyleSheet.create({
     color: C.muted,
     marginBottom: 6,
   },
+  rollupRow: {
+    flexDirection: "row",
+    marginBottom: 6,
+  },
+  rollupText: {
+    fontSize: 8,
+  },
+  adminRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: C.hairline,
+  },
+  adminDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  adminRowText: {
+    fontSize: 8.5,
+    color: C.ink,
+  },
   credColType: { width: "20%" },
   credColLicense: { width: "16%" },
   credColState: { width: "10%" },
@@ -264,6 +309,10 @@ const styles = StyleSheet.create({
   credColExpires: { width: "12%" },
   credColStatus: { width: "14%" },
   credColVerified: { width: "16%" },
+  attColStaff: { width: "30%" },
+  attColCred: { width: "32%" },
+  attColExpires: { width: "20%" },
+  attColStatus: { width: "18%" },
   upcomingColStaff: { width: "20%" },
   upcomingColCred: { width: "20%" },
   upcomingColExpires: { width: "14%" },
@@ -344,25 +393,28 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function AlertsSummary({ sent }: { sent: string[] }) {
-  if (sent.length === 0) {
+  const label = formatAlertWindows(sent);
+  if (label === "") {
     return <Text style={styles.tableCell}>—</Text>;
   }
-  return <Text style={styles.tableCell}>{sent.join(", ")}d</Text>;
+  return <Text style={styles.tableCell}>{label}</Text>;
 }
 
 export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "basic" | "audit" }) {
   const isBasic = tier === "basic";
   const pct = (n: number) => (data.summary.total > 0 ? Math.round((n / data.summary.total) * 100) : 0);
-  const complianceScore = data.summary.total > 0 ? pct(data.summary.valid) : 0;
-  const sectionTitleColor = C.action;
-  const staffNameColor = C.action;
+  const complianceScore = pct(data.summary.valid);
+
+  const reportDate = formatReportDate(data.generatedAt);
+  const reportDateTime = formatReportDateTime(data.generatedAt);
+  const staffWithoutCredentials = data.staffMembers.filter((s) => s.credentials.length === 0).length;
 
   const coverPage = !isBasic ? (
     <Page size="A4" style={styles.coverPage}>
       <View style={styles.coverInner}>
         <View style={[styles.coverAccent, { backgroundColor: C.action }]} />
-        <Text style={styles.coverTitle}>Compliance Audit Report</Text>
-        <Text style={[styles.coverTitle, { fontSize: 18 }]}>{data.clinic.name}</Text>
+        <Text style={styles.coverTitle}>{REPORT_DOC_TITLE}</Text>
+        <Text style={styles.coverSubtitle}>{data.clinic.name}</Text>
         <View style={styles.coverDivider} />
         <Text style={styles.coverMeta}>Medical Director</Text>
         <Text style={styles.coverMetaBold}>{data.medicalDirector || "Not designated"}</Text>
@@ -371,16 +423,23 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
         <Text style={styles.coverMetaBold}>{data.generatedBy}</Text>
         <View style={{ height: 12 }} />
         <Text style={styles.coverMeta}>Date Generated</Text>
-        <Text style={styles.coverMetaBold}>{data.generatedAt}</Text>
+        <Text style={styles.coverMetaBold}>{reportDateTime}</Text>
+        <View style={{ height: 12 }} />
+        <Text style={styles.coverMeta}>Report ID</Text>
+        <Text style={styles.coverMetaBold}>{data.reportId}</Text>
         <View style={{ height: 24 }} />
-        <Text style={{ fontSize: 7, color: C.muted, textAlign: "center" }}>Prepared by ComplySpa</Text>
+        <Text style={styles.coverScope}>
+          This report reflects the records in the clinic&apos;s compliance tracking system as of {reportDate}.
+        </Text>
+        <View style={{ height: 12 }} />
+        <Text style={styles.coverPrepared}>Prepared by ComplySpa</Text>
       </View>
     </Page>
   ) : null;
 
   const brandedHeader = !isBasic ? (
     <Text style={styles.header} fixed>
-      <Text style={styles.headerBrand}>Compliance Audit Report</Text>
+      <Text style={styles.headerBrand}>{REPORT_DOC_TITLE}</Text>
       <Text> — {data.clinic.name}</Text>
     </Text>
   ) : null;
@@ -393,25 +452,55 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
     />
   ) : null;
 
+  const basicFooter = isBasic ? (
+    <Text style={styles.footer} fixed
+      render={({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+        `Page ${pageNumber} of ${totalPages} | Prepared by ComplySpa`
+      }
+    />
+  ) : null;
+
+  const letterhead = isBasic ? (
+    <View style={styles.letterhead}>
+      <Text style={styles.letterheadClinic}>{data.clinic.name}</Text>
+      <Text style={styles.letterheadTitle}>{REPORT_DOC_TITLE}</Text>
+      <Text style={styles.letterheadMeta}>Generated {reportDateTime} by {data.generatedBy}</Text>
+    </View>
+  ) : null;
+
   const executiveSummary = !isBasic ? (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: sectionTitleColor, borderBottomColor: sectionTitleColor }]}>Executive Summary</Text>
+      <Text style={[styles.sectionTitle, { color: C.action, borderBottomColor: C.action }]}>Executive Summary</Text>
       <View style={styles.executiveSummary}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <View>
-            <Text style={[styles.summaryScore, { color: sectionTitleColor }]}>{complianceScore}%</Text>
-            <Text style={styles.summaryScoreLabel}>Compliance Score</Text>
+            <Text style={[styles.summaryScore, { color: C.action }]}>{complianceScore}%</Text>
+            <Text style={styles.summaryScoreLabel}>Credential Validity</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={[styles.summaryScore, { color: sectionTitleColor }]}>{data.staffMembers.length}</Text>
+            <Text style={[styles.summaryScore, { color: C.action }]}>{data.staffMembers.length}</Text>
             <Text style={styles.summaryScoreLabel}>Active Staff</Text>
           </View>
         </View>
         <Text style={styles.summaryText}>
-          This report summarizes the credential status for {data.staffMembers.length} active staff
-          members and {data.summary.total} tracked credentials at {data.clinic.name}.
-          Of {data.summary.total} credentials, {data.summary.valid} ({complianceScore}%) are valid,
-          {data.summary.expiring} are approaching expiration, and {data.summary.expired} have expired.
+          As of {reportDate}, {data.clinic.name} holds {data.summary.total} tracked credentials across{" "}
+          {data.staffMembers.length} active staff members. {data.summary.valid} credentials ({complianceScore}%) are
+          valid, {data.summary.expired} are expired, and {data.summary.expiring} expire within the next 90 days.
+          {data.summary.noExpiration > 0
+            ? ` ${data.summary.noExpiration} credentials carry no expiration date and require manual review.`
+            : ""}
+        </Text>
+        <Text style={styles.summaryText}>
+          {data.medicalDirector
+            ? `The clinic's medical director is ${data.medicalDirector}.`
+            : "A medical director is not currently designated."}
+          {staffWithoutCredentials > 0
+            ? ` ${staffWithoutCredentials} staff ${staffWithoutCredentials === 1 ? "member has" : "members have"} no tracked credentials.`
+            : ""}
+        </Text>
+        <Text style={styles.summaryText}>
+          This report is a point-in-time record prepared from the clinic&apos;s compliance tracking system and is intended
+          for internal review and regulatory inspection preparation.
         </Text>
       </View>
     </View>
@@ -419,8 +508,7 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
 
   const overviewContent = (
     <View style={styles.section}>
-      {isBasic && <Text style={styles.sectionTitle}>Basic Compliance Report</Text>}
-      {!isBasic && <Text style={{ fontSize: 10, color: C.muted, marginBottom: 8 }}>Clinic Overview</Text>}
+      <Text style={[styles.sectionTitle, { color: C.action, borderBottomColor: C.action }]}>Clinic Overview</Text>
       <View style={{ marginTop: 4 }}>
         <View style={styles.overviewBlock}>
           <Text style={styles.overviewLabel}>Clinic</Text>
@@ -440,7 +528,7 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
         </View>
         <View style={styles.overviewBlock}>
           <Text style={styles.overviewLabel}>Generated</Text>
-          <Text style={styles.overviewValue}>{data.generatedAt}</Text>
+          <Text style={styles.overviewValue}>{reportDateTime}</Text>
         </View>
         <View style={styles.overviewBlock}>
           <Text style={styles.overviewLabel}>Generated By</Text>
@@ -450,64 +538,16 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
     </View>
   );
 
-  const registerContent = !isBasic ? (
-    <View style={styles.section} break>
-      <Text style={[styles.sectionTitle, { color: sectionTitleColor, borderBottomColor: sectionTitleColor }]}>Staff Credential Register</Text>
-      {data.staffMembers.length === 0 ? (
-        <Text style={styles.emptySection}>No staff members on record.</Text>
-      ) : (
-        data.staffMembers.map((staff) => (
-          <View key={staff.id} wrap={false}>
-            <Text style={[styles.staffName, { color: staffNameColor }]}>{staff.name}</Text>
-            <Text style={styles.staffMeta}>
-              {[staff.role, staff.hireDate ? `Hired: ${staff.hireDate}` : ""].filter(Boolean).join(" | ")}
-            </Text>
-            {staff.credentials.length === 0 ? (
-              <View style={styles.tableRow}>
-                <Text style={styles.emptyCell}>No credentials tracked</Text>
-              </View>
-            ) : (
-              <View style={styles.table}>
-                <View style={styles.tableHeader}>
-                  <Text style={{ ...styles.tableHeaderCell, ...styles.credColType }}>Type</Text>
-                  <Text style={{ ...styles.tableHeaderCell, ...styles.credColLicense }}>License #</Text>
-                  <Text style={{ ...styles.tableHeaderCell, ...styles.credColState }}>State</Text>
-                  <Text style={{ ...styles.tableHeaderCell, ...styles.credColIssued }}>Issued</Text>
-                  <Text style={{ ...styles.tableHeaderCell, ...styles.credColExpires }}>Expires</Text>
-                  <Text style={{ ...styles.tableHeaderCell, ...styles.credColStatus }}>Status</Text>
-                  <Text style={{ ...styles.tableHeaderCell, ...styles.credColVerified }}>Verified</Text>
-                </View>
-                {staff.credentials.map((cred, ci) => (
-                  <View key={ci} style={ci % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
-                    <Text style={{ ...styles.tableCell, ...styles.credColType }}>{cred.type}</Text>
-                    <Text style={{ ...styles.tableCell, ...styles.credColLicense }}>{cred.licenseNumber || "—"}</Text>
-                    <Text style={{ ...styles.tableCell, ...styles.credColState }}>{cred.state || "—"}</Text>
-                    <Text style={{ ...styles.tableCell, ...styles.credColIssued }}>{cred.issueDate || "—"}</Text>
-                    <Text style={{ ...styles.tableCell, ...styles.credColExpires }}>{cred.expirationDate || "—"}</Text>
-                    <View style={{ ...styles.credColStatus }}>
-                      <StatusBadge status={cred.status} />
-                    </View>
-                    <Text style={{ ...styles.tableCell, ...styles.credColVerified }}>{cred.lastVerified || "Never"}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        ))
-      )}
-    </View>
-  ) : null;
-
   const summaryContent = (
     <View style={styles.section} break>
-      <Text style={[styles.sectionTitle, { color: sectionTitleColor, borderBottomColor: sectionTitleColor }]}>Credential Status Summary</Text>
+      <Text style={[styles.sectionTitle, { color: C.action, borderBottomColor: C.action }]}>Credential Status Summary</Text>
 
       {!isBasic && (
         <View style={styles.metricCard}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
             <View style={{ alignItems: "center", flex: 1 }}>
               <Text style={styles.metricCardValue}>{data.summary.total}</Text>
-              <Text style={styles.metricCardSub}>Total</Text>
+              <Text style={styles.metricCardSub}>Tracked</Text>
             </View>
             <View style={{ alignItems: "center", flex: 1 }}>
               <Text style={[styles.metricCardValue, { color: C.valid }]}>{data.summary.valid}</Text>
@@ -528,7 +568,7 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
       {isBasic && (
         <View style={{ marginBottom: 8 }}>
           <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>Total credentials tracked</Text>
+            <Text style={styles.metricLabel}>Credentials tracked</Text>
             <Text style={styles.metricValue}>{data.summary.total}</Text>
           </View>
           <View style={styles.metricRow}>
@@ -568,20 +608,70 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
 
       {data.summary.noExpiration > 0 && (
         <Text style={styles.noExpirationNote}>
-          Credentials with no expiration date: {data.summary.noExpiration} — manual review required
+          Credentials without an expiration date on record: {data.summary.noExpiration} — requires manual review
         </Text>
       )}
     </View>
   );
 
-  const upcomingContent = (
+  const attentionItems = buildAttentionItems(data);
+
+  const attentionContent = (
     <View style={styles.section} break>
-      <Text style={[styles.sectionTitle, { color: sectionTitleColor, borderBottomColor: sectionTitleColor }]}>Upcoming Renewals</Text>
+      <Text style={[styles.sectionTitle, { color: C.action, borderBottomColor: C.action }]}>Items Requiring Attention</Text>
+      <Text style={styles.sectionSub}>Credentials and administrative items requiring action as of {reportDate}</Text>
 
-      {!isBasic && <Text style={{ fontSize: 7.5, color: C.muted, marginBottom: 6 }}>Credentials expiring within 90 days</Text>}
+      {attentionItems.credentialItems.length === 0 && attentionItems.adminItems.length === 0 ? (
+        <Text style={[styles.emptySection, { color: C.valid }]}>
+          No items require attention as of {reportDate}.
+        </Text>
+      ) : (
+        <>
+          {attentionItems.credentialItems.length > 0 && (
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={{ ...styles.tableHeaderCell, ...styles.attColStaff }}>Staff</Text>
+                <Text style={{ ...styles.tableHeaderCell, ...styles.attColCred }}>Credential</Text>
+                <Text style={{ ...styles.tableHeaderCell, ...styles.attColExpires }}>Expires</Text>
+                <Text style={{ ...styles.tableHeaderCell, ...styles.attColStatus }}>Status</Text>
+              </View>
+              {attentionItems.credentialItems.map((item, i) => (
+                <View key={i} style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
+                  <Text style={{ ...styles.tableCell, ...styles.attColStaff }}>{item.staffName}</Text>
+                  <Text style={{ ...styles.tableCell, ...styles.attColCred }}>{item.type}</Text>
+                  <Text style={{ ...styles.tableCell, ...styles.attColExpires }}>{formatReportDate(item.expirationDate)}</Text>
+                  <View style={{ ...styles.attColStatus }}>
+                    <StatusBadge status={item.status} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
-      {data.upcoming.length === 0 ? (
-        <Text style={styles.emptySection}>No credentials expiring within 90 days.</Text>
+          {attentionItems.adminItems.length > 0 && (
+            <View style={{ marginTop: 8 }}>
+              {attentionItems.adminItems.map((item, i) => (
+                <View key={i} style={styles.adminRow}>
+                  <View style={[styles.adminDot, { backgroundColor: C.expiring }]} />
+                  <Text style={styles.adminRowText}>{item.message}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </>
+      )}
+    </View>
+  );
+
+  const upcomingTable = splitUpcoming(data.upcoming).upcoming;
+
+  const upcomingContent = (
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: C.action, borderBottomColor: C.action }]}>Upcoming Renewals</Text>
+      <Text style={styles.sectionSub}>Credentials expiring within 31–90 days</Text>
+
+      {upcomingTable.length === 0 ? (
+        <Text style={styles.emptySection}>No credentials expiring within 31–90 days.</Text>
       ) : (
         <View style={styles.table}>
           <View style={styles.tableHeader}>
@@ -592,11 +682,11 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
             <Text style={{ ...styles.tableHeaderCell, ...styles.upcomingColStatus }}>Status</Text>
             <Text style={{ ...styles.tableHeaderCell, ...styles.upcomingColAlerts }}>Alerts</Text>
           </View>
-          {data.upcoming.map((item, i) => (
+          {upcomingTable.map((item, i) => (
             <View key={i} style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
               <Text style={{ ...styles.tableCell, ...styles.upcomingColStaff }}>{item.staffName}</Text>
               <Text style={{ ...styles.tableCell, ...styles.upcomingColCred }}>{item.credentialType}</Text>
-              <Text style={{ ...styles.tableCell, ...styles.upcomingColExpires }}>{item.expirationDate}</Text>
+              <Text style={{ ...styles.tableCell, ...styles.upcomingColExpires }}>{formatReportDate(item.expirationDate)}</Text>
               <Text style={{ ...styles.tableCell, ...styles.upcomingColDays }}>{item.daysLeft}</Text>
               <View style={{ ...styles.upcomingColStatus }}>
                 <StatusBadge status={item.status} />
@@ -609,23 +699,87 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
     </View>
   );
 
+  const registerContent = !isBasic ? (
+    <View style={styles.section} break>
+      <Text style={[styles.sectionTitle, { color: C.action, borderBottomColor: C.action }]}>Staff Credential Register</Text>
+      {data.staffMembers.length === 0 ? (
+        <Text style={styles.emptySection}>No staff members on record.</Text>
+      ) : (
+        data.staffMembers.map((staff) => {
+          const rollup = summarizeStaffCredentials(staff.credentials);
+          const rollupSegments = [
+            rollup.valid > 0 && { text: `${rollup.valid} valid`, color: C.valid },
+            rollup.expiring > 0 && { text: `${rollup.expiring} expiring`, color: C.expiring },
+            rollup.expired > 0 && { text: `${rollup.expired} expired`, color: C.expired },
+          ].filter(Boolean) as Array<{ text: string; color: string }>;
+          return (
+            <View key={staff.id} wrap={false}>
+              <Text style={[styles.staffName, { color: C.action }]}>{staff.name}</Text>
+              <Text style={styles.staffMeta}>
+                {[staff.role, staff.hireDate ? `Hired: ${formatReportDate(staff.hireDate)}` : ""].filter(Boolean).join(" | ")}
+              </Text>
+              {rollupSegments.length > 0 && (
+                <View style={styles.rollupRow}>
+                  {rollupSegments.map((seg, i) => (
+                    <View key={seg.text} style={{ flexDirection: "row" }}>
+                      {i > 0 && <Text style={[styles.rollupText, { color: C.muted }]}> · </Text>}
+                      <Text style={[styles.rollupText, { color: seg.color }]}>{seg.text}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              {staff.credentials.length === 0 ? (
+                <View style={styles.tableRow}>
+                  <Text style={styles.emptyCell}>No credentials tracked</Text>
+                </View>
+              ) : (
+                <View style={styles.table}>
+                  <View style={styles.tableHeader}>
+                    <Text style={{ ...styles.tableHeaderCell, ...styles.credColType }}>Type</Text>
+                    <Text style={{ ...styles.tableHeaderCell, ...styles.credColLicense }}>License #</Text>
+                    <Text style={{ ...styles.tableHeaderCell, ...styles.credColState }}>State</Text>
+                    <Text style={{ ...styles.tableHeaderCell, ...styles.credColIssued }}>Issued</Text>
+                    <Text style={{ ...styles.tableHeaderCell, ...styles.credColExpires }}>Expires</Text>
+                    <Text style={{ ...styles.tableHeaderCell, ...styles.credColStatus }}>Status</Text>
+                    <Text style={{ ...styles.tableHeaderCell, ...styles.credColVerified }}>Verified</Text>
+                  </View>
+                  {staff.credentials.map((cred, ci) => (
+                    <View key={ci} style={ci % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
+                      <Text style={{ ...styles.tableCell, ...styles.credColType }}>{cred.type}</Text>
+                      <Text style={{ ...styles.tableCell, ...styles.credColLicense }}>{cred.licenseNumber || "—"}</Text>
+                      <Text style={{ ...styles.tableCell, ...styles.credColState }}>{cred.state || "—"}</Text>
+                      <Text style={{ ...styles.tableCell, ...styles.credColIssued }}>{formatReportDate(cred.issueDate) || "—"}</Text>
+                      <Text style={{ ...styles.tableCell, ...styles.credColExpires }}>{formatReportDate(cred.expirationDate) || "—"}</Text>
+                      <View style={{ ...styles.credColStatus }}>
+                        <StatusBadge status={cred.status} />
+                      </View>
+                      <Text style={{ ...styles.tableCell, ...styles.credColVerified }}>{cred.lastVerified ? formatReportDate(cred.lastVerified) : "Never"}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          );
+        })
+      )}
+    </View>
+  ) : null;
+
   const attestationContent = !isBasic ? (
     <View style={styles.section} break>
-      <Text style={[styles.sectionTitle, { color: sectionTitleColor, borderBottomColor: sectionTitleColor }]}>Attestation</Text>
+      <Text style={[styles.sectionTitle, { color: C.action, borderBottomColor: C.action }]}>Attestation</Text>
       <View style={{ marginTop: 20 }}>
         <Text style={styles.attestationText}>
-          This compliance audit report was generated on {data.generatedAt} by {data.generatedBy}. The
-          information herein reflects the credential records maintained in the clinic&apos;s compliance
-          tracking system as of the generation date. Verification of accuracy and completeness is the
-          responsibility of the clinic owner or medical director.
+          This report was generated on {reportDateTime} by {data.generatedBy} and reflects the credential records
+          maintained in {data.clinic.name}&apos;s compliance tracking system as of the time of generation. The clinic
+          is responsible for the accuracy and completeness of the records it maintains.
         </Text>
         <Text style={styles.attestationText}>
-          This document is intended for internal compliance review and regulatory inspection preparation.
-          It is not a substitute for independent verification of individual credential status with the
-          issuing authority.
+          Credential status is derived from the issue and expiration dates recorded in the system. This report is not a
+          substitute for independent verification with the issuing authority.
         </Text>
         <Text style={styles.reportIdText}>Report ID: {data.reportId}</Text>
-        <Text style={styles.reportIdText}>Generated: {data.generatedAt}</Text>
+        <Text style={styles.reportIdText}>Generated: {reportDateTime}</Text>
       </View>
     </View>
   ) : null;
@@ -634,19 +788,23 @@ export function ComplianceReport({ data, tier }: { data: ReportData; tier?: "bas
     <Page size="A4" style={styles.page} wrap>
       {brandedHeader}
       {brandedFooter}
+      {basicFooter}
       {isBasic ? (
         <>
+          {letterhead}
           {overviewContent}
           {summaryContent}
+          {attentionContent}
           {upcomingContent}
         </>
       ) : (
         <>
           {executiveSummary}
           {overviewContent}
-          {registerContent}
           {summaryContent}
+          {attentionContent}
           {upcomingContent}
+          {registerContent}
           {attestationContent}
         </>
       )}

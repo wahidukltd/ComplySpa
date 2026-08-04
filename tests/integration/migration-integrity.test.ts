@@ -41,6 +41,7 @@ const EXPECTED_FUNCTIONS = [
   "auth_clinic_id",
   "auth_user_role",
   "create_clinic_for_user",
+  "get_alert_windows",
 ] as const;
 
 const EXPECTED_CRON_JOBS = [
