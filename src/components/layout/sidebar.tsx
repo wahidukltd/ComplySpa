@@ -8,6 +8,7 @@ import {
   Users,
   ShieldCheck,
   FileText,
+  CreditCard,
   Settings,
   X,
   type LucideIcon,
@@ -18,6 +19,7 @@ const navItems: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Staff", href: "/dashboard/staff", icon: Users },
   { label: "Credentials", href: "/dashboard/credentials", icon: ShieldCheck },
   { label: "Reports", href: "/dashboard/reports", icon: FileText },
+  { label: "Billing", href: "/dashboard/settings/billing", icon: CreditCard },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 

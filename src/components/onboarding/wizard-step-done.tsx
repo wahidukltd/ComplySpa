@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Users, ShieldCheck, ArrowRight, CreditCard } from "lucide-react";
@@ -20,9 +21,13 @@ export function WizardStepDone({
 
   async function handleSubscribe() {
     if (!plan) return;
-    const url = await getCheckoutUrl(plan as "solo" | "practice");
-    if (url) {
-      window.open(url, "_blank");
+    const res = await getCheckoutUrl(plan as "solo" | "practice");
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    if (res.url) {
+      window.open(res.url, "_blank", "noopener");
       router.push("/dashboard");
     }
   }

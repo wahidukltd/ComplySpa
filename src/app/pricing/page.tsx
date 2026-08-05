@@ -9,6 +9,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createCheckoutLink } from "@/lib/polar/checkout";
 import { polarConfig } from "@/lib/polar/config";
+import { shouldBlockNewCheckout } from "@/lib/billing/copy";
 
 export const metadata: Metadata = {
   title: "Plans & Pricing — Simple, Transparent Compliance Pricing",
@@ -59,17 +60,22 @@ export default async function PricingPage() {
         if (userRecord) {
           const { data: clinic } = await supabase
             .from("clinics")
-            .select("id, polar_customer_id")
+            .select("id, polar_customer_id, plan, polar_subscription_status")
             .eq("id", userRecord.clinic_id)
             .single();
           if (clinic) {
-            checkoutUrls = {};
-            for (const plan of ["solo", "practice"] as const) {
-              const result = await createCheckoutLink(plan, clinic.polar_customer_id ?? undefined, {
-                clinic_id: clinic.id,
-                plan,
-              });
-              if (result.url) checkoutUrls[plan] = result.url;
+            // Repeat-checkout defense (review 2026-08-05): a paid clinic with a
+            // live subscription must not get a second checkout from the pricing
+            // page either — same gate as the billing page action.
+            if (!shouldBlockNewCheckout(clinic.plan, clinic.polar_subscription_status)) {
+              checkoutUrls = {};
+              for (const plan of ["solo", "practice"] as const) {
+                const result = await createCheckoutLink(plan, clinic.polar_customer_id ?? undefined, {
+                  clinic_id: clinic.id,
+                  plan,
+                });
+                if (result.url) checkoutUrls[plan] = result.url;
+              }
             }
           }
         }

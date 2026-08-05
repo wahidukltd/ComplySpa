@@ -112,12 +112,18 @@ export type Database = {
           address: string | null
           cancel_at_period_end: boolean
           created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
           id: string
           name: string
           plan: string
           polar_customer_id: string | null
           polar_subscription_id: string | null
+          polar_subscription_status: string | null
           state: string | null
+          subscription_amount: number | null
+          subscription_currency: string
+          subscription_product_id: string | null
           trial_end_date: string
           trial_plan: string
           updated_at: string
@@ -126,12 +132,18 @@ export type Database = {
           address?: string | null
           cancel_at_period_end?: boolean
           created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
           id?: string
           name: string
           plan?: string
           polar_customer_id?: string | null
           polar_subscription_id?: string | null
+          polar_subscription_status?: string | null
           state?: string | null
+          subscription_amount?: number | null
+          subscription_currency?: string
+          subscription_product_id?: string | null
           trial_end_date?: string
           trial_plan: string
           updated_at?: string
@@ -140,12 +152,18 @@ export type Database = {
           address?: string | null
           cancel_at_period_end?: boolean
           created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
           id?: string
           name?: string
           plan?: string
           polar_customer_id?: string | null
           polar_subscription_id?: string | null
+          polar_subscription_status?: string | null
           state?: string | null
+          subscription_amount?: number | null
+          subscription_currency?: string
+          subscription_product_id?: string | null
           trial_end_date?: string
           trial_plan?: string
           updated_at?: string
@@ -666,26 +684,22 @@ export type Database = {
         Args: { p_clinic_id: string; p_staff_id: string }
         Returns: boolean
       }
-      update_clinic_subscription:
-        | {
-            Args: {
-              p_cancel_at_period_end?: boolean
-              p_clinic_id: string
-              p_plan: string
-              p_polar_subscription_id?: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_cancel_at_period_end?: boolean
-              p_clinic_id: string
-              p_plan: string
-              p_polar_customer_id?: string
-              p_polar_subscription_id?: string
-            }
-            Returns: undefined
-          }
+      update_clinic_subscription: {
+        Args: {
+          p_cancel_at_period_end?: boolean | null
+          p_clinic_id: string
+          p_plan: string
+          p_polar_customer_id?: string | null
+          p_polar_subscription_id?: string | null
+          p_subscription_amount?: number | null
+          p_subscription_currency?: string | null
+          p_subscription_product_id?: string | null
+          p_subscription_status?: string | null
+          p_current_period_end?: string | null
+          p_current_period_start?: string | null
+        }
+        Returns: undefined
+      }
       update_credential_statuses: { Args: never; Returns: undefined }
     }
     Enums: {
