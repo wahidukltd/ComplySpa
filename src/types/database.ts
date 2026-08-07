@@ -123,6 +123,7 @@ export type Database = {
           state: string | null
           subscription_amount: number | null
           subscription_currency: string
+          subscription_interval: string
           subscription_product_id: string | null
           trial_end_date: string
           trial_plan: string
@@ -143,6 +144,7 @@ export type Database = {
           state?: string | null
           subscription_amount?: number | null
           subscription_currency?: string
+          subscription_interval?: string
           subscription_product_id?: string | null
           trial_end_date?: string
           trial_plan: string
@@ -163,6 +165,7 @@ export type Database = {
           state?: string | null
           subscription_amount?: number | null
           subscription_currency?: string
+          subscription_interval?: string
           subscription_product_id?: string | null
           trial_end_date?: string
           trial_plan?: string
@@ -645,6 +648,10 @@ export type Database = {
         Args: { p_jobname: string; p_max_stale_hours?: number }
         Returns: boolean
       }
+      count_preserved_clinic_data: {
+        Args: never
+        Returns: { staff_count: number; credential_count: number }[]
+      }
       check_trial_expiry: { Args: never; Returns: undefined }
       cleanup_inactive_clinics: { Args: never; Returns: undefined }
       create_clinic_for_user: {
@@ -693,12 +700,13 @@ export type Database = {
           p_polar_subscription_id?: string | null
           p_subscription_amount?: number | null
           p_subscription_currency?: string | null
+          p_subscription_interval?: string | null
           p_subscription_product_id?: string | null
           p_subscription_status?: string | null
           p_current_period_end?: string | null
           p_current_period_start?: string | null
         }
-        Returns: undefined
+        Returns: boolean
       }
       update_credential_statuses: { Args: never; Returns: undefined }
     }

@@ -249,7 +249,10 @@ export async function inviteUser(input: InviteUserInput) {
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
-      .eq("clinic_id", user.clinic_id),
+      .eq("clinic_id", user.clinic_id)
+      // B4 (plan 2026-08-08): match the enforce_plan_limits trigger and the
+      // billing usage counts — soft-deleted users must not hold a seat.
+      .is("deleted_at", null),
     supabase
       .from("clinics")
       .select("plan, trial_plan")

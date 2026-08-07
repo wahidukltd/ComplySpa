@@ -21,7 +21,10 @@ export function WizardStepDone({
 
   async function handleSubscribe() {
     if (!plan) return;
-    const res = await getCheckoutUrl(plan as "solo" | "practice");
+    // Trial-path subscribe defaults to monthly (matches the displayed
+    // monthly anchor; full interval choice lives on the pricing page and the
+    // Billing change dialog — plan 2026-08-08 §4.7).
+    const res = await getCheckoutUrl(plan as "solo" | "practice", "monthly");
     if (res.error) {
       toast.error(res.error);
       return;

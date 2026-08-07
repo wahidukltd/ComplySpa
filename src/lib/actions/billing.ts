@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getClinicIdAndUser } from "@/lib/utils/clinic";
 import { getEntitlements } from "@/lib/utils/entitlements";
-import { polarConfig } from "@/lib/polar/config";
+import { polarConfig, productAvailable } from "@/lib/polar/config";
 import { createPolarAdmin } from "@/lib/polar/client";
 import { createCheckoutLink, resolveProductIdFromPrice, type PlanId } from "@/lib/polar/checkout";
 import { createCustomerPortalUrl } from "@/lib/polar/customer-portal";
@@ -15,12 +15,13 @@ import {
   daysUntil,
   deriveBannerState,
   nextChargeLine,
-  PLAN_MONTHLY_PRICE,
+  planPrice,
   PLAN_NAME,
   PLAN_LOOKUP,
   polarStatusLabel,
   shouldBlockNewCheckout,
   type BannerState,
+  type SubscriptionInterval,
 } from "@/lib/billing/copy";
 import * as Sentry from "@sentry/nextjs";
 
@@ -68,6 +69,7 @@ export interface BillingOverviewData {
   plan: string;
   trialPlan: string | null;
   planName: string;
+  interval: SubscriptionInterval | null;
   isTrial: boolean;
   isPaid: boolean;
   entitlements: {
@@ -79,11 +81,14 @@ export interface BillingOverviewData {
   usage: { staff: number; credentials: number; users: number };
   billingContact: string | null;
   planOptions: Array<{
-    plan: "solo" | "practice";
+    plan: PlanId;
+    interval: SubscriptionInterval;
+    price: number;
     maxStaff: number;
     maxCredentials: number;
     maxUsers: number;
     reportLabel: string;
+    available: boolean;
   }>;
   banner: { state: BannerState; title: string; detail: string };
   planCard: {
@@ -105,13 +110,20 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
   if (!ctx) return { data: null, error: "Unauthorized" };
   const { supabase, clinicId } = ctx;
 
-  const { data: clinic } = await supabase
+  const { data: clinic, error: clinicError } = await supabase
     .from("clinics")
     .select(
-      "name, plan, trial_plan, trial_end_date, cancel_at_period_end, polar_customer_id, polar_subscription_id, polar_subscription_status, current_period_start, current_period_end, subscription_amount, subscription_currency, subscription_product_id",
+      "name, plan, trial_plan, trial_end_date, cancel_at_period_end, polar_customer_id, polar_subscription_id, polar_subscription_status, current_period_start, current_period_end, subscription_amount, subscription_currency, subscription_product_id, subscription_interval",
     )
     .eq("id", clinicId)
     .maybeSingle();
+
+  if (clinicError) {
+    // B9: the sentinel path alone hid the failure from every human — capture
+    // it so the billing page's error box has a Sentry trail.
+    captureBillingError(clinicError, "billing.overview.clinic", { clinicId });
+    return { data: null, error: "Clinic not found" };
+  }
   if (!clinic) return { data: null, error: "Clinic not found" };
 
   const [staffRes, credsRes, usersRes, ownerRes] = await Promise.all([
@@ -119,12 +131,14 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
       .from("staff_members")
       .select("id", { count: "exact", head: true })
       .eq("clinic_id", clinicId)
-      .is("deleted_at", null),
+      .is("deleted_at", null)
+      .is("suspended_at", null),
     supabase
       .from("credentials")
       .select("id", { count: "exact", head: true })
       .eq("clinic_id", clinicId)
-      .is("deleted_at", null),
+      .is("deleted_at", null)
+      .is("suspended_at", null),
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
@@ -144,7 +158,15 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
   const isPaid = clinic.plan === "solo" || clinic.plan === "practice";
   const trialPlanId: PlanId | null =
     clinic.trial_plan === "solo" || clinic.trial_plan === "practice" ? clinic.trial_plan : null;
-  const priceDollars = trialPlanId ? PLAN_MONTHLY_PRICE[trialPlanId] : isPaid ? PLAN_MONTHLY_PRICE[clinic.plan as PlanId] ?? 0 : 0;
+  // Projected interval from the webhook (never guessed); null = pre-subscription.
+  const interval: SubscriptionInterval | null =
+    clinic.subscription_interval === "annual" ? "annual" : clinic.subscription_interval === "monthly" ? "monthly" : null;
+  const priceDollars =
+    trialPlanId
+      ? planPrice(trialPlanId, interval ?? "monthly")
+      : isPaid
+        ? planPrice(clinic.plan as PlanId, interval ?? "monthly")
+        : 0;
 
   let livePolar = false;
   let degraded = false;
@@ -152,6 +174,7 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
   let liveAmountCents: number | null = clinic.subscription_amount;
   let livePeriodEnd: string | null = clinic.current_period_end;
   let liveStatus: string | null = clinic.polar_subscription_status;
+  let liveInterval: SubscriptionInterval | null = interval;
   let payment: { hasMethod: boolean; brand: string | null; last4: string | null } = {
     hasMethod: false,
     brand: null,
@@ -169,6 +192,7 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
         liveAmountCents = sub.amount;
         livePeriodEnd = sub.currentPeriodEnd.toISOString();
         liveStatus = sub.status;
+        liveInterval = sub.recurringInterval === "year" ? "annual" : sub.recurringInterval === "month" ? "monthly" : liveInterval;
       } catch (err) {
         degraded = true;
         degradedReason = "subscription";
@@ -210,7 +234,7 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
   const daysLeft = daysUntil(isTrial ? clinic.trial_end_date : livePeriodEnd);
   const amountCents = liveAmountCents;
   const priceCents = amountCents ?? null;
-  const bannerState = deriveBannerState({
+  const bannerInput = {
     polarEnabled: polarConfig.enabled,
     plan: clinic.plan,
     trialPlan: clinic.trial_plan,
@@ -222,20 +246,9 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
     degraded,
     daysLeft,
     price: priceCents != null ? priceCents / 100 : priceDollars,
-  });
-  const banner = bannerCopy(bannerState, {
-    polarEnabled: polarConfig.enabled,
-    plan: clinic.plan,
-    trialPlan: clinic.trial_plan,
-    polarStatus: liveStatus,
-    cancelAtPeriodEnd: clinic.cancel_at_period_end,
-    trialEndDate: clinic.trial_end_date,
-    periodEnd: livePeriodEnd,
-    pendingSync: false,
-    degraded,
-    daysLeft,
-    price: priceCents != null ? priceCents / 100 : priceDollars,
-  });
+  };
+  const bannerState = deriveBannerState(bannerInput);
+  const banner = bannerCopy(bannerState, bannerInput);
 
   const priceLine = nextChargeLine({
     plan: clinic.plan,
@@ -246,6 +259,7 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
     trialPlan: clinic.trial_plan,
     trialEndDate: clinic.trial_end_date,
     currency: clinic.subscription_currency,
+    interval: liveInterval,
   });
 
   const data: BillingOverviewData = {
@@ -256,6 +270,7 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
     plan: clinic.plan,
     trialPlan: clinic.trial_plan,
     planName: isTrial && trialPlanId ? `Trial of ${PLAN_NAME[trialPlanId]}` : (PLAN_LOOKUP[clinic.plan] ?? clinic.plan),
+    interval: liveInterval,
     isTrial,
     isPaid,
     entitlements: {
@@ -269,19 +284,25 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
       credentials: credsRes.count ?? 0,
       users: usersRes.count ?? 0,
     },
-    // Per-target-plan limits for the change-plan dialog (each option shows
-    // what THAT plan offers, not the current plan's — derived from the single
-    // entitlement resolver, never hardcoded in the UI).
-    planOptions: (["solo", "practice"] as const).map((p) => {
-      const e = getEntitlements(p, p);
-      return {
-        plan: p,
-        maxStaff: e.maxStaff,
-        maxCredentials: e.maxCredentials,
-        maxUsers: e.maxUsers,
-        reportLabel: e.reportTier === "audit" ? "Audit-ready report" : "Basic report",
-      };
-    }),
+    // Per-target options for the change dialog (2×2 plan × interval). Limits
+    // derive from the single entitlement resolver; prices from the published
+    // constants; availability from the per-product config gate — never
+    // hardcoded in the UI.
+    planOptions: (["solo", "practice"] as const).flatMap((p) =>
+      (["monthly", "annual"] as const).map((i) => {
+        const e = getEntitlements(p, p);
+        return {
+          plan: p,
+          interval: i,
+          price: planPrice(p, i),
+          maxStaff: e.maxStaff,
+          maxCredentials: e.maxCredentials,
+          maxUsers: e.maxUsers,
+          reportLabel: e.reportTier === "audit" ? "Audit-ready report" : "Basic report",
+          available: productAvailable(p, i),
+        };
+      }),
+    ),
     billingContact: ownerRes.data?.email ?? null,
     banner: { state: bannerState, title: banner.title, detail: banner.detail },
     planCard: {
@@ -357,12 +378,20 @@ export async function getBillingPollState(): Promise<{ data: BillingPollState | 
 // ─── Checkout & portal ──────────────────────────────────────────────────────
 
 const planIdSchema = z.enum(["solo", "practice"]);
+const intervalSchema = z.enum(["monthly", "annual"]);
 
-export async function getCheckoutUrl(plan: PlanId): Promise<{ url: string | null; error: string | null }> {
+export async function getCheckoutUrl(
+  plan: PlanId,
+  interval: SubscriptionInterval,
+): Promise<{ url: string | null; error: string | null }> {
   const ctx = await getBillingContext();
   if (!ctx) return { url: null, error: "Unauthorized" };
   if (ctx.role !== "owner") return { url: null, error: "Only the owner can manage the subscription" };
   if (!planIdSchema.safeParse(plan).success) return { url: null, error: "Invalid plan" };
+  if (!intervalSchema.safeParse(interval).success) return { url: null, error: "Invalid billing interval" };
+  if (!productAvailable(plan, interval)) {
+    return { url: null, error: `The ${interval === "annual" ? "annual" : "monthly"} option isn't available yet.` };
+  }
 
   try {
     const supabase = ctx.supabase;
@@ -389,14 +418,14 @@ export async function getCheckoutUrl(plan: PlanId): Promise<{ url: string | null
       .is("deleted_at", null)
       .maybeSingle();
 
-    const result = await createCheckoutLink(plan, clinic.polar_customer_id ?? undefined, {
+    const result = await createCheckoutLink(plan, interval, clinic.polar_customer_id ?? undefined, {
       clinic_id: clinic.id,
       plan,
     }, owner?.email ?? undefined);
 
     return { url: result.url, error: result.error };
   } catch (err) {
-    captureBillingError(err, "billing.checkout.create", { clinicId: ctx.clinicId, plan });
+    captureBillingError(err, "billing.checkout.create", { clinicId: ctx.clinicId, plan, interval });
     return { url: null, error: "Failed to create checkout link. Please try again." };
   }
 }
@@ -460,12 +489,15 @@ async function getPolarSubscription() {
 }
 
 export async function cancelSubscription(input: { reason?: string; comment?: string }): Promise<{ success: boolean; error: string | null }> {
-  const parsed = cancelInputSchema.safeParse(input);
-  if (!parsed.success) return { success: false, error: "Invalid cancellation details" };
-
+  // Auth before validation (finding 18): an unauthenticated caller gets
+  // "Unauthorized" for ANY input, not a validation error that leaks nothing
+  // but is inconsistent with the other billing actions.
   const res = await getPolarSubscription();
   if (!res.ctx || res.error) return { success: false, error: res.error ?? "Unauthorized" };
   if (!res.polar) return { success: false, error: "Billing is not configured yet." };
+
+  const parsed = cancelInputSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid cancellation details" };
 
   try {
     await res.polar.subscriptions.update({
@@ -504,32 +536,57 @@ export async function reactivateSubscription(): Promise<{ success: boolean; erro
   return { success: true, error: null };
 }
 
-export async function changePlan(plan: string): Promise<{ success: boolean; error: string | null }> {
-  if (!planIdSchema.safeParse(plan).success) return { success: false, error: "Invalid plan" };
-  const targetPlan = plan as PlanId;
-
+// Change plan AND/OR billing interval. Both are the same Polar operation:
+// subscriptions.update({ productId }) — one product per plan × interval, and
+// the SDK applies the swap as a PendingSubscriptionUpdate at the START of the
+// next billing period (verified v0.48.1 types; plan 2026-08-08 §4.7). The DB
+// converges when the applied change lands as subscription.updated carrying the
+// new product + recurringInterval — no convergence polling (documented
+// 2026-08-05 lesson: the predicate would have no true branch mid-period).
+export async function changePlan(plan: string, interval: SubscriptionInterval): Promise<{ success: boolean; error: string | null }> {
+  // Auth before validation (finding 18): an unauthenticated caller gets
+  // "Unauthorized" for ANY input, consistent with getCheckoutUrl.
   const res = await getPolarSubscription();
   if (!res.ctx || res.error) return { success: false, error: res.error ?? "Unauthorized" };
   if (!res.polar) return { success: false, error: "Billing is not configured yet." };
 
+  if (!planIdSchema.safeParse(plan).success) return { success: false, error: "Invalid plan" };
+  if (!intervalSchema.safeParse(interval).success) return { success: false, error: "Invalid billing interval" };
+  const targetPlan = plan as PlanId;
+  if (!productAvailable(targetPlan, interval)) {
+    return { success: false, error: `The ${interval === "annual" ? "annual" : "monthly"} option isn't available yet.` };
+  }
+
   try {
     const { data: clinic } = await res.ctx.supabase
       .from("clinics")
-      .select("plan, trial_plan")
+      .select("plan, trial_plan, cancel_at_period_end, subscription_interval")
       .eq("id", res.ctx.clinicId)
       .maybeSingle();
-    const effective = clinic?.plan === "trial" ? clinic.trial_plan : clinic?.plan;
-    if (effective === targetPlan) return { success: false, error: `You are already on the ${PLAN_NAME[targetPlan]} plan.` };
 
-    const productId = await resolveProductIdFromPrice(res.polar, targetPlan);
-    if (!productId) return { success: false, error: `No product configured for the ${PLAN_NAME[targetPlan]} plan.` };
+    // B10: a cancel-scheduled subscription must be resumed before any
+    // plan/interval change (UI already disables the button; the action is the
+    // enforcement boundary).
+    if (clinic?.cancel_at_period_end) {
+      return { success: false, error: "Resume your subscription before changing plans." };
+    }
+
+    const effective = clinic?.plan === "trial" ? clinic.trial_plan : clinic?.plan;
+    const currentInterval = clinic?.subscription_interval === "annual" ? "annual" : "monthly";
+    if (effective === targetPlan && currentInterval === interval) {
+      const label = `${PLAN_NAME[targetPlan]} (${interval})`;
+      return { success: false, error: `You are already on the ${label} plan.` };
+    }
+
+    const productId = await resolveProductIdFromPrice(res.polar, targetPlan, interval);
+    if (!productId) return { success: false, error: `No product configured for the ${PLAN_NAME[targetPlan]} ${interval} plan.` };
 
     await res.polar.subscriptions.update({
       id: res.subscriptionId,
       subscriptionUpdate: { productId },
     });
   } catch (err) {
-    captureBillingError(err, "billing.plan-change", { clinicId: res.ctx.clinicId, plan: targetPlan });
+    captureBillingError(err, "billing.plan-change", { clinicId: res.ctx.clinicId, plan: targetPlan, interval });
     return { success: false, error: "We couldn't reach the payment provider. Please try again." };
   }
 

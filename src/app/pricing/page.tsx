@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createCheckoutLink } from "@/lib/polar/checkout";
-import { polarConfig } from "@/lib/polar/config";
+import { polarConfig, productAvailable } from "@/lib/polar/config";
 import { shouldBlockNewCheckout } from "@/lib/billing/copy";
 
 export const metadata: Metadata = {
@@ -29,17 +29,31 @@ const pricingJsonLd = {
   itemListElement: [
     {
       "@type": "Offer",
-      name: "Solo Plan",
+      name: "Solo Plan (Monthly)",
       price: "29.00",
       priceCurrency: "USD",
       description: "5 staff, 50 credentials, email alerts, basic compliance report with email to yourself. 14-day free trial.",
     },
     {
       "@type": "Offer",
-      name: "Practice Plan",
+      name: "Solo Plan (Annual)",
+      price: "290.00",
+      priceCurrency: "USD",
+      description: "5 staff, 50 credentials, email alerts, basic compliance report with email to yourself. 2 months free on annual billing.",
+    },
+    {
+      "@type": "Offer",
+      name: "Practice Plan (Monthly)",
       price: "49.00",
       priceCurrency: "USD",
       description: "15 staff, 300 credentials, email alerts, audit-ready compliance report with email to yourself, inspection-readiness engine.",
+    },
+    {
+      "@type": "Offer",
+      name: "Practice Plan (Annual)",
+      price: "490.00",
+      priceCurrency: "USD",
+      description: "15 staff, 300 credentials, email alerts, audit-ready compliance report with email to yourself, inspection-readiness engine. 2 months free on annual billing.",
     },
   ],
 };
@@ -54,10 +68,14 @@ export default async function PricingPage() {
       if (user) {
         const { data: userRecord } = await supabase
           .from("users")
-          .select("id, clinic_id")
+          .select("id, clinic_id, role")
           .eq("auth_user_id", user.id)
           .single();
-        if (userRecord) {
+        // B5 (plan 2026-08-08): checkout URL generation is owner-only — the
+        // billing page's getCheckoutUrl is owner-gated, and the pricing page
+        // is a second checkout entry point on the same money path. Viewers and
+        // managers see the standard trial/sign-up CTAs instead.
+        if (userRecord && userRecord.role === "owner") {
           const { data: clinic } = await supabase
             .from("clinics")
             .select("id, polar_customer_id, plan, polar_subscription_status")
@@ -70,11 +88,14 @@ export default async function PricingPage() {
             if (!shouldBlockNewCheckout(clinic.plan, clinic.polar_subscription_status)) {
               checkoutUrls = {};
               for (const plan of ["solo", "practice"] as const) {
-                const result = await createCheckoutLink(plan, clinic.polar_customer_id ?? undefined, {
-                  clinic_id: clinic.id,
-                  plan,
-                });
-                if (result.url) checkoutUrls[plan] = result.url;
+                for (const interval of ["monthly", "annual"] as const) {
+                  if (!productAvailable(plan, interval)) continue;
+                  const result = await createCheckoutLink(plan, interval, clinic.polar_customer_id ?? undefined, {
+                    clinic_id: clinic.id,
+                    plan,
+                  });
+                  if (result.url) checkoutUrls[`${plan}_${interval}`] = result.url;
+                }
               }
             }
           }

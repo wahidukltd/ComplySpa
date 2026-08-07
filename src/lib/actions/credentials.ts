@@ -47,17 +47,18 @@ export async function addCredential(input: CredentialInput & { document_url?: st
   // ponytail: race window between count and insert — acceptable at current scale,
   // use SERIALIZABLE isolation or BEFORE INSERT trigger if this becomes a problem
   // ponytail: clinic-wide count, not per-staff — per-staff limits if needed later
-  // Count must MATCH enforce_plan_limits() (migration 045 counts
-  // deleted_at IS NULL only, suspended included) so the app check and the DB
-  // trigger can never disagree — a mismatch at the limit edge would surface
-  // the trigger's ND0MV as a generic error instead of the plan-limit toast.
+  // Count must MATCH enforce_plan_limits() (053 counts active-only — suspended
+  // credentials are a freed slot, matching reconcile semantics; review finding
+  // 4 fixed the pre-053 mismatch where this counted suspended rows and the
+  // trigger did not).
   const limits = getPlanLimits(plan, trialPlan);
 
   const { count } = await supabase
     .from("credentials")
     .select("id", { count: "exact", head: true })
     .eq("clinic_id", clinicId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .is("suspended_at", null);
 
   if ((count ?? 0) >= limits.maxCredentials) {
     const err = new PlanLimitError(

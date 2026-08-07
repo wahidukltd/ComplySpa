@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
-  getBillingOverview,
   getBillingPollState,
   cancelSubscription,
   reactivateSubscription,
@@ -43,7 +42,7 @@ import {
   type BillingOverviewData,
   type BillingPollState,
 } from "@/lib/actions/billing";
-import { PLAN_MONTHLY_PRICE, PLAN_NAME, formatCurrency, type BannerState } from "@/lib/billing/copy";
+import { PLAN_NAME, formatCurrency, type BannerState, type SubscriptionInterval } from "@/lib/billing/copy";
 import type { PlanId } from "@/lib/polar/checkout";
 
 const BANNER_STYLE: Record<BannerState, { bg: string; border: string; color: string }> = {
@@ -204,10 +203,10 @@ export function BillingClient({ overview }: Props) {
 
   const isOwner = data.canMutate;
 
-  async function handleSubscribe(plan: PlanId) {
+  async function handleSubscribe(plan: PlanId, interval: SubscriptionInterval = "monthly") {
     setBusy("subscribe");
     try {
-      const res = await getCheckoutUrl(plan);
+      const res = await getCheckoutUrl(plan, interval);
       if (res.error || !res.url) {
         if (res.error) toast.error(res.error);
         else router.push("/pricing");
@@ -281,20 +280,21 @@ export function BillingClient({ overview }: Props) {
     }
   }
 
-  async function handleChangePlan(plan: PlanId) {
+  async function handleChangePlan(plan: PlanId, interval: SubscriptionInterval) {
     setBusy("plan-change");
     try {
-      const res = await changePlan(plan);
+      const res = await changePlan(plan, interval);
       if (res.error) {
         toast.error(res.error);
         return;
       }
       setPlanOpen(false);
-      // Review 2026-08-05: plan changes register a PENDING update applied at
-      // the start of the next billing period (SDK `PendingSubscriptionUpdate`
-      // semantics) — the DB plan does NOT flip within the poll window, so
-      // polling for convergence would always time out silently. The Polar
-      // call succeeding IS the completion: confirm and refresh.
+      // Review 2026-08-05 + plan 2026-08-08 §4.7: plan/interval changes
+      // register a PENDING update applied at the start of the next billing
+      // period (SDK `PendingSubscriptionUpdate` semantics) — the DB does NOT
+      // flip within the poll window, so polling for convergence would always
+      // time out silently. The Polar call succeeding IS the completion:
+      // confirm and refresh.
       toast.success(`Plan change scheduled — takes effect at the start of your next billing cycle.`);
       finishSync();
     } finally {
@@ -383,7 +383,7 @@ export function BillingClient({ overview }: Props) {
             {bannerState === "trial" && trialPlanId && (
               <Button
                 size="sm"
-                onClick={() => handleSubscribe(trialPlanId)}
+                onClick={() => handleSubscribe(trialPlanId, "monthly")}
                 disabled={busy !== null}
                 style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
               >
@@ -422,6 +422,14 @@ export function BillingClient({ overview }: Props) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle>{data.planName}</CardTitle>
+              {data.interval && !data.isTrial && (
+                <span
+                  className="inline-flex h-5 items-center rounded-full px-2 text-xs font-medium"
+                  style={{ backgroundColor: "#F0F4F5", color: "#3D5F6B" }}
+                >
+                  {data.interval === "annual" ? "Annual" : "Monthly"}
+                </span>
+              )}
               <span
                 className="inline-flex h-5 items-center rounded-full px-2 text-xs font-medium"
                 style={{ backgroundColor: "#F0F4F5", color: "#6E97A7" }}
@@ -467,7 +475,7 @@ export function BillingClient({ overview }: Props) {
               {data.isTrial && data.polarEnabled && trialPlanId && (
                 <Button
                   size="sm"
-                  onClick={() => handleSubscribe(trialPlanId)}
+                  onClick={() => handleSubscribe(trialPlanId, "monthly")}
                   disabled={busy !== null}
                   style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
                 >
@@ -771,7 +779,7 @@ export function BillingClient({ overview }: Props) {
         </div>
       )}
 
-      {/* Change plan dialog */}
+      {/* Change plan dialog — 2×2 plan × interval matrix (plan 2026-08-08 §4.7) */}
       <Dialog open={planOpen} onOpenChange={setPlanOpen}>
         <DialogContent>
           <DialogHeader>
@@ -781,35 +789,42 @@ export function BillingClient({ overview }: Props) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            {(["solo", "practice"] as PlanId[]).map((plan) => {
-              const isCurrent = data.plan === plan;
-              const option = data.planOptions.find((o) => o.plan === plan);
+            {data.planOptions.map((option) => {
+              const isCurrent =
+                data.plan === option.plan && (data.interval ?? "monthly") === option.interval;
               return (
                 <button
-                  key={plan}
-                  onClick={() => handleChangePlan(plan)}
-                  disabled={busy !== null || isCurrent}
+                  key={`${option.plan}-${option.interval}`}
+                  onClick={() => handleChangePlan(option.plan, option.interval)}
+                  disabled={busy !== null || isCurrent || !option.available}
                   className="flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-[#F8FAFB] disabled:opacity-50"
                   style={{ borderColor: isCurrent ? "#6E97A7" : "rgba(0,0,0,0.12)", backgroundColor: isCurrent ? "#F0F4F5" : "#FFFFFF" }}
                 >
                   <div>
-                    <p className="text-sm font-medium" style={{ color: "#000000" }}>{PLAN_NAME[plan]}</p>
+                    <p className="text-sm font-medium" style={{ color: "#000000" }}>
+                      {PLAN_NAME[option.plan]}
+                      <span className="ml-1.5 text-xs font-normal" style={{ color: "rgba(0,0,0,0.55)" }}>
+                        {option.interval === "annual" ? "Annual" : "Monthly"}
+                      </span>
+                    </p>
                     <p className="text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>
-                      {option
+                      {option.available
                         ? `${option.maxStaff} staff · ${option.maxCredentials} credentials · ${option.maxUsers} ${option.maxUsers === 1 ? "user" : "users"} · ${option.reportLabel}`
-                        : ""}
+                        : "This billing option isn't available yet."}
                     </p>
                   </div>
                   <span className="text-sm font-medium" style={{ color: "#6E97A7" }}>
-                    {isCurrent ? "Current" : `${formatCurrency(PLAN_MONTHLY_PRICE[plan] * 100)}/mo`}
-                    {busy === "plan-change" ? "" : isCurrent ? "" : <ArrowRight className="ml-1 inline size-3.5" />}
+                    {isCurrent
+                      ? "Current"
+                      : `${formatCurrency(option.price * 100)}/${option.interval === "annual" ? "yr" : "mo"}`}
+                    {!isCurrent && option.available && busy !== "plan-change" ? <ArrowRight className="ml-1 inline size-3.5" /> : null}
                   </span>
                 </button>
               );
             })}
           </div>
           <p className="text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>
-            Data above the new plan&apos;s limits is preserved and suspended, not deleted.
+            Data above the new plan&apos;s limits is preserved and suspended, not deleted. Annual billing starts at your next billing cycle.
           </p>
           <DialogFooter>
             <DialogClose render={<Button variant="outline">Keep current plan</Button>} />

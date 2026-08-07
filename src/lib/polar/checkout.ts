@@ -1,14 +1,10 @@
 import { Polar } from "@polar-sh/sdk";
-import { polarConfig, APP_URL } from "./config";
+import { polarConfig, APP_URL, priceIdFor, productAvailable } from "./config";
 import { createPolarAdmin } from "./client";
+import type { SubscriptionInterval } from "@/lib/billing/copy";
 import * as Sentry from "@sentry/nextjs";
 
 export type PlanId = "solo" | "practice";
-
-const PRODUCT_PRICE_IDS: Record<PlanId, string> = {
-  solo: polarConfig.soloProductPriceId,
-  practice: polarConfig.practiceProductPriceId,
-};
 
 export interface CheckoutLinkResult {
   url: string | null;
@@ -17,10 +13,15 @@ export interface CheckoutLinkResult {
 
 // Price → product resolution: checkout sessions are created from PRODUCT ids
 // (verified in the SDK: `CheckoutCreate.products: Array<string>`), while the
-// environment configures PRICE ids. The two products' catalog is tiny, so a
-// single paginated products.list pass is the resolution — no extra env vars.
-export async function resolveProductIdFromPrice(polar: Polar, plan: PlanId): Promise<string | null> {
-  const priceId = PRODUCT_PRICE_IDS[plan];
+// environment configures PRICE ids. Four products (plan × interval — one
+// product per billing interval, `Product.recurringInterval`), so a single
+// paginated products.list pass per (plan, interval) is the resolution.
+export async function resolveProductIdFromPrice(
+  polar: Polar,
+  plan: PlanId,
+  interval: SubscriptionInterval,
+): Promise<string | null> {
+  const priceId = priceIdFor(plan, interval);
   if (!priceId) return null;
 
   const iterator = await polar.products.list({ isRecurring: true });
@@ -41,14 +42,21 @@ export async function resolveProductIdFromPrice(polar: Polar, plan: PlanId): Pro
 //     from the very first subscription.
 // allowTrial: false is deliberate — "Subscribe now" must skip the trial
 // (owner requirement: subscribing immediately never silently starts one).
+// Availability (B7): no checkout session is ever created for an unconfigured
+// product — the URL simply does not exist, so no fake checkout behavior and
+// no interval ever charges differently than the UI displays.
 export async function createCheckoutLink(
   plan: PlanId,
+  interval: SubscriptionInterval,
   customerId: string | undefined,
   metadata: Record<string, string>,
   customerEmail?: string,
 ): Promise<CheckoutLinkResult> {
   if (!polarConfig.enabled) {
     return { url: null, error: "Billing is not configured yet. Please try again later." };
+  }
+  if (!productAvailable(plan, interval)) {
+    return { url: null, error: `The ${interval === "annual" ? "annual" : "monthly"} option isn't available yet.` };
   }
 
   const polar = createPolarAdmin();
@@ -57,9 +65,9 @@ export async function createCheckoutLink(
   }
 
   try {
-    const productId = await resolveProductIdFromPrice(polar, plan);
+    const productId = await resolveProductIdFromPrice(polar, plan, interval);
     if (!productId) {
-      return { url: null, error: `No product configured for the ${plan} plan.` };
+      return { url: null, error: `No product configured for the ${plan} ${interval} plan.` };
     }
 
     const clinicId = metadata.clinic_id ?? "";
@@ -71,6 +79,7 @@ export async function createCheckoutLink(
       metadata: {
         clinic_id: clinicId,
         plan: metadata.plan ?? "",
+        interval,
       },
       successUrl: `${APP_URL}/dashboard/settings/billing?checkout=success`,
       returnUrl: `${APP_URL}/dashboard/settings/billing?checkout=cancelled`,
@@ -80,7 +89,7 @@ export async function createCheckoutLink(
 
     return { url: result.url, error: null };
   } catch (err) {
-    Sentry.captureException(err, { extra: { plan, metadata } });
+    Sentry.captureException(err, { extra: { plan, interval, metadata } });
     return { url: null, error: "Failed to create checkout link. Please try again." };
   }
 }

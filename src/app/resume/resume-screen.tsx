@@ -52,7 +52,10 @@ export function ResumeScreen({ clinicName, staffCount, credentialCount, plan, pl
     setLoadingPlan(planId);
     setError(null);
     try {
-      const res = await getCheckoutUrl(planId as "solo" | "practice");
+      // Reactivation default: monthly (matches the displayed "$29/$49 /mo"
+      // plan options). Interval choice for the full subscription lives on the
+      // pricing page toggle and the Billing change dialog.
+      const res = await getCheckoutUrl(planId as "solo" | "practice", "monthly");
       if (res.error) {
         setError(res.error);
       } else if (res.url) {

@@ -20,10 +20,15 @@ export default async function ResumePage() {
 
   if (!userRecord) redirect("/onboarding");
 
-  const [clinicRes, staffRes, credRes] = await Promise.all([
+  const [clinicRes, countsRes] = await Promise.all([
     supabase.from("clinics").select("name, plan, trial_plan").eq("id", userRecord.clinic_id).single(),
-    supabase.from("staff_members").select("id", { count: "exact", head: true }).eq("clinic_id", userRecord.clinic_id).is("deleted_at", null).is("suspended_at", null),
-    supabase.from("credentials").select("id", { count: "exact", head: true }).eq("clinic_id", userRecord.clinic_id).is("deleted_at", null).is("suspended_at", null),
+    // B6 (plan 2026-08-08) + review finding 5: count ALL preserved rows —
+    // suspended staff/credentials are still the clinic's data ("Everything you
+    // built is securely preserved"). A direct count through the RLS-scoped
+    // client is a no-op for revoked clinics (036 SELECT policies filter
+    // suspended_at IS NULL), so this runs through the scoped SECURITY DEFINER
+    // RPC (048/049 pattern — tenant from the session, never a caller arg).
+    supabase.rpc("count_preserved_clinic_data"),
   ]);
 
   if (clinicRes.error) redirect("/onboarding");
@@ -36,11 +41,12 @@ export default async function ResumePage() {
     { id: "practice", name: "Practice", monthly: 49 },
   ];
 
+  const counts = countsRes.data?.[0];
   return (
     <ResumeScreen
       clinicName={clinic.name}
-      staffCount={staffRes.count ?? 0}
-      credentialCount={credRes.count ?? 0}
+      staffCount={counts?.staff_count ?? 0}
+      credentialCount={counts?.credential_count ?? 0}
       plan={clinic.plan as "expired_trial" | "inactive"}
       plans={plans}
       polarEnabled={polarConfig.enabled}

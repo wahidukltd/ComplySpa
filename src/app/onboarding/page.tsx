@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
-import { createCheckoutLink } from "@/lib/polar/checkout";
+import { getCheckoutUrl } from "@/lib/actions/billing";
 import { OnboardingForm } from "./onboarding-form";
 import { completeInvitationSignup, restoreExistingAccount } from "@/lib/actions/onboarding";
 
@@ -29,7 +29,7 @@ export default async function OnboardingPage(props: { searchParams: Promise<{ pl
     if (validPlan) {
       const { data: clinic } = await supabase
         .from("clinics")
-        .select("plan, trial_plan, polar_customer_id")
+        .select("plan, trial_plan")
         .eq("id", existingUser.clinic_id)
         .single();
 
@@ -42,13 +42,18 @@ export default async function OnboardingPage(props: { searchParams: Promise<{ pl
         ) {
           redirect("/dashboard");
         }
-        const result = await createCheckoutLink(validPlan, clinic.polar_customer_id ?? undefined, {
-          clinic_id: existingUser.clinic_id,
-          plan: validPlan,
-        });
-        if (result?.url) {
+        // Finding 6 (security review 2026-08-08): this is a third checkout
+        // entry point on the same money path — route through the owner-gated
+        // getCheckoutUrl server action (owner role + shouldBlockNewCheckout +
+        // productAvailable), never a direct createCheckoutLink call.
+        const result = await getCheckoutUrl(validPlan, "monthly");
+        if (result.url) {
           redirect(result.url);
         }
+        // Finding 19: a truthful fallback instead of silently landing on the
+        // dashboard when no checkout URL can be created (unconfigured or
+        // unavailable product — the common case pre-approval).
+        redirect("/pricing?reason=unavailable");
       }
     }
     redirect("/dashboard");

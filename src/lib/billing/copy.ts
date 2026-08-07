@@ -6,10 +6,26 @@ import type { ReportTier } from "@/lib/utils/entitlements";
 
 export type PlanId = "solo" | "practice";
 
+// Billing cycle dimension (plan 2026-08-08 §4.7/B7): the subscription model
+// understands plan + interval independently. Entitlements derive from plan
+// only; interval is a billing-cycle dimension (one Polar product per
+// interval). Published prices are display-only until a live Polar amount is
+// projected (live-amount-wins pattern in the overview).
+export type SubscriptionInterval = "monthly" | "annual";
+
 export const PLAN_MONTHLY_PRICE: Record<PlanId, number> = {
   solo: 29,
   practice: 49,
 };
+
+export const PLAN_ANNUAL_PRICE: Record<PlanId, number> = {
+  solo: 290,
+  practice: 490,
+};
+
+export function planPrice(plan: PlanId, interval: SubscriptionInterval): number {
+  return interval === "annual" ? PLAN_ANNUAL_PRICE[plan] : PLAN_MONTHLY_PRICE[plan];
+}
 
 export const PLAN_NAME: Record<PlanId, string> = {
   solo: "Solo",
@@ -143,7 +159,9 @@ export function bannerCopy(state: BannerState, input: BannerInput): { title: str
 }
 
 // Next-charge line: amount + date + frequency together (research: shown in one
-// line, never hunted for). Live Polar amount wins; published price is the fallback.
+// line, never hunted for). Live Polar amount wins; published price is the
+// fallback. Interval-aware (plan 2026-08-08 §4.7): annual subscriptions show
+// the annual amount with the annual cadence, monthly unchanged.
 export function nextChargeLine(opts: {
   plan: string;
   priceCents: number | null;
@@ -153,6 +171,7 @@ export function nextChargeLine(opts: {
   trialPlan: string | null;
   trialEndDate: string | null;
   currency?: string | null;
+  interval?: SubscriptionInterval | null;
 }): string {
   const currency = opts.currency ?? "usd";
   const amount = opts.priceCents != null ? formatCurrency(opts.priceCents, currency) : formatCurrency(opts.priceDollars * 100, currency);
@@ -160,7 +179,8 @@ export function nextChargeLine(opts: {
     const planLabel = opts.trialPlan === "solo" || opts.trialPlan === "practice" ? PLAN_NAME[opts.trialPlan] : null;
     return `Trial of ${planLabel ?? "your plan"} — ${amount}/mo after ${formatDateOnly(opts.trialEndDate)}`;
   }
-  return `Next charge ${amount} on ${formatDateOnly(opts.periodEnd)}`;
+  const cadence = opts.interval === "annual" ? "annual charge" : "charge";
+  return `Next ${cadence} ${amount} on ${formatDateOnly(opts.periodEnd)}`;
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
