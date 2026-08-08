@@ -73,7 +73,7 @@ export function StaffTableWrapper({
       <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove {pendingDelete?.name}?</DialogTitle>
+            {pendingDelete && <DialogTitle>Remove {pendingDelete.name}?</DialogTitle>}
             <DialogDescription>
               They&apos;ll be removed from your roster immediately. Their credential records stay on file — you can
               add this person back at any time. This can&apos;t be undone from this screen.

@@ -68,7 +68,7 @@ export default async function StaffDetailPage({
 
   const onboardingRes = await getStaffOnboarding(id);
   const onboardingFailed = "error" in onboardingRes;
-  if (onboardingFailed) Sentry.captureException(new Error(onboardingRes.error));
+  if (onboardingFailed && onboardingRes.error) Sentry.captureMessage(onboardingRes.error);
   const onboardingItems = ("items" in onboardingRes ? onboardingRes.items : []) ?? [];
   const onboardingProgress = ("progress" in onboardingRes ? onboardingRes.progress : undefined) ?? {
     total: 0, completed: 0, skipped: 0, pending: 0,

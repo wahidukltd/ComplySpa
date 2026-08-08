@@ -90,7 +90,7 @@ export default async function StaffListPage() {
         staff={(staff ?? []) as Tables<"staff_members">[]}
         readinessMap={readinessMap}
         onboardingState={onboardingState}
-        dataUnavailable={dataUnavailable || !!staffQueryError}
+        dataUnavailable={dataUnavailable}
         canEdit={userRecord.role !== "viewer"}
         roleOptions={roleOptions}
       />

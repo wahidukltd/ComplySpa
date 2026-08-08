@@ -11,16 +11,12 @@ import { getCredentialStatus } from "@/lib/utils/status";
 import { PlanLimitError } from "@/lib/utils/errors";
 import * as Sentry from "@sentry/nextjs";
 
-/** Map the enforce_plan_limits trigger's ND0MV (race-window backstop) to the
- * same friendly message the app-level count check returns. The count check
- * usually fires first; when two concurrent inserts race past it, the trigger
- * rejects the loser — the user must see the limit message, not a generic
- * failure. */
-function planLimitErrorMessage(error: { code?: string; message?: string } | null): string | null {
-  if (error?.code === "ND0MV" || error?.message?.includes("Plan limit reached")) {
-    return "Your plan has reached its limit. Upgrade to add more.";
-  }
-  return null;
+/** Detect the enforce_plan_limits trigger's ND0MV (race-window backstop) or
+ * the app-level "Plan limit reached" message. The count check usually fires
+ * first; when two concurrent inserts race past it, the trigger rejects the
+ * loser — the caller must surface the limit message, not a generic failure. */
+function isPlanLimitError(error: { code?: string; message?: string } | null): boolean {
+  return error?.code === "ND0MV" || (error?.message?.includes("Plan limit reached") ?? false);
 }
 
 /** Map the 057 enforce_staff_role_template trigger's P0001 message to friendly
@@ -92,8 +88,7 @@ export async function addStaffMember(input: StaffMemberInput) {
     Sentry.captureException(error);
     const roleError = staffRoleErrorMessage(error);
     if (roleError) return { success: false, error: roleError };
-    const limitError = planLimitErrorMessage(error);
-    if (limitError) return { success: false, error: "Your plan has reached its staff limit. Upgrade to add more." };
+    if (isPlanLimitError(error)) return { success: false, error: "Your plan has reached its staff limit. Upgrade to add more." };
     return { success: false, error: "Failed to add staff member. Please try again." };
   }
 
@@ -366,8 +361,7 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
     Sentry.captureException(staffError);
     const roleError = staffRoleErrorMessage(staffError);
     if (roleError) return { success: false, error: roleError };
-    const limitError = planLimitErrorMessage(staffError);
-    if (limitError) return { success: false, error: "Your plan has reached its staff limit. Upgrade to add more." };
+    if (isPlanLimitError(staffError)) return { success: false, error: "Your plan has reached its staff limit. Upgrade to add more." };
     return { success: false, error: "Failed to add staff member. Please try again." };
   }
 
@@ -401,8 +395,7 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
     if (credError) {
       Sentry.captureException(credError);
       await supabase.rpc("soft_delete_staff_member", { p_staff_id: staff.id, p_clinic_id: clinicId });
-      const limitError = planLimitErrorMessage(credError);
-      if (limitError) return { success: false, error: "Your plan has reached its credential limit. Upgrade to add more." };
+      if (isPlanLimitError(credError)) return { success: false, error: "Your plan has reached its credential limit. Upgrade to add more." };
       return { success: false, error: "Failed to add credentials. Staff member was not created." };
     }
   }
