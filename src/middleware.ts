@@ -91,15 +91,17 @@ export default async function middleware(req: NextRequest) {
 
   const plan = clinics?.[0]?.plan ?? "trial";
   const trialPlan = clinics?.[0]?.trial_plan ?? null;
-  const { blocked, canManageUsers } = getEntitlements(plan, trialPlan);
+  const { blocked } = getEntitlements(plan, trialPlan);
 
   if (blocked && pathname !== "/resume" && !pathname.startsWith("/api/")) {
     return NextResponse.redirect(new URL("/resume", req.url));
   }
 
-  if (!canManageUsers && pathname.startsWith("/dashboard/settings/users")) {
-    return NextResponse.redirect(new URL("/pricing?reason=plan_upgrade_required", req.url));
-  }
+  // Plan 2026-08-08 (owner decision): the Users tab is viewable read-only on
+  // every active plan (solo shows 1/1 seats + upgrade CTA). The old
+  // canManageUsers route gate is removed — all invite/remove/role mutations
+  // remain owner-only in the server actions AND RLS, so view access cannot
+  // weaken enforcement.
 
   return res;
 }

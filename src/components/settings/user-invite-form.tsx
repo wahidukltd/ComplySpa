@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 
-export function UserInviteForm() {
+export function UserInviteForm({ seatsAvailable }: { seatsAvailable: number }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("manager");
@@ -77,7 +77,8 @@ export function UserInviteForm() {
         </Button>
       </div>
       <p className="text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>
-        Invited colleagues sign up with this email and are linked to your clinic automatically.
+        {seatsAvailable} seat{seatsAvailable === 1 ? "" : "s"} remaining. Invited colleagues sign up with this email
+        and are linked to your clinic automatically — a pending invitation holds a seat until accepted or removed.
       </p>
     </form>
   );

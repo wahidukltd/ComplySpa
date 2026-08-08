@@ -14,6 +14,7 @@ import { UserList } from "@/components/settings/user-list";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { getAlertRecipients, getCredentialTypes, getClinicUsers } from "@/lib/actions/settings";
 import { getEntitlements } from "@/lib/utils/entitlements";
+import { deriveSeatSummary } from "@/lib/utils/seats";
 
 export const dynamic = "force-dynamic";
 
@@ -50,18 +51,31 @@ export default async function SettingsPage({
     getClinicUsers(),
   ]);
 
-  const { canManageUsers, canManageAlertRecipients } = getEntitlements(clinic.plan, clinic.trial_plan);
+  const { canManageUsers, canManageAlertRecipients, maxUsers } = getEntitlements(clinic.plan, clinic.trial_plan);
   const ownerEmail = usersResult.users.find((u) => u.role === "owner")?.email ?? null;
+
+  // Seat summary (plan 2026-08-08): derived from the same active-only user
+  // list the trigger and billing page count, so the UI can never drift.
+  const seatSummary = deriveSeatSummary(usersResult.users, maxUsers);
+
+  // Plan label for the seat card (trial resolves via trial_plan).
+  const planLabel =
+    clinic.plan === "trial"
+      ? `trial of ${clinic.trial_plan === "practice" ? "Practice" : "Solo"}`
+      : clinic.plan === "practice"
+        ? "Practice"
+        : "Solo";
 
   // Sanitize the deep-link tab against the tabs actually rendered for this
   // session (review-team finding 2026-08-08): an entitlement-gated tab value
-  // (e.g. ?tab=users on a solo plan) must fall back to profile instead of
-  // rendering a dead tab state.
+  // must fall back to profile instead of rendering a dead tab state. The
+  // Users tab is visible to EVERY active plan (owner decision 2026-08-08 —
+  // solo sees it read-only with an upgrade CTA); mutations stay gated.
   const allowedTabs = [
     "profile",
     "credential-types",
+    "users",
     ...(canManageAlertRecipients ? ["recipients"] : []),
-    ...(canManageUsers ? ["users"] : []),
   ];
   const defaultTab = tab && allowedTabs.includes(tab) ? tab : "profile";
 
@@ -92,7 +106,7 @@ export default async function SettingsPage({
           <TabsTrigger value="profile">Clinic Profile</TabsTrigger>
           {canManageAlertRecipients && <TabsTrigger value="recipients">Alert Recipients</TabsTrigger>}
           <TabsTrigger value="credential-types">Credential Types</TabsTrigger>
-          {canManageUsers && <TabsTrigger value="users">Users</TabsTrigger>}
+          <TabsTrigger value="users">Users</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-4">
@@ -122,16 +136,31 @@ export default async function SettingsPage({
           />
         </TabsContent>
 
-        {canManageUsers && (
-          <TabsContent value="users" className="mt-4 space-y-4">
-            {userRecord.role === "owner" && <UserInviteForm />}
-            <UserList
-              users={usersResult.users}
-              currentUserId={userRecord.id}
-              currentUserRole={userRecord.role}
-            />
-          </TabsContent>
-        )}
+        <TabsContent value="users" className="mt-4 space-y-4">
+          {userRecord.role === "owner" && canManageUsers && (
+            seatSummary.available > 0 && !seatSummary.overLimit ? (
+              <UserInviteForm seatsAvailable={seatSummary.available} />
+            ) : (
+              <div className="rounded-lg border p-4" style={{ borderColor: "rgba(0,0,0,0.12)", backgroundColor: "#FBF0E0" }}>
+                <p className="text-sm font-medium" style={{ color: "#7A4E1F" }}>
+                  {seatSummary.overLimit
+                    ? `Currently over the ${planLabel} seat limit — remove members to free seats.`
+                    : seatSummary.pending > 0
+                      ? "All seats are in use — 1 or more is held by a pending invitation."
+                      : "All seats are in use. Remove a member or upgrade to invite more."}
+                </p>
+              </div>
+            )
+          )}
+          <UserList
+            users={usersResult.users}
+            currentUserId={userRecord.id}
+            currentUserRole={userRecord.role}
+            seatSummary={seatSummary}
+            maxUsers={maxUsers}
+            planLabel={planLabel}
+          />
+        </TabsContent>
       </SettingsTabs>
     </div>
   );

@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Toaster } from "sonner";
@@ -32,17 +31,15 @@ export default async function DashboardLayout({
 
   if (!clinic) redirect("/onboarding");
 
-  const { blocked, canManageUsers } = getEntitlements(clinic.plan, clinic.trial_plan);
+  const { blocked } = getEntitlements(clinic.plan, clinic.trial_plan);
 
   if (blocked) {
     redirect("/resume");
   }
 
-  const headersList = await headers();
-  const pathname = headersList.get("x-pathname") ?? "";
-  if (!canManageUsers && pathname.startsWith("/dashboard/settings/users")) {
-    redirect("/pricing?reason=plan_upgrade_required");
-  }
+  // Plan 2026-08-08 (owner decision): the Users tab is viewable read-only on
+  // every active plan; mutations stay owner-only in actions + RLS, so no
+  // per-plan route gate is needed here.
 
   return (
     <>
