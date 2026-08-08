@@ -140,17 +140,15 @@ export default async function SettingsPage({
           {userRecord.role === "owner" && canManageUsers && (
             seatSummary.available > 0 && !seatSummary.overLimit ? (
               <UserInviteForm seatsAvailable={seatSummary.available} />
-            ) : (
+            ) : !seatSummary.overLimit ? (
               <div className="rounded-lg border p-4" style={{ borderColor: "rgba(0,0,0,0.12)", backgroundColor: "#FBF0E0" }}>
                 <p className="text-sm font-medium" style={{ color: "#7A4E1F" }}>
-                  {seatSummary.overLimit
-                    ? `Currently over the ${planLabel} seat limit — remove members to free seats.`
-                    : seatSummary.pending > 0
-                      ? "All seats are in use — 1 or more is held by a pending invitation."
-                      : "All seats are in use. Remove a member or upgrade to invite more."}
+                  {seatSummary.pending > 0
+                    ? "All seats are in use — 1 or more is held by a pending invitation."
+                    : "All seats are in use. Remove a member or upgrade to invite more."}
                 </p>
               </div>
-            )
+            ) : null
           )}
           <UserList
             users={usersResult.users}

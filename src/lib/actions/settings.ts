@@ -1,6 +1,7 @@
 "use server";
 
 import "server-only";
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getClinicIdAndUser } from "@/lib/utils/clinic";
@@ -427,6 +428,14 @@ export async function inviteUser(input: InviteUserInput) {
     .select("id")
     .maybeSingle();
   if (inviteErr) {
+    if (inviteErr.code === "ND0MV") {
+      // Seat-race loser at the boundary: both concurrent invites passed the
+      // app count check, the advisory-locked trigger serialized them and the
+      // loser hits the plan limit. Expected outcome, not an anomaly — return
+      // the same friendly message the app check would have (review-team
+      // finding 2026-08-08: no submit-and-fail loop).
+      return { success: false, error: "User limit reached for your plan. Upgrade to add more users." };
+    }
     if (inviteErr.code === "23505") {
       // Race loser (migration 056 index / users_email_unique): the other
       // request won. Re-read the surviving row (case-insensitive — the
@@ -557,6 +566,12 @@ export async function updateUserRole(id: string, role: "manager" | "viewer") {
   const user = await getAuth();
   if (!user) return { success: false, error: "Unauthorized" };
   if (user.role !== "owner") return { success: false, error: "Only the owner can change roles" };
+
+  // Runtime validation at the boundary (review-team finding 2026-08-08): the
+  // TS type alone is not enforcement — a crafted call with role='owner'
+  // would be accepted by the DB CHECK and grant co-ownership.
+  const parsedRole = z.enum(["manager", "viewer"]).safeParse(role);
+  if (!parsedRole.success) return { success: false, error: "Validation failed" };
 
   const supabase = await createClient();
 

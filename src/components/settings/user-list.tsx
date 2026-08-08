@@ -67,7 +67,7 @@ function SeatSummaryCard({
 
       <div
         role="progressbar"
-        aria-valuenow={seatSummary.used}
+        aria-valuenow={Math.min(seatSummary.used, maxUsers)}
         aria-valuemin={0}
         aria-valuemax={maxUsers}
         aria-label="Seats used"

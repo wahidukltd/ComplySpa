@@ -504,7 +504,7 @@ export function BillingClient({ overview }: Props) {
               className="mt-2 h-1.5 w-full overflow-hidden rounded-full"
               style={{ backgroundColor: "#F0F4F5" }}
               role="progressbar"
-              aria-valuenow={data.usage.users}
+              aria-valuenow={Math.min(data.usage.users, data.entitlements.maxUsers)}
               aria-valuemin={0}
               aria-valuemax={data.entitlements.maxUsers}
               aria-label="User seats used"

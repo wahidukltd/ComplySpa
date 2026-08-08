@@ -11,6 +11,11 @@ const eslintConfig = defineConfig([
     "supabase/functions/**",
     "clerk-cli/**",
     "src/types/database.ts",
+    // Agent tooling — not application code (impeccable + other skills ship
+    // detector scripts that trip no-unused-vars/no-unused-expressions).
+    ".opencode/**",
+    ".claude/**",
+    ".agents/**",
   ]),
   ...nextVitals,
   ...nextTs,

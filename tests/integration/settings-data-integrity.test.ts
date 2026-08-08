@@ -258,12 +258,16 @@ describe("Seat enforcement (plan 2026-08-08 — backend authoritative)", () => {
 
   afterAll(async () => {
     await serviceClient.from("clinics").delete().in("id", [clinicSId]);
-    // Restore clinic C's seat count for any later runs of this file.
+    // Restore clinic C's seat count for any later runs of this file
+    // (review-team fix 2026-08-08): soft-delete the rows this describe
+    // actually created — seat-a was already removed by the remove-frees-seat
+    // test; seat-b is the surviving residue.
     await serviceClient
       .from("users")
       .update({ deleted_at: new Date().toISOString() })
       .eq("clinic_id", clinicCId)
-      .eq("email", "seat@seats.test");
+      .ilike("email", "seat-%@seats.test")
+      .is("deleted_at", null);
   });
 
   it("solo (1/1): a second user row is blocked by the trigger — ND0MV even though RLS would allow the owner insert", async () => {
@@ -303,7 +307,7 @@ describe("Seat enforcement (plan 2026-08-08 — backend authoritative)", () => {
     expect(count).toBe(3);
   });
 
-  it("practice: removing a member frees a seat — re-invite succeeds after soft-remove", async () => {
+  it("practice: removing a member frees a seat (review-team fix — proves headroom directly)", async () => {
     const { data: target } = await serviceClient
       .from("users")
       .select("id")
@@ -316,10 +320,23 @@ describe("Seat enforcement (plan 2026-08-08 — backend authoritative)", () => {
     });
     expect(remove.status).toBe(200);
 
+    // The soft-delete freed a seat: the count drops 3/3 -> 2/3…
+    const { count: afterRemove } = await serviceClient
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .eq("clinic_id", clinicCId)
+      .is("deleted_at", null);
+    expect(afterRemove).toBe(2);
+
+    // …re-inserting the removed address is rejected at the DB path while the
+    // seat is free (users_email_unique keeps the soft-deleted row's address —
+    // the action revives it, which is why the raw insert can only be 409)…
     const reInvite = await fetchAsUser(ownerC, "users", { method: "POST", body: { clinic_id: clinicCId, email: "seat-a@seats.test", role: "viewer" } });
-    // users_email_unique keeps the soft-deleted row's address — the action
-    // revives it; at the DB path the insert is rejected, which is the
-    // documented reason inviteUser revives instead of inserting.
-    expect([201, 409]).toContain(reInvite.status);
+    expect(reInvite.status).toBe(409);
+
+    // …and a FRESH invite is accepted by the trigger (201) — direct proof
+    // the removal freed a seat.
+    const fresh = await fetchAsUser(ownerC, "users", { method: "POST", body: { clinic_id: clinicCId, email: "seat-d@seats.test", role: "viewer" } });
+    expect(fresh.status).toBe(201);
   });
 });
