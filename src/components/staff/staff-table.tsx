@@ -121,6 +121,20 @@ export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState
     });
   }, [staff, search, roleFilter, statusFilter, readinessMap, onboardingState]);
 
+  if (dataUnavailable) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-muted-foreground/20 bg-muted/20 px-4 py-3">
+        <AlertTriangle className="size-5 shrink-0 text-muted-foreground" />
+        <div>
+          <p className="text-sm font-medium">Compliance data unavailable</p>
+          <p className="text-xs text-muted-foreground">
+            Work readiness could not be computed. Try refreshing to see staff statuses.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (staff.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
@@ -133,17 +147,6 @@ export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState
 
   return (
     <div className="space-y-4">
-      {dataUnavailable && (
-        <div className="flex items-center gap-3 rounded-lg border border-muted-foreground/20 bg-muted/20 px-4 py-3">
-          <AlertTriangle className="size-5 shrink-0 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-medium">Compliance data unavailable</p>
-            <p className="text-xs text-muted-foreground">
-              Work readiness could not be computed. Try refreshing to see staff statuses.
-            </p>
-          </div>
-        </div>
-      )}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />

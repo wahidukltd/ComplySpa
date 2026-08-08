@@ -14,6 +14,7 @@ import type { ReadinessResult } from "@/lib/staff/readiness";
 import { SyncStaffToTemplateButton } from "@/components/staff/sync-staff-to-template-button";
 import { Pencil, Plus, Paperclip, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,7 @@ export default async function StaffDetailPage({
 
   const onboardingRes = await getStaffOnboarding(id);
   const onboardingFailed = "error" in onboardingRes;
+  if (onboardingFailed) Sentry.captureException(new Error(onboardingRes.error));
   const onboardingItems = ("items" in onboardingRes ? onboardingRes.items : []) ?? [];
   const onboardingProgress = ("progress" in onboardingRes ? onboardingRes.progress : undefined) ?? {
     total: 0, completed: 0, skipped: 0, pending: 0,
