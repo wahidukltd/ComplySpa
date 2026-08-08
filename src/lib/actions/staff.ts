@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { staffMemberSchema, addStaffWithCredentialsSchema, type StaffMemberInput, type AddStaffWithCredentialsInput } from "@/lib/validations/staff";
 import { createOnboardingItems, reconcileOnboardingItemsToRole } from "@/lib/staff/onboarding";
+import { getResolvedTemplate } from "@/lib/staff/role-templates";
+import { roleNameSchema } from "@/lib/utils/roles";
+import type { StaffWizardData } from "@/lib/staff/wizard";
 import { getClinicIdAndPlan } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
 import { getCredentialStatus } from "@/lib/utils/status";
@@ -405,6 +408,111 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
   revalidatePath("/dashboard/onboarding");
   revalidatePath("/dashboard");
   return { success: true, id: staff.id };
+}
+
+/** One round-trip load for the staff wizard: clinic-accessible credential
+ * types (with renewal cycles), template-backed custom roles, and — when a
+ * role is selected — its credential suggestions resolved through the SAME
+ * getResolvedTemplate engine createOnboardingItems uses (clinic-wins,
+ * zero-item templates resolve to empty). The wizard never re-implements
+ * template resolution, so what it suggests is exactly what onboarding will
+ * generate. */
+export async function getStaffWizardData(
+  role: string | null,
+): Promise<{ data: StaffWizardData | null; error: string | null }> {
+  const clinicData = await getClinicIdAndPlan();
+  if (!clinicData) return { data: null, error: "Unauthorized" };
+  const { clinicId, userId } = clinicData;
+
+  const supabase = await createClient();
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("role")
+    .eq("auth_user_id", userId)
+    .maybeSingle();
+  if (!user) return { data: null, error: "Unauthorized" };
+  if (user.role === "viewer") return { data: null, error: "Insufficient permissions" };
+
+  // Role-format check first — a malformed value must fail before any data
+  // access (parity with getRoleChangePreview / syncStaffToRoleTemplate).
+  let parsedRole: string | null = null;
+  if (role) {
+    const parsed = roleNameSchema.safeParse(role);
+    if (!parsed.success) return { data: null, error: "Invalid role name." };
+    parsedRole = parsed.data;
+  }
+
+  const { data: typeRows, error: typeErr } = await supabase
+    .from("credential_types")
+    .select("id, name, category, default_renewal_cycle_days")
+    .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`)
+    .order("name");
+  if (typeErr) {
+    Sentry.captureException(typeErr);
+    return { data: null, error: "Failed to load credential types." };
+  }
+
+  const { data: templateRows, error: templateErr } = await supabase
+    .from("role_templates")
+    .select("role, clinic_id")
+    .is("is_active", true)
+    .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
+  if (templateErr) {
+    Sentry.captureException(templateErr);
+    return { data: null, error: "Failed to load role templates." };
+  }
+
+  const globalRoles = new Set(
+    (templateRows ?? []).filter((t) => t.clinic_id === null).map((t) => t.role),
+  );
+  const customRoles = (templateRows ?? [])
+    .filter((t) => t.clinic_id !== null && !globalRoles.has(t.role))
+    .map((t) => t.role)
+    .sort();
+
+  const types: StaffWizardData["types"] = (typeRows ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    category: t.category ?? "other",
+    defaultRenewalCycleDays: t.default_renewal_cycle_days,
+  }));
+  const renewalByType = new Map(types.map((t) => [t.id, t.defaultRenewalCycleDays]));
+
+  let suggestions: StaffWizardData["suggestions"] = [];
+  if (parsedRole) {
+    let template;
+    try {
+      template = await getResolvedTemplate(clinicId, parsedRole);
+    } catch (err) {
+      Sentry.captureException(err);
+      return { data: null, error: "Failed to load role template." };
+    }
+    // No template row → an honest error (same copy as getTemplateSyncPreview /
+    // getRoleChangePreview): a role whose template was deleted mid-session
+    // must NOT render as "no credentials required" — the DB trigger would
+    // reject the hire anyway. The wizard surfaces this on the step-2 error
+    // path with Retry; Next stays blocked.
+    if (!template) return { data: null, error: "Role template not found." };
+    suggestions = [
+      ...template.required.map((r) => ({
+        credentialTypeId: r.credentialTypeId,
+        name: r.name,
+        category: r.category,
+        isRequired: true,
+        renewalDays: renewalByType.get(r.credentialTypeId) ?? null,
+      })),
+      ...template.optional.map((o) => ({
+        credentialTypeId: o.credentialTypeId,
+        name: o.name,
+        category: o.category,
+        isRequired: false,
+        renewalDays: renewalByType.get(o.credentialTypeId) ?? null,
+      })),
+    ];
+  }
+
+  return { data: { types, customRoles, suggestions }, error: null };
 }
 
 

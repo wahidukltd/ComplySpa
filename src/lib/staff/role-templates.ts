@@ -3,8 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 export interface ResolvedTemplate {
   templateId: string;
   clinicId: string | null;
-  required: { credentialTypeId: string; name: string }[];
-  optional: { credentialTypeId: string; name: string }[];
+  required: { credentialTypeId: string; name: string; category: string }[];
+  optional: { credentialTypeId: string; name: string; category: string }[];
 }
 
 interface TemplateRow {
@@ -19,6 +19,7 @@ interface TemplateItemRow {
   sort_order: number;
   credential_type_id: string;
   credential_type_name: string;
+  category: string;
 }
 
 /** Resolve templates for the given roles: the clinic's override row wins per
@@ -60,7 +61,7 @@ async function fetchResolvedTemplates(
       is_required,
       sort_order,
       credential_type_id,
-      credential_type:credential_types!role_template_items_credential_type_id_fkey(name)
+      credential_type:credential_types!role_template_items_credential_type_id_fkey(name, category)
     `)
     .in("template_id", templateIds);
 
@@ -73,6 +74,7 @@ async function fetchResolvedTemplates(
       sort_order: item.sort_order,
       credential_type_id: item.credential_type_id,
       credential_type_name: item.credential_type?.name ?? "Unknown",
+      category: item.credential_type?.category ?? "other",
     });
     itemsByTemplate.set(item.template_id, bucket);
   }
@@ -87,10 +89,18 @@ async function fetchResolvedTemplates(
       clinicId: template.clinic_id,
       required: roleItems
         .filter((r) => r.is_required)
-        .map((r) => ({ credentialTypeId: r.credential_type_id, name: r.credential_type_name })),
+        .map((r) => ({
+          credentialTypeId: r.credential_type_id,
+          name: r.credential_type_name,
+          category: r.category,
+        })),
       optional: roleItems
         .filter((r) => !r.is_required)
-        .map((r) => ({ credentialTypeId: r.credential_type_id, name: r.credential_type_name })),
+        .map((r) => ({
+          credentialTypeId: r.credential_type_id,
+          name: r.credential_type_name,
+          category: r.category,
+        })),
     });
   }
 
