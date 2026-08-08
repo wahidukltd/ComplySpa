@@ -1,11 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
-vi.mock("@/lib/staff/role-templates", () => ({ getResolvedTemplate: vi.fn() }));
+vi.mock("@/lib/staff/role-templates", () => ({
+  getResolvedTemplate: vi.fn(),
+  getResolvedTemplatesBulk: vi.fn(async () => ({})),
+}));
 
 import { createClient } from "@/lib/supabase/server";
 import { getResolvedTemplate } from "@/lib/staff/role-templates";
-import { getStaffReadiness } from "@/lib/staff/readiness";
+import { getStaffReadiness, getStaffReadinessBulk } from "@/lib/staff/readiness";
 
 describe("getStaffReadiness error contract", () => {
   it("returns null when the staff query fails (never a false 'pending')", async () => {
@@ -68,5 +71,46 @@ describe("getStaffReadiness error contract", () => {
     });
     const result = await getStaffReadiness("staff-1");
     expect(result).toBeNull();
+  });
+});
+
+describe("role-less staff semantics", () => {
+  it("single: a staff member with no role derives pending, never ready", async () => {
+    (createClient as ReturnType<typeof vi.fn>).mockResolvedValue({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            is: () => ({
+              is: () => ({
+                single: async () => ({ data: { id: "staff-1", role: null, clinic_id: "clinic-1" }, error: null }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    });
+    const result = await getStaffReadiness("staff-1");
+    expect(result?.status).toBe("pending");
+  });
+
+  it("bulk: a role-less staff member in a set derives pending", async () => {
+    (createClient as ReturnType<typeof vi.fn>).mockResolvedValue({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            in: () => ({
+              is: () => ({
+                is: () => ({
+                  then: async (resolve: (v: unknown) => void) =>
+                    resolve({ data: [{ id: "staff-1", role: null, clinic_id: "clinic-1" }], error: null }),
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    });
+    const result = await getStaffReadinessBulk(["staff-1"], "clinic-1");
+    expect(result["staff-1"]?.status).toBe("pending");
   });
 });

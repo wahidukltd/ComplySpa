@@ -256,8 +256,10 @@ export default async function StaffDetailPage({
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
               <div>
-                <p className="font-medium text-muted-foreground">Pending — no credentials tracked yet</p>
-                {canEdit && (
+                <p className="font-medium text-muted-foreground">
+                  {staff.role ? "Pending — no credentials tracked yet" : "No role assigned — requirements not generated yet"}
+                </p>
+                {canEdit && staff.role && (
                   <Link
                     href={`/dashboard/staff/${id}/credentials/new`}
                     className="mt-1 inline-block text-xs text-primary hover:underline"
@@ -289,6 +291,14 @@ export default async function StaffDetailPage({
                 ? "No requirements generated for this role yet."
                 : "Assign a role to generate requirements."}
             </p>
+            {canEdit && !staff.role && (
+              <Link
+                href={`/dashboard/staff/${id}/edit`}
+                className="mt-2 inline-block text-xs text-primary hover:underline"
+              >
+                Assign a role
+              </Link>
+            )}
             {staff.role && canEdit && (
               <div className="mt-3">
                 <SyncStaffToTemplateButton staffMemberId={id} />

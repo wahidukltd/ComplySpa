@@ -106,7 +106,10 @@ export async function getStaffReadiness(staffMemberId: string): Promise<Readines
     }
 
     if (!staff || !staff.role) {
-      return { status: "ready", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
+      // Role-less: nothing is tracked yet — "pending", never a green "ready"
+      // (plan 2026-08-09: Work Ready would claim readiness with zero
+      // requirements; the checklist directs the admin to assign a role).
+      return { status: "pending", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
     }
 
     const template = await getResolvedTemplate(staff.clinic_id, staff.role);
@@ -218,7 +221,9 @@ export async function getStaffReadinessBulk(
 
       const role = staffInfo?.role ?? null;
       if (!role) {
-        result[id] = { status: "ready", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
+        // Role-less: nothing is tracked yet — "pending", never a green "ready"
+        // (plan 2026-08-09, same rule as the single variant).
+        result[id] = { status: "pending", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
         continue;
       }
 
