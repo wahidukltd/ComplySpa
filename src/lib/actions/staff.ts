@@ -11,6 +11,18 @@ import { getCredentialStatus } from "@/lib/utils/status";
 import { PlanLimitError } from "@/lib/utils/errors";
 import * as Sentry from "@sentry/nextjs";
 
+/** Map the enforce_plan_limits trigger's ND0MV (race-window backstop) to the
+ * same friendly message the app-level count check returns. The count check
+ * usually fires first; when two concurrent inserts race past it, the trigger
+ * rejects the loser — the user must see the limit message, not a generic
+ * failure. */
+function planLimitErrorMessage(error: { code?: string; message?: string } | null): string | null {
+  if (error?.code === "ND0MV" || error?.message?.includes("Plan limit reached")) {
+    return "Your plan has reached its limit. Upgrade to add more.";
+  }
+  return null;
+}
+
 /** Map the 057 enforce_staff_role_template trigger's P0001 message to friendly
  * copy. The UI only offers roles with templates, so this fires on crafted or
  * manual requests — the error must name the cause, not a generic failure. */
@@ -80,6 +92,8 @@ export async function addStaffMember(input: StaffMemberInput) {
     Sentry.captureException(error);
     const roleError = staffRoleErrorMessage(error);
     if (roleError) return { success: false, error: roleError };
+    const limitError = planLimitErrorMessage(error);
+    if (limitError) return { success: false, error: "Your plan has reached its staff limit. Upgrade to add more." };
     return { success: false, error: "Failed to add staff member. Please try again." };
   }
 
@@ -352,6 +366,8 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
     Sentry.captureException(staffError);
     const roleError = staffRoleErrorMessage(staffError);
     if (roleError) return { success: false, error: roleError };
+    const limitError = planLimitErrorMessage(staffError);
+    if (limitError) return { success: false, error: "Your plan has reached its staff limit. Upgrade to add more." };
     return { success: false, error: "Failed to add staff member. Please try again." };
   }
 
@@ -387,6 +403,8 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
       Sentry.captureException(credError);
       await supabase.rpc("soft_delete_staff_member", { p_staff_id: staff.id, p_clinic_id: clinicId });
       await supabase.from("onboarding_items").delete().eq("staff_member_id", staff.id).eq("clinic_id", clinicId);
+      const limitError = planLimitErrorMessage(credError);
+      if (limitError) return { success: false, error: "Your plan has reached its credential limit. Upgrade to add more." };
       return { success: false, error: "Failed to add credentials. Staff member was not created." };
     }
   }

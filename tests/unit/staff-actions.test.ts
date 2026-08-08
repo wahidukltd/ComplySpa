@@ -71,8 +71,18 @@ vi.mock("@/lib/staff/onboarding", async (importOriginal) => {
   return {
     ...actual,
     reconcileOnboardingItemsToRole: vi.fn(),
+    createOnboardingItems: vi.fn(async () => ({})),
   };
 });
+
+vi.mock("@/lib/utils/clinic", () => ({
+  getClinicIdAndPlan: vi.fn(async () => ({
+    clinicId: "clinic-1",
+    plan: "solo",
+    trialPlan: null,
+    userId: "auth-user-1",
+  })),
+}));
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -82,6 +92,7 @@ import {
   staffMemberSchema,
 } from "@/lib/validations/staff";
 import { deleteCredential } from "@/lib/actions/credentials";
+import { addStaffMember, addStaffMemberWithCredentials } from "@/lib/actions/staff";
 
 const mockedCreateClient = vi.mocked(createClient);
 
@@ -284,5 +295,36 @@ describe("updateStaffMember — role-change regeneration (D3/D11)", () => {
 
     expect(result).toMatchObject({ success: true, added: 2, removed: 1, backfilled: 1 });
     expect(reconcileOnboardingItemsToRole).toHaveBeenCalledWith("s1", "c1", "NP", "role-change");
+  });
+});
+
+describe("ND0MV trigger race mapping", () => {
+  it("addStaffMember maps a trigger ND0MV on insert to the friendly staff-limit message", async () => {
+    const { supabase } = makeSupabase([
+      () => ({ data: { role: "owner" }, error: null }),            // users lookup
+      () => ({ count: 4, error: null }),                           // staff count (under limit)
+      () => ({ data: null, error: { code: "ND0MV", message: "Plan limit reached for staff_members. 5 of 5 allowed" } }), // insert rejected by trigger
+    ]);
+    (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(supabase);
+    const result = await addStaffMember({ name: "Racey McRace", role: "RN" });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Your plan has reached its staff limit. Upgrade to add more.");
+  });
+
+  it("wizard credential insert ND0MV returns the friendly credential-limit message and rolls the staff row back", async () => {
+    const { supabase, calls } = makeSupabase([
+      () => ({ data: { role: "owner" }, error: null }),            // users lookup
+      () => ({ count: 0, error: null }),                           // staff count
+      () => ({ data: [{ id: "type-1" }], error: null }),           // credential-type scope check
+      () => ({ count: 40, error: null }),                          // credential count (under limit)
+      () => ({ data: { id: "staff-1" }, error: null }),            // staff insert
+      () => ({ data: null, error: { code: "ND0MV", message: "Plan limit reached for credentials. 50 of 50 allowed" } }), // credential insert
+    ]);
+    (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(supabase);
+    const result = await addStaffMemberWithCredentials({ name: "Limit RN", role: "RN", credentials: [{ credential_type_id: "11111111-1111-1111-8111-111111111111" }] });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Your plan has reached its credential limit. Upgrade to add more.");
+    const rpcCalls = calls.filter((c) => c.op === "rpc");
+    expect(rpcCalls.length).toBeGreaterThan(0);                    // rollback RPC invoked
   });
 });
