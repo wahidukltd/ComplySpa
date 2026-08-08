@@ -7,13 +7,10 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   ArrowRight,
-  CheckCircle2,
-  Clock,
   CreditCard,
   ExternalLink,
   FileText,
   Loader2,
-  RefreshCw,
   Receipt,
   ShieldCheck,
   Users,
@@ -42,33 +39,17 @@ import {
   type BillingOverviewData,
   type BillingPollState,
 } from "@/lib/actions/billing";
-import { PLAN_NAME, formatCurrency, type BannerState, type SubscriptionInterval } from "@/lib/billing/copy";
+import { PLAN_NAME, formatCurrency, MONEY_PROBLEM_STATES, paymentCopy, type StatusCta, type StatusTone, type SubscriptionInterval } from "@/lib/billing/copy";
 import type { PlanId } from "@/lib/polar/checkout";
 
-const BANNER_STYLE: Record<BannerState, { bg: string; border: string; color: string }> = {
-  active: { bg: "#EDF5F0", border: "#4A8C5C", color: "#2F6B3F" },
-  trial: { bg: "#FFFBEB", border: "#C2853A", color: "#92400E" },
-  "cancel-scheduled": { bg: "#FFFBEB", border: "#C2853A", color: "#92400E" },
-  past_due: { bg: "#FEF2F2", border: "#B8443A", color: "#7A2A26" },
-  incomplete: { bg: "#FEF2F2", border: "#B8443A", color: "#7A2A26" },
-  unpaid: { bg: "#FEF2F2", border: "#B8443A", color: "#7A2A26" },
-  canceled: { bg: "#FFFBEB", border: "#C2853A", color: "#92400E" },
-  "pending-sync": { bg: "#F0F4F5", border: "#6E97A7", color: "#3D5F6B" },
-  degraded: { bg: "#FFFBEB", border: "#C2853A", color: "#92400E" },
-  unconfigured: { bg: "#F0F4F5", border: "#6E97A7", color: "#3D5F6B" },
-};
-
-const BANNER_ICON: Record<BannerState, typeof CheckCircle2> = {
-  active: CheckCircle2,
-  trial: Clock,
-  "cancel-scheduled": Clock,
-  past_due: AlertTriangle,
-  incomplete: AlertTriangle,
-  unpaid: AlertTriangle,
-  canceled: Clock,
-  "pending-sync": Loader2,
-  degraded: RefreshCw,
-  unconfigured: Clock,
+// Functional-palette tone styles — the single map for every status surface on
+// the page (badge, danger panel, pending-sync strip). Same colors the banner
+// used per state, now grouped by tone (plan 2026-08-08 §4.4).
+const TONE_STYLE: Record<StatusTone, { border: string; bg: string; color: string; badgeColor: string; badgeBg: string }> = {
+  positive: { border: "#4A8C5C", bg: "#EDF5F0", color: "#2F6B3F", badgeColor: "#2F6B3F", badgeBg: "#EDF5F0" },
+  warning: { border: "#C2853A", bg: "#FFFBEB", color: "#92400E", badgeColor: "#92400E", badgeBg: "#FFFBEB" },
+  danger: { border: "#B8443A", bg: "#FEF2F2", color: "#7A2A26", badgeColor: "#7A2A26", badgeBg: "#FEF2F2" },
+  neutral: { border: "#6E97A7", bg: "#F0F4F5", color: "#3D5F6B", badgeColor: "#3D5F6B", badgeBg: "#F0F4F5" },
 };
 
 const INVOICE_STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
@@ -113,23 +94,31 @@ export function BillingClient({ overview }: Props) {
   const [cancelReason, setCancelReason] = useState<string | null>(null);
   const [cancelComment, setCancelComment] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
-  const [successNotice, setSuccessNotice] = useState(checkoutSuccess);
   const [cancelledNotice, setCancelledNotice] = useState(checkoutCancelled);
-  const [checkoutTimedOut, setCheckoutTimedOut] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState<string | null>(null);
   const pollRef = useRef<{ stop: () => void } | null>(null);
 
-  const bannerState: BannerState = pendingSync ? "pending-sync" : data.banner.state;
-  const banner = pendingSync
-    ? syncTimedOut
-      ? {
-          title: "Still confirming with our payment provider",
-          detail: "If this takes more than a few minutes, refresh the page.",
-        }
-      : { title: "Confirming your change with our payment provider", detail: "This usually takes a few seconds." }
-    : data.banner;
-  const bannerStyle = BANNER_STYLE[bannerState];
-  const BannerIcon = BANNER_ICON[bannerState];
+  // Single-surface status (plan 2026-08-08): the plan card is the only status
+  // surface. The server-derived presentation (state/tone/badge/headline/
+  // detail/CTA) is read-only for the client; pending-sync is a transient
+  // strip, never a card state.
+  const status = data.status;
+  const showDangerPanel = !pendingSync && MONEY_PROBLEM_STATES.includes(status.state);
+  const pendingSyncCopy = syncTimedOut
+    ? checkoutSuccess
+      ? "Still confirming your subscription — if you completed checkout, it can take a moment to appear. Refresh in a few minutes."
+      : "Still confirming — refresh if it takes more than a few minutes."
+    : checkoutSuccess
+      ? "Confirming your subscription…"
+      : "Confirming your change…";
+
+  // Verified payment-card copy (plan F3): every state comes from the backend
+  // truth (no customer / Polar-listed card / verified absence / degraded).
+  const payment = paymentCopy(data.payment.state, {
+    brand: data.payment.brand,
+    last4: data.payment.last4,
+    isTrial: data.isTrial,
+  });
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -168,32 +157,35 @@ export function BillingClient({ overview }: Props) {
         clearInterval(interval);
         pollRef.current = null;
         // Review 2026-08-05: never silently drop back to the stale
-        // server-rendered banner — keep the confirming state visible with
+        // server-rendered state — keep the confirming strip visible with
         // timeout copy so the user knows the change is still converging.
         setSyncTimedOut(true);
-        if (checkoutSuccess) setCheckoutTimedOut(true);
       }, 60000);
       pollRef.current = { stop: () => { stopped = true; clearInterval(interval); clearTimeout(timeout); } };
     },
-    [checkoutSuccess, stopPolling],
+    [stopPolling],
   );
 
   const finishSync = useCallback(() => {
     setPendingSync(false);
     setSyncTimedOut(false);
-    setSuccessNotice(false);
-    setCheckoutTimedOut(false);
     router.refresh();
   }, [router]);
 
-  // Entering with ?checkout=success: poll until the subscription is active.
-  // pendingSync starts true when the query param is present (initial state, no
-  // effect-time setState); the poll itself only calls setState in callbacks.
+  // Entering with ?checkout=success: poll until the server confirms the
+  // subscription is paid (review SEC1 — the green confirmation is only
+  // rendered AFTER server-verified convergence, never from the forgeable
+  // query param alone). The param itself only starts a neutral confirming
+  // strip; pendingSync starts true when the param is present (initial state,
+  // no effect-time setState).
   useEffect(() => {
     if (!checkoutSuccess) return;
     pollUntil(
       (d) => d.isPaid,
-      () => finishSync(),
+      () => {
+        toast.success("Your payment was received — your subscription is now active.");
+        finishSync();
+      },
     );
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -213,7 +205,11 @@ export function BillingClient({ overview }: Props) {
         return;
       }
       window.open(res.url, "_blank", "noopener");
-      setPendingSync(true);
+      // No pendingSync here (plan F4): nothing has been paid yet — the
+      // checkout tab is still open. The confirming flow enters truthfully via
+      // the ?checkout=success return param. The poll below is a silent
+      // convergence bonus: if the DB flips while this tab sits idle, the page
+      // refreshes on its own without claiming any confirming state.
       pollUntil(
         (d) => d.isPaid,
         () => finishSync(),
@@ -316,42 +312,18 @@ export function BillingClient({ overview }: Props) {
     }
   }
 
-  function dismissSuccess() {
-    setSuccessNotice(false);
-    setCheckoutTimedOut(false);
-    router.replace("/dashboard/settings/billing");
-  }
-
   function dismissCancelled() {
     setCancelledNotice(false);
     router.replace("/dashboard/settings/billing");
   }
 
-  const trialPlanId: PlanId | null =
-    data.trialPlan === "solo" || data.trialPlan === "practice" ? data.trialPlan : null;
-
   return (
     <div className="space-y-6">
-      {/* Transient query-param notices */}
-      {successNotice && (
-        <div
-          className="flex items-start justify-between gap-3 rounded-lg border p-4 text-sm"
-          style={{ borderColor: "#4A8C5C", backgroundColor: "#EDF5F0", color: "#2F6B3F" }}
-          role="status"
-        >
-          <div>
-            <p className="font-medium">Your payment was received.</p>
-            <p className="mt-0.5 opacity-80">
-              {checkoutTimedOut
-                ? "We haven&apos;t seen the subscription confirm yet. If you completed checkout, it can take a moment to appear — refresh in a few minutes."
-                : "Confirming your subscription…"}
-            </p>
-          </div>
-          <button onClick={dismissSuccess} className="text-sm underline opacity-80" aria-label="Dismiss">
-            Dismiss
-          </button>
-        </div>
-      )}
+      {/* Transient query-param notice — checkout cancelled (neutral, truthful
+          in every state). The checkout-success signal is NOT a green notice
+          from the param: the confirming strip runs, and the green
+          confirmation only appears after the server confirms the paid state
+          (review SEC1). */}
       {cancelledNotice && (
         <div
           className="flex items-start justify-between gap-3 rounded-lg border p-4 text-sm"
@@ -365,61 +337,55 @@ export function BillingClient({ overview }: Props) {
         </div>
       )}
 
-      {/* 1. Status banner */}
-      <div
-        className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
-        style={{ borderColor: bannerStyle.border, backgroundColor: bannerStyle.bg, color: bannerStyle.color }}
-        aria-live="polite"
-      >
-        <div className="flex items-start gap-3">
-          <BannerIcon className={`size-5 shrink-0 ${bannerState === "pending-sync" ? "animate-spin" : ""}`} aria-hidden="true" />
-          <div>
-            <p className="text-sm font-medium">{banner.title}</p>
-            <p className="mt-0.5 text-sm opacity-80">{banner.detail}</p>
-          </div>
-        </div>
-        {!pendingSync && isOwner && (
-          <div className="flex flex-wrap gap-2 sm:shrink-0">
-            {bannerState === "trial" && trialPlanId && (
-              <Button
-                size="sm"
-                onClick={() => handleSubscribe(trialPlanId, "monthly")}
-                disabled={busy !== null}
-                style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
-              >
-                {busy === "subscribe" ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                Subscribe now — keep {PLAN_NAME[trialPlanId]}
-              </Button>
-            )}
-            {bannerState === "cancel-scheduled" && (
-              <Button size="sm" onClick={handleResume} disabled={busy !== null} style={{ backgroundColor: "#4A8C5C", color: "#FFFFFF" }}>
-                {busy === "resume" ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                Resume subscription
-              </Button>
-            )}
-            {bannerState === "past_due" && (
-              <Button size="sm" onClick={handlePortal} disabled={busy !== null} style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}>
-                Update payment method
-              </Button>
-            )}
-            {bannerState === "degraded" && (
-              <Button size="sm" variant="outline" onClick={() => router.refresh()}>
-                Refresh
-              </Button>
-            )}
-            {bannerState === "unconfigured" && (
-              <Button size="sm" variant="outline" render={<Link href="/pricing" />}>
-                Compare plans
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 2. Plan card */}
+      {/* 1. Plan card — the single status surface (plan 2026-08-08) */}
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="w-full min-w-0">
+            {/* Transient confirming strip — the page's one live region */}
+            {pendingSync && (
+              <div
+                className="mb-4 flex items-center gap-2 rounded-lg border p-3 text-sm"
+                style={{ borderColor: TONE_STYLE.neutral.border, backgroundColor: TONE_STYLE.neutral.bg, color: TONE_STYLE.neutral.color }}
+                role="status"
+                aria-live="polite"
+              >
+                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+                <span>{pendingSyncCopy}</span>
+              </div>
+            )}
+
+            {/* Money-problem states: full-width panel at the top of the card
+                (prominence without a second surface) */}
+            {showDangerPanel && status.headline && (
+              <div
+                className="mb-4 flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+                style={{
+                  borderColor: TONE_STYLE[status.tone].border,
+                  backgroundColor: TONE_STYLE[status.tone].bg,
+                  color: TONE_STYLE[status.tone].color,
+                }}
+                role="alert"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="size-5 shrink-0" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-medium">{status.headline}</p>
+                    {status.detail && <p className="mt-0.5 text-sm opacity-80">{status.detail}</p>}
+                  </div>
+                </div>
+                {isOwner && status.cta && status.cta.kind !== "refresh" && (
+                  <StatusCtaButton
+                    cta={status.cta}
+                    busy={busy}
+                    onSubscribe={handleSubscribe}
+                    onPortal={handlePortal}
+                    onResume={handleResume}
+                    onRefresh={() => router.refresh()}
+                  />
+                )}
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle>{data.planName}</CardTitle>
               {data.interval && !data.isTrial && (
@@ -430,56 +396,55 @@ export function BillingClient({ overview }: Props) {
                   {data.interval === "annual" ? "Annual" : "Monthly"}
                 </span>
               )}
-              <span
-                className="inline-flex h-5 items-center rounded-full px-2 text-xs font-medium"
-                style={{ backgroundColor: "#F0F4F5", color: "#6E97A7" }}
-              >
-                Current plan
-              </span>
-              {data.planCard.polarStatusLabel && (
-                <StatusBadge state={bannerState} label={data.planCard.polarStatusLabel} />
+              {!showDangerPanel && status.badgeLabel && (
+                <StatusBadge tone={status.tone} label={status.badgeLabel} />
               )}
             </div>
             <p className="mt-1.5 text-sm font-medium" style={{ color: "#000000" }}>
               {data.planCard.priceLine}
             </p>
-            {data.planCard.cancelAtPeriodEnd && (
-              <p className="mt-1 text-sm" style={{ color: "#92400E" }}>
-                Full access until then. Nothing is deleted — resume any time before the date.
+            {!showDangerPanel && status.headline && (
+              <p className="mt-1 text-sm font-medium" style={{ color: status.tone === "warning" ? "#92400E" : "#000000" }}>
+                {status.headline}
               </p>
             )}
-            {data.degraded && (
-              <p className="mt-1 text-xs" style={{ color: "#92400E" }}>
-                Live billing data temporarily unavailable — showing the last confirmed state.
+            {!showDangerPanel && status.detail && (
+              <p className="mt-1 text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
+                {status.detail}
               </p>
+            )}
+            {status.cta?.kind === "refresh" && (
+              <button onClick={() => router.refresh()} className="mt-2 text-sm underline" style={{ color: "#3D5F6B" }}>
+                {status.cta.label}
+              </button>
             )}
           </div>
           {isOwner && (
             <div className="flex flex-wrap gap-2 sm:shrink-0">
-              {data.isTrial && trialPlanId && !data.polarEnabled && (
-                <Button variant="outline" size="sm" render={<Link href="/pricing" />}>
-                  Compare plans
-                </Button>
+              {!showDangerPanel && status.cta && status.cta.kind !== "refresh" && (
+                <StatusCtaButton
+                  cta={status.cta}
+                  busy={busy}
+                  onSubscribe={handleSubscribe}
+                  onPortal={handlePortal}
+                  onResume={handleResume}
+                  onRefresh={() => router.refresh()}
+                />
               )}
-              {data.isPaid && (
+              {/* Management actions stay available in every paid state (review
+                  N4 — a money-problem panel must not leave the user with zero
+                  valid actions); only an ENDED subscription loses "Change
+                  plan", and unconfigured Polar hides both (they cannot
+                  succeed). */}
+              {data.isPaid && data.polarEnabled && status.state !== "canceled" && (
                 <Button size="sm" onClick={() => setPlanOpen(true)} disabled={busy !== null || data.planCard.cancelAtPeriodEnd}>
                   Change plan
                 </Button>
               )}
-              {data.isPaid && (
+              {data.isPaid && data.polarEnabled && (
                 <Button variant="outline" size="sm" onClick={handlePortal} disabled={busy !== null}>
                   Manage billing
                   <ExternalLink className="size-3.5" />
-                </Button>
-              )}
-              {data.isTrial && data.polarEnabled && trialPlanId && (
-                <Button
-                  size="sm"
-                  onClick={() => handleSubscribe(trialPlanId, "monthly")}
-                  disabled={busy !== null}
-                  style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}
-                >
-                  Subscribe now — keep {PLAN_NAME[trialPlanId]}
                 </Button>
               )}
             </div>
@@ -487,7 +452,7 @@ export function BillingClient({ overview }: Props) {
         </CardHeader>
       </Card>
 
-      {/* 3. Usage row */}
+      {/* 2. Usage row */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -549,7 +514,7 @@ export function BillingClient({ overview }: Props) {
         </Card>
       </div>
 
-      {/* 4. Payment card */}
+      {/* 3. Payment card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -561,17 +526,13 @@ export function BillingClient({ overview }: Props) {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="font-medium" style={{ color: "#000000" }}>
-                {data.payment.hasMethod
-                  ? `${data.payment.brand ?? "Card"} •••• ${data.payment.last4 ?? ""}`
-                  : "No payment method on file yet"}
+                {payment.line}
               </p>
               <p className="text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>
-                {data.payment.hasMethod
-                  ? "Your first payment added this card."
-                  : "Your first payment will add one."}
+                {payment.sub}
               </p>
             </div>
-            {isOwner && data.isPaid && (
+            {isOwner && data.payment.state !== "no-account" && (
               <Button variant="outline" size="sm" onClick={handlePortal} disabled={busy !== null}>
                 Update payment method
               </Button>
@@ -588,7 +549,7 @@ export function BillingClient({ overview }: Props) {
         </CardContent>
       </Card>
 
-      {/* 5. Invoices */}
+      {/* 4. Invoices */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -606,9 +567,7 @@ export function BillingClient({ overview }: Props) {
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
               <FileText className="mb-2 size-6" style={{ color: "rgba(0,0,0,0.3)" }} aria-hidden="true" />
               <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
-                {data.isPaid || data.polarEnabled
-                  ? "No invoices yet — your first charge will appear here."
-                  : "Invoices will appear here once billing is live."}
+                Invoices appear here after your first charge.
               </p>
             </div>
           ) : (
@@ -670,7 +629,7 @@ export function BillingClient({ overview }: Props) {
         </CardContent>
       </Card>
 
-      {/* 6. Danger zone — paid clinics only */}
+      {/* 5. Danger zone — paid clinics only */}
       {data.isPaid && (
         <div className="rounded-lg border p-6" style={{ borderColor: "rgba(184,68,58,0.35)" }}>
           <h3 className="text-base font-medium" style={{ color: "#7A2A26" }}>
@@ -682,10 +641,12 @@ export function BillingClient({ overview }: Props) {
                 Your plan continues through {data.planCard.periodEnd ? new Date(data.planCard.periodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the end of your billing period"}. Nothing is deleted — change your mind any time before then.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button onClick={handleResume} disabled={busy !== null} style={{ backgroundColor: "#4A8C5C", color: "#FFFFFF" }}>
-                  {busy === "resume" ? <Loader2 className="size-4 animate-spin" /> : null}
-                  Resume subscription
-                </Button>
+                {isOwner && (
+                  <Button onClick={handleResume} disabled={busy !== null} style={{ backgroundColor: "#4A8C5C", color: "#FFFFFF" }}>
+                    {busy === "resume" ? <Loader2 className="size-4 animate-spin" /> : null}
+                    Resume subscription
+                  </Button>
+                )}
                 {isOwner && (
                   <button onClick={handlePortal} disabled={busy !== null} className="text-sm underline" style={{ color: "rgba(0,0,0,0.55)" }}>
                     Need to end today? Cancel immediately in the portal
@@ -824,7 +785,7 @@ export function BillingClient({ overview }: Props) {
             })}
           </div>
           <p className="text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>
-            Data above the new plan&apos;s limits is preserved and suspended, not deleted. Annual billing starts at your next billing cycle.
+            Data over the new plan&apos;s limit stays saved but paused — nothing is deleted. Annual billing starts at your next billing cycle.
           </p>
           <DialogFooter>
             <DialogClose render={<Button variant="outline">Keep current plan</Button>} />
@@ -835,20 +796,68 @@ export function BillingClient({ overview }: Props) {
   );
 }
 
-function StatusBadge({ state, label }: { state: BannerState; label: string }) {
-  const style =
-    state === "past_due" || state === "incomplete" || state === "unpaid"
-      ? { bg: "#FEF2F2", color: "#7A2A26" }
-      : state === "cancel-scheduled" || state === "canceled"
-        ? { bg: "#FFFBEB", color: "#92400E" }
-        : state === "active"
-          ? { bg: "#EDF5F0", color: "#2F6B3F" }
-          : { bg: "#F0F4F5", color: "#3D5F6B" };
+function StatusBadge({ tone, label }: { tone: StatusTone; label: string }) {
+  const style = TONE_STYLE[tone];
   return (
-    <span className="inline-flex h-5 items-center rounded-full px-2 text-xs font-medium" style={{ backgroundColor: style.bg, color: style.color }}>
+    <span className="inline-flex h-5 items-center rounded-full px-2 text-xs font-medium" style={{ backgroundColor: style.badgeBg, color: style.badgeColor }}>
       {label}
     </span>
   );
+}
+
+// The one action a state supports (plan 2026-08-08): renders the status CTA
+// from the pure presentation — never a button without a valid action. The
+// refresh CTA renders inline in the card body for all roles instead.
+function StatusCtaButton({
+  cta,
+  busy,
+  onSubscribe,
+  onPortal,
+  onResume,
+  onRefresh,
+}: {
+  cta: Exclude<StatusCta, null>;
+  busy: string | null;
+  onSubscribe: (plan: PlanId, interval: SubscriptionInterval) => void;
+  onPortal: () => void;
+  onResume: () => void;
+  onRefresh: () => void;
+}) {
+  switch (cta.kind) {
+    case "subscribe":
+      return (
+        <Button size="sm" onClick={() => onSubscribe(cta.plan, cta.interval)} disabled={busy !== null} style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}>
+          {busy === "subscribe" ? <Loader2 className="size-3.5 animate-spin" /> : null}
+          {cta.label}
+        </Button>
+      );
+    case "resume":
+      return (
+        <Button size="sm" onClick={onResume} disabled={busy !== null} style={{ backgroundColor: "#4A8C5C", color: "#FFFFFF" }}>
+          {busy === "resume" ? <Loader2 className="size-3.5 animate-spin" /> : null}
+          {cta.label}
+        </Button>
+      );
+    case "portal":
+      return (
+        <Button size="sm" onClick={onPortal} disabled={busy !== null} style={{ backgroundColor: "#6E97A7", color: "#FFFFFF" }}>
+          {busy === "portal" ? <Loader2 className="size-3.5 animate-spin" /> : null}
+          {cta.label}
+        </Button>
+      );
+    case "compare-plans":
+      return (
+        <Button size="sm" variant="outline" render={<Link href="/pricing" />}>
+          {cta.label}
+        </Button>
+      );
+    case "refresh":
+      return (
+        <Button size="sm" variant="outline" onClick={onRefresh}>
+          {cta.label}
+        </Button>
+      );
+  }
 }
 
 function LimitRow({ label, used, max }: { label: string; used: number; max: number }) {

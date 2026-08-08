@@ -11,16 +11,14 @@ import { createPolarAdmin } from "@/lib/polar/client";
 import { createCheckoutLink, resolveProductIdFromPrice, type PlanId } from "@/lib/polar/checkout";
 import { createCustomerPortalUrl } from "@/lib/polar/customer-portal";
 import {
-  bannerCopy,
   daysUntil,
-  deriveBannerState,
+  deriveStatusPresentation,
   nextChargeLine,
   planPrice,
   PLAN_NAME,
   PLAN_LOOKUP,
-  polarStatusLabel,
   shouldBlockNewCheckout,
-  type BannerState,
+  type StatusPresentation,
   type SubscriptionInterval,
 } from "@/lib/billing/copy";
 import * as Sentry from "@sentry/nextjs";
@@ -63,7 +61,6 @@ export interface InvoiceRow {
 
 export interface BillingOverviewData {
   polarEnabled: boolean;
-  livePolar: boolean;
   degraded: boolean;
   clinicName: string;
   plan: string;
@@ -90,19 +87,21 @@ export interface BillingOverviewData {
     reportLabel: string;
     available: boolean;
   }>;
-  banner: { state: BannerState; title: string; detail: string };
+  status: StatusPresentation;
   planCard: {
     priceLine: string;
     periodEnd: string | null;
     trialEndDate: string | null;
     cancelAtPeriodEnd: boolean;
-    polarStatusLabel: string | null;
     amountCents: number | null;
   };
-  payment: { hasMethod: boolean; brand: string | null; last4: string | null };
+  payment: {
+    state: "no-account" | "card" | "no-card" | "unavailable";
+    brand: string | null;
+    last4: string | null;
+  };
   invoices: InvoiceRow[];
   canMutate: boolean;
-  degradedReason: string | null;
 }
 
 export async function getBillingOverview(): Promise<{ data: BillingOverviewData | null; error: string | null }> {
@@ -168,24 +167,21 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
         ? planPrice(clinic.plan as PlanId, interval ?? "monthly")
         : 0;
 
-  let livePolar = false;
   let degraded = false;
-  let degradedReason: string | null = null;
   let liveAmountCents: number | null = clinic.subscription_amount;
   let livePeriodEnd: string | null = clinic.current_period_end;
   let liveStatus: string | null = clinic.polar_subscription_status;
   let liveInterval: SubscriptionInterval | null = interval;
-  let payment: { hasMethod: boolean; brand: string | null; last4: string | null } = {
-    hasMethod: false,
-    brand: null,
-    last4: null,
-  };
+  let payment: {
+    state: "no-account" | "card" | "no-card" | "unavailable";
+    brand: string | null;
+    last4: string | null;
+  } = { state: "no-account", brand: null, last4: null };
   let invoices: InvoiceRow[] = [];
 
   const polar = polarConfig.enabled ? createPolarAdmin() : null;
 
   if (polar && clinic.polar_customer_id) {
-    livePolar = true;
     if (clinic.polar_subscription_id) {
       try {
         const sub = await polar.subscriptions.get({ id: clinic.polar_subscription_id });
@@ -195,7 +191,6 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
         liveInterval = sub.recurringInterval === "year" ? "annual" : sub.recurringInterval === "month" ? "monthly" : liveInterval;
       } catch (err) {
         degraded = true;
-        degradedReason = "subscription";
         captureBillingError(err, "billing.overview.subscription", { clinicId });
       }
     }
@@ -215,26 +210,39 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
       }));
     } catch (err) {
       degraded = true;
-      degradedReason = degradedReason ?? "orders";
       captureBillingError(err, "billing.overview.orders", { clinicId });
     }
     try {
       const methodsRes = await polar.customers.listPaymentMethods({ id: clinic.polar_customer_id, limit: 1 });
       const card = methodsRes.result.items?.find((m) => m.type === "card");
       if (card && "methodMetadata" in card) {
-        payment = { hasMethod: true, brand: card.methodMetadata.brand, last4: card.methodMetadata.last4 };
+        // Verified state (plan F3): brand/last4 come ONLY from Polar's
+        // metadata — never invented, never from a guessed customer.
+        payment = { state: "card", brand: card.methodMetadata.brand, last4: card.methodMetadata.last4 };
+      } else {
+        // A customer exists but Polar lists no card — a genuine problem on a
+        // paid plan, distinct from "no account yet" (plan F3).
+        payment = { state: "no-card", brand: null, last4: null };
       }
     } catch (err) {
+      payment = { state: "unavailable", brand: null, last4: null };
       degraded = true;
-      degradedReason = degradedReason ?? "payment-method";
       captureBillingError(err, "billing.overview.payment-method", { clinicId });
     }
+  }
+
+  // Review finding N5: a PAID clinic with Polar deconfigured (deployment
+  // edge) has no reachable card state — "no card on file" would be a lie to a
+  // billed customer; "unavailable" is the truthful read.
+  if (!polarConfig.enabled && isPaid && payment.state === "no-account") {
+    payment = { state: "unavailable", brand: null, last4: null };
   }
 
   const daysLeft = daysUntil(isTrial ? clinic.trial_end_date : livePeriodEnd);
   const amountCents = liveAmountCents;
   const priceCents = amountCents ?? null;
-  const bannerInput = {
+  const checkoutReady = polarConfig.enabled && productAvailable(trialPlanId ?? "solo", "monthly");
+  const statusInput = {
     polarEnabled: polarConfig.enabled,
     plan: clinic.plan,
     trialPlan: clinic.trial_plan,
@@ -245,10 +253,9 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
     pendingSync: false,
     degraded,
     daysLeft,
-    price: priceCents != null ? priceCents / 100 : priceDollars,
+    checkoutReady,
   };
-  const bannerState = deriveBannerState(bannerInput);
-  const banner = bannerCopy(bannerState, bannerInput);
+  const status = deriveStatusPresentation(statusInput);
 
   const priceLine = nextChargeLine({
     plan: clinic.plan,
@@ -260,11 +267,13 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
     trialEndDate: clinic.trial_end_date,
     currency: clinic.subscription_currency,
     interval: liveInterval,
+    cancelAtPeriodEnd: clinic.cancel_at_period_end,
+    ended: liveStatus === "canceled",
+    pendingActivation: liveStatus === "incomplete" || liveStatus === "incomplete_expired",
   });
 
   const data: BillingOverviewData = {
     polarEnabled: polarConfig.enabled,
-    livePolar,
     degraded,
     clinicName: clinic.name,
     plan: clinic.plan,
@@ -304,19 +313,17 @@ export async function getBillingOverview(): Promise<{ data: BillingOverviewData 
       }),
     ),
     billingContact: ownerRes.data?.email ?? null,
-    banner: { state: bannerState, title: banner.title, detail: banner.detail },
+    status,
     planCard: {
       priceLine,
       periodEnd: livePeriodEnd,
       trialEndDate: clinic.trial_end_date,
       cancelAtPeriodEnd: clinic.cancel_at_period_end,
-      polarStatusLabel: polarStatusLabel(liveStatus),
       amountCents,
     },
     payment,
     invoices,
     canMutate: ctx.role === "owner",
-    degradedReason: degraded ? degradedReason : null,
   };
 
   return { data, error: null };

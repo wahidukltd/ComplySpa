@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
-  deriveBannerState,
-  bannerCopy,
+  deriveSubscriptionStatus,
+  deriveStatusPresentation,
+  MONEY_PROBLEM_STATES,
   nextChargeLine,
+  paymentCopy,
   formatCurrency,
   formatDateOnly,
   daysUntil,
@@ -12,9 +14,10 @@ import {
 import { mapPlan } from "@/lib/polar/webhook";
 
 // Pure state derivation + copy mapping for the billing workspace
-// (experience blueprint §6.1, §8 — every banner state and copy string).
+// (plan 2026-08-08: single-surface status presentation on the plan card —
+// every subscription state renders as badge/headline/detail/exactly-one CTA).
 
-function bannerInput(overrides: Record<string, unknown> = {}) {
+function statusInput(overrides: Record<string, unknown> = {}) {
   return {
     polarEnabled: true,
     plan: "solo",
@@ -26,91 +29,190 @@ function bannerInput(overrides: Record<string, unknown> = {}) {
     pendingSync: false,
     degraded: false,
     daysLeft: 0,
-    price: 49,
+    checkoutReady: true,
     ...overrides,
   };
 }
 
-describe("deriveBannerState", () => {
+describe("deriveSubscriptionStatus", () => {
   it("unconfigured wins when Polar is disabled", () => {
-    expect(deriveBannerState(bannerInput({ polarEnabled: false }))).toBe("unconfigured");
+    expect(deriveSubscriptionStatus(statusInput({ polarEnabled: false }))).toBe("unconfigured");
   });
 
   it("trial wins for trial plans", () => {
-    expect(deriveBannerState(bannerInput({ plan: "trial", trialPlan: "practice" }))).toBe("trial");
+    expect(deriveSubscriptionStatus(statusInput({ plan: "trial", trialPlan: "practice" }))).toBe("trial");
   });
 
   it("past_due outranks cancel-scheduled (money problem > schedule)", () => {
     expect(
-      deriveBannerState(bannerInput({ polarStatus: "past_due", cancelAtPeriodEnd: true })),
+      deriveSubscriptionStatus(statusInput({ polarStatus: "past_due", cancelAtPeriodEnd: true })),
     ).toBe("past_due");
   });
 
   it("cancel-scheduled shows for cancelAtPeriodEnd on a paid plan", () => {
-    expect(deriveBannerState(bannerInput({ cancelAtPeriodEnd: true }))).toBe("cancel-scheduled");
+    expect(deriveSubscriptionStatus(statusInput({ cancelAtPeriodEnd: true }))).toBe("cancel-scheduled");
   });
 
   it("active is the default paid state", () => {
-    expect(deriveBannerState(bannerInput())).toBe("active");
+    expect(deriveSubscriptionStatus(statusInput())).toBe("active");
   });
 
-  it("incomplete/unpaid never render a false green active banner (review 2026-08-05)", () => {
-    expect(deriveBannerState(bannerInput({ polarStatus: "incomplete" }))).toBe("incomplete");
-    expect(deriveBannerState(bannerInput({ polarStatus: "incomplete_expired" }))).toBe("incomplete");
-    expect(deriveBannerState(bannerInput({ polarStatus: "unpaid" }))).toBe("unpaid");
+  it("incomplete/unpaid never collapse to active (review 2026-08-05)", () => {
+    expect(deriveSubscriptionStatus(statusInput({ polarStatus: "incomplete" }))).toBe("incomplete");
+    expect(deriveSubscriptionStatus(statusInput({ polarStatus: "incomplete_expired" }))).toBe("incomplete");
+    expect(deriveSubscriptionStatus(statusInput({ polarStatus: "unpaid" }))).toBe("unpaid");
   });
 
   it("canceled without a scheduled end is its own amber state, not active", () => {
-    expect(deriveBannerState(bannerInput({ polarStatus: "canceled" }))).toBe("canceled");
-    expect(deriveBannerState(bannerInput({ polarStatus: "canceled", cancelAtPeriodEnd: true }))).toBe("cancel-scheduled");
+    expect(deriveSubscriptionStatus(statusInput({ polarStatus: "canceled" }))).toBe("canceled");
+    expect(deriveSubscriptionStatus(statusInput({ polarStatus: "canceled", cancelAtPeriodEnd: true }))).toBe("cancel-scheduled");
   });
 
   it("pending-sync overrides everything", () => {
-    expect(deriveBannerState(bannerInput({ pendingSync: true, polarStatus: "past_due" }))).toBe("pending-sync");
+    expect(deriveSubscriptionStatus(statusInput({ pendingSync: true, polarStatus: "past_due" }))).toBe("pending-sync");
   });
 
-  it("degraded shows when live data failed (still resolves before state)", () => {
-    expect(deriveBannerState(bannerInput({ degraded: true }))).toBe("degraded");
+  it("degraded shows when live data failed", () => {
+    expect(deriveSubscriptionStatus(statusInput({ degraded: true }))).toBe("degraded");
   });
 });
 
-describe("bannerCopy", () => {
-  it("trial copy carries the countdown and price anchor, never fear", () => {
-    const { title } = bannerCopy("trial", bannerInput({ plan: "trial", trialPlan: "solo", daysLeft: 3, price: 29 }));
-    expect(title).toContain("3 days");
-    expect(title).toContain("$29.00/mo after");
-    expect(title.toLowerCase()).not.toContain("expire");
+describe("deriveStatusPresentation", () => {
+  it("active renders no status box — badge + price line carry it", () => {
+    const p = deriveStatusPresentation(statusInput());
+    expect(p.tone).toBe("positive");
+    expect(p.badgeLabel).toBe("Active");
+    expect(p.headline).toBeNull();
+    expect(p.detail).toBeNull();
+    expect(p.cta).toBeNull();
   });
 
-  it("cancel-scheduled copy states the end date and the no-deletion promise", () => {
-    const { title, detail } = bannerCopy("cancel-scheduled", bannerInput({ periodEnd: "2026-09-05T00:00:00.000Z" }));
-    expect(title).toContain("Cancels on");
-    expect(detail).toContain("Nothing is deleted");
-    expect(detail.toLowerCase()).toContain("resume");
+  it("trial with checkoutReady: countdown headline + subscribe CTA", () => {
+    const p = deriveStatusPresentation(
+      statusInput({ plan: "trial", trialPlan: "solo", daysLeft: 3, price: 29, checkoutReady: true }),
+    );
+    expect(p.state).toBe("trial");
+    expect(p.tone).toBe("warning");
+    expect(p.badgeLabel).toBeNull();
+    expect(p.headline).toBe("Trial ends in 3 days");
+    expect(p.detail).toContain("pauses and goes read-only");
+    expect(p.cta).toEqual({
+      kind: "subscribe",
+      plan: "solo",
+      interval: "monthly",
+      label: "Subscribe now — keep Solo",
+    });
   });
 
-  it("past_due copy states the consequence and the fix", () => {
-    const { title, detail } = bannerCopy("past_due", bannerInput());
-    expect(title).toBe("Payment failed");
-    expect(detail).toContain("access continues");
-    expect(detail).toContain("Update your payment method");
+  it("trial renders the trial row even when the derived state is unconfigured (pre-approval: no subscribe button, compare-plans CTA)", () => {
+    // Challenge precedence: !polarEnabled derives `unconfigured`, but the
+    // trial presentation must still render for trial-plan clinics.
+    const p = deriveStatusPresentation(
+      statusInput({ plan: "trial", trialPlan: "practice", daysLeft: 10, polarEnabled: false, checkoutReady: false }),
+    );
+    expect(p.state).toBe("unconfigured");
+    expect(p.headline).toBe("Trial ends in 10 days");
+    expect(p.detail).toContain("Monthly checkout isn't available yet");
+    expect(p.cta).toEqual({ kind: "compare-plans", label: "Compare plans" });
   });
 
-  it("unconfigured copy never implies a broken page", () => {
-    const { detail } = bannerCopy("unconfigured", bannerInput({ plan: "trial", trialPlan: "practice" }));
-    expect(detail).toContain("trial of Practice");
+  it("trial with partial config (enabled but no price id): no subscribe CTA, availability line", () => {
+    const p = deriveStatusPresentation(
+      statusInput({ plan: "trial", trialPlan: "solo", daysLeft: 10, checkoutReady: false }),
+    );
+    expect(p.state).toBe("trial");
+    expect(p.cta).toEqual({ kind: "compare-plans", label: "Compare plans" });
+    expect(p.detail).toContain("Monthly checkout isn't available yet");
   });
 
-  it("unconfigured copy is truthful for non-trial clinics (review 2026-08-05)", () => {
-    const { detail } = bannerCopy("unconfigured", bannerInput({ plan: "solo", trialPlan: null }));
-    expect(detail.toLowerCase()).not.toContain("trial");
-    expect(detail).toContain("billing actions will be enabled soon");
+  it("trial + degraded still names the degraded state (review finding: the trial row must not swallow a failed live call)", () => {
+    const p = deriveStatusPresentation(
+      statusInput({ plan: "trial", trialPlan: "solo", daysLeft: 7, degraded: true, checkoutReady: true }),
+    );
+    expect(p.state).toBe("degraded");
+    expect(p.headline).toBe("Trial ends in 7 days");
+    expect(p.detail).toContain("Live billing data is temporarily unavailable");
+    expect(p.cta?.kind).toBe("subscribe");
   });
 
-  it("incomplete/unpaid/canceled copy states the consequence and the fix", () => {
-    expect(bannerCopy("incomplete", bannerInput()).title).toBe("Payment not completed");
-    expect(bannerCopy("unpaid", bannerInput()).title).toBe("Payment failed repeatedly");
-    expect(bannerCopy("canceled", bannerInput()).title).toBe("Subscription ended");
+  it("trial wins over an abandoned checkout (precedence): countdown + subscribe CTA, never a dead incomplete row", () => {
+    const p = deriveStatusPresentation(
+      statusInput({ plan: "trial", trialPlan: "practice", polarStatus: "incomplete", daysLeft: 5, checkoutReady: true }),
+    );
+    expect(p.state).toBe("trial");
+    expect(p.headline).toBe("Trial ends in 5 days");
+    expect(p.cta?.kind).toBe("subscribe");
+    expect(p.detail).not.toContain("Payment not completed");
+  });
+
+  it("trial countdown handles the elapsed edge (pre-cron): d<0 → has ended", () => {
+    expect(
+      deriveStatusPresentation(statusInput({ plan: "trial", trialPlan: "solo", daysLeft: -1, checkoutReady: true })).headline,
+    ).toBe("Your trial has ended");
+    expect(
+      deriveStatusPresentation(statusInput({ plan: "trial", trialPlan: "solo", daysLeft: 1, checkoutReady: true })).headline,
+    ).toBe("Trial ends tomorrow");
+    expect(
+      deriveStatusPresentation(statusInput({ plan: "trial", trialPlan: "solo", daysLeft: 0, checkoutReady: true })).headline,
+    ).toBe("Trial ends today");
+  });
+
+  it("cancel-scheduled: amber, live-status badge, end date, resume CTA", () => {
+    const p = deriveStatusPresentation(statusInput({ cancelAtPeriodEnd: true }));
+    expect(p.state).toBe("cancel-scheduled");
+    expect(p.tone).toBe("warning");
+    expect(p.badgeLabel).toBe("Active");
+    expect(p.headline).toBe("Cancels on Sep 5, 2026");
+    expect(p.cta).toEqual({ kind: "resume", label: "Resume subscription" });
+  });
+
+  it("cancel-scheduled without a projected period end renders an honest dash, never a crash", () => {
+    const p = deriveStatusPresentation(statusInput({ cancelAtPeriodEnd: true, periodEnd: null }));
+    expect(p.headline).toBe("Cancels on —");
+  });
+
+  it("MONEY_PROBLEM_STATES is the single panel-state source (past_due/unpaid/incomplete/canceled)", () => {
+    expect([...MONEY_PROBLEM_STATES]).toEqual(["past_due", "unpaid", "incomplete", "canceled"]);
+  });
+
+  it("money-problem states are danger with the right copy and CTA — never a false positive tone", () => {
+    const pastDue = deriveStatusPresentation(statusInput({ polarStatus: "past_due" }));
+    expect(pastDue.tone).toBe("danger");
+    expect(pastDue.headline).toBe("Payment failed");
+    expect(pastDue.cta).toEqual({ kind: "portal", label: "Update payment method" });
+
+    const unpaid = deriveStatusPresentation(statusInput({ polarStatus: "unpaid" }));
+    expect(unpaid.tone).toBe("danger");
+    expect(unpaid.headline).toBe("Payment failed repeatedly");
+    expect(unpaid.cta?.kind).toBe("portal");
+
+    const incomplete = deriveStatusPresentation(statusInput({ polarStatus: "incomplete" }));
+    expect(incomplete.tone).toBe("danger");
+    expect(incomplete.headline).toBe("Payment not completed");
+    expect(incomplete.cta).toBeNull();
+  });
+
+  it("canceled: amber, ended copy, choose-a-plan CTA", () => {
+    const p = deriveStatusPresentation(statusInput({ polarStatus: "canceled" }));
+    expect(p.tone).toBe("warning");
+    expect(p.headline).toBe("Subscription ended");
+    expect(p.cta).toEqual({ kind: "compare-plans", label: "Choose a plan" });
+  });
+
+  it("degraded: warning, last-confirmed-state copy, refresh CTA", () => {
+    const p = deriveStatusPresentation(statusInput({ degraded: true }));
+    expect(p.tone).toBe("warning");
+    expect(p.headline).toBe("Live billing data is temporarily unavailable");
+    expect(p.cta).toEqual({ kind: "refresh", label: "Refresh" });
+  });
+
+  it("unconfigured applies to paid plans only: plain card, no box, no CTA", () => {
+    const p = deriveStatusPresentation(statusInput({ polarEnabled: false, plan: "solo" }));
+    expect(p.state).toBe("unconfigured");
+    expect(p.tone).toBe("neutral");
+    expect(p.headline).toBeNull();
+    expect(p.detail).toBeNull();
+    expect(p.cta).toBeNull();
   });
 });
 
@@ -128,7 +230,7 @@ describe("nextChargeLine", () => {
     expect(line).toBe("Next charge $49.00 on Sep 5, 2026");
   });
 
-  it("trial: shows the evaluated plan and the post-trial anchor", () => {
+  it("trial: post-trial anchor without repeating the plan name (plan F8)", () => {
     const line = nextChargeLine({
       plan: "trial",
       priceCents: null,
@@ -138,8 +240,8 @@ describe("nextChargeLine", () => {
       trialPlan: "solo",
       trialEndDate: "2026-08-19T00:00:00.000Z",
     });
-    expect(line).toContain("Trial of Solo");
-    expect(line).toContain("$29.00/mo after");
+    expect(line).toBe("Then $29.00/mo after Aug 19, 2026");
+    expect(line).not.toContain("Trial of");
   });
 
   it("never invents a figure: falls back to the published monthly price", () => {
@@ -153,6 +255,92 @@ describe("nextChargeLine", () => {
       trialEndDate: null,
     });
     expect(line).toContain("$49.00");
+  });
+
+  it("cancel-scheduled makes NO next charge — the line states the end (review S2)", () => {
+    const line = nextChargeLine({
+      plan: "solo",
+      priceCents: 4900,
+      priceDollars: 49,
+      periodEnd: "2026-09-05T00:00:00.000Z",
+      isTrial: false,
+      trialPlan: null,
+      trialEndDate: null,
+      cancelAtPeriodEnd: true,
+    });
+    expect(line).toBe("No further charges — access through Sep 5, 2026");
+    expect(line).not.toContain("Next charge");
+  });
+
+  it("ended (canceled) subscription states no further charges", () => {
+    const line = nextChargeLine({
+      plan: "solo",
+      priceCents: null,
+      priceDollars: 49,
+      periodEnd: null,
+      isTrial: false,
+      trialPlan: null,
+      trialEndDate: null,
+      ended: true,
+    });
+    expect(line).toBe("No further charges");
+  });
+
+  it("pending activation (incomplete) never invents a next charge", () => {
+    const line = nextChargeLine({
+      plan: "solo",
+      priceCents: null,
+      priceDollars: 49,
+      periodEnd: null,
+      isTrial: false,
+      trialPlan: null,
+      trialEndDate: null,
+      pendingActivation: true,
+    });
+    expect(line).toBe("Payment pending — your subscription isn't active yet");
+  });
+});
+
+describe("paymentCopy — verified states only (plan F3)", () => {
+  it("card: brand + last4 from Polar metadata, truthful billing line", () => {
+    const p = paymentCopy("card", { brand: "Visa", last4: "4242", isTrial: false });
+    expect(p.line).toBe("Visa •••• 4242 — your card on file.");
+    expect(p.sub).toContain("billed to this card");
+  });
+
+  it("card without a last4 falls back to a bare line, never a malformed fragment", () => {
+    const p = paymentCopy("card", { brand: "Visa", last4: null, isTrial: false });
+    expect(p.line).toBe("Visa on file.");
+    expect(p.line).not.toContain("••••");
+  });
+
+  it("no-account on a trial: nothing is charged during the trial", () => {
+    const p = paymentCopy("no-account", { brand: null, last4: null, isTrial: true });
+    expect(p.line).toBe("No card on file — nothing is charged during your trial.");
+    expect(p.sub).toBe("You'll add one when you subscribe.");
+  });
+
+  it("no-account on a paid plan (edge): first payment adds it", () => {
+    const p = paymentCopy("no-account", { brand: null, last4: null, isTrial: false });
+    expect(p.line).toBe("No card on file — you'll add one when you subscribe.");
+  });
+
+  it("no-card: verified absence on an existing customer is a real problem", () => {
+    const p = paymentCopy("no-card", { brand: null, last4: null, isTrial: false });
+    expect(p.line).toContain("update your payment method");
+    expect(p.line).toContain("before your next charge");
+    expect(p.sub).toContain("won't renew");
+  });
+
+  it("no-card on a trial never claims a renewal is at risk (review finding)", () => {
+    const p = paymentCopy("no-card", { brand: null, last4: null, isTrial: true });
+    expect(p.line).toBe("No card on file — nothing is charged during your trial.");
+    expect(p.sub).not.toContain("renew");
+  });
+
+  it("unavailable: degraded, shows last confirmed state", () => {
+    const p = paymentCopy("unavailable", { brand: null, last4: null, isTrial: false });
+    expect(p.line).toBe("Payment details temporarily unavailable — showing the last confirmed state.");
   });
 });
 

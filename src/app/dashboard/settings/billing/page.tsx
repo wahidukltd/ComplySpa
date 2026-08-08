@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
@@ -25,11 +24,11 @@ export default async function BillingSettingsPage() {
       <div className="space-y-6">
         <PageHeader
           title="Billing & Plan"
-          description="Manage your subscription, payment method, and invoices."
+          description="Your plan, billing cycle, and payment details."
         />
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <p className="text-sm" style={{ color: "rgba(0,0,0,0.55)" }}>
-            Failed to load billing details. Please try again.
+            We couldn&apos;t load your billing details. Refresh the page to try again.
           </p>
         </div>
       </div>
@@ -40,11 +39,9 @@ export default async function BillingSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Billing & Plan"
-        description="Manage your subscription, payment method, and invoices."
+        description="Your plan, billing cycle, and payment details."
       />
-      <Suspense fallback={null}>
-        <BillingClient overview={data!} />
-      </Suspense>
+      <BillingClient overview={data!} />
     </div>
   );
 }
