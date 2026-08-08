@@ -11,6 +11,16 @@ import { getCredentialStatus } from "@/lib/utils/status";
 import { PlanLimitError } from "@/lib/utils/errors";
 import * as Sentry from "@sentry/nextjs";
 
+/** Map the 057 enforce_staff_role_template trigger's P0001 message to friendly
+ * copy. The UI only offers roles with templates, so this fires on crafted or
+ * manual requests — the error must name the cause, not a generic failure. */
+function staffRoleErrorMessage(error: { message?: string } | null): string | null {
+  if (error?.message?.includes("has no active template")) {
+    return "This role has no template yet. Create one in Settings → Role Templates first.";
+  }
+  return null;
+}
+
 export async function addStaffMember(input: StaffMemberInput) {
   const clinicData = await getClinicIdAndPlan();
   if (!clinicData) return { success: false, error: "Unauthorized" };
@@ -68,12 +78,17 @@ export async function addStaffMember(input: StaffMemberInput) {
 
   if (error) {
     Sentry.captureException(error);
+    const roleError = staffRoleErrorMessage(error);
+    if (roleError) return { success: false, error: roleError };
     return { success: false, error: "Failed to add staff member. Please try again." };
   }
 
   const staffRole = parsed.data.role;
   if (staffRole) {
-    const onboardingResult = await createOnboardingItems(staff.id, clinicId, staffRole, { flow: "add-staff" });
+    // requireTemplate (057): a role with no resolved template must fail the
+    // hire honestly instead of silently generating an empty checklist — the
+    // trigger backstops at the DB, this makes the app error friendly first.
+    const onboardingResult = await createOnboardingItems(staff.id, clinicId, staffRole, { requireTemplate: true, flow: "add-staff" });
     if (onboardingResult.error) {
       // Roll back the staff row — a hire whose requirements failed to
       // generate must not linger as a half-created record. Clean up any items
@@ -153,6 +168,8 @@ export async function updateStaffMember(id: string, input: StaffMemberInput) {
 
   if (error) {
     Sentry.captureException(error);
+    const roleError = staffRoleErrorMessage(error);
+    if (roleError) return { error: roleError };
     return { error: "Failed to update staff member. Please try again." };
   }
   if (!updated) {
@@ -333,12 +350,14 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
 
   if (staffError) {
     Sentry.captureException(staffError);
+    const roleError = staffRoleErrorMessage(staffError);
+    if (roleError) return { success: false, error: roleError };
     return { success: false, error: "Failed to add staff member. Please try again." };
   }
 
   const role = parsed.data.role;
   if (role) {
-    const onboardingResult = await createOnboardingItems(staff.id, clinicId, role, { flow: "add-staff-wizard" });
+    const onboardingResult = await createOnboardingItems(staff.id, clinicId, role, { requireTemplate: true, flow: "add-staff-wizard" });
     if (onboardingResult.error) {
       await supabase.rpc("soft_delete_staff_member", { p_staff_id: staff.id, p_clinic_id: clinicId });
       await supabase.from("onboarding_items").delete().eq("staff_member_id", staff.id).eq("clinic_id", clinicId);

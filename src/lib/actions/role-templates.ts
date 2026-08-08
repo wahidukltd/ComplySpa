@@ -5,7 +5,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getClinicIdAndPlan } from "@/lib/utils/clinic";
-import { ROLE_VALUES } from "@/lib/staff/role-credential-defaults";
+import { roleNameSchema } from "@/lib/utils/roles";
 import { getResolvedTemplate } from "@/lib/staff/role-templates";
 import { createOnboardingItems, captureFlowError } from "@/lib/staff/onboarding";
 import * as Sentry from "@sentry/nextjs";
@@ -15,14 +15,43 @@ const templateItemSchema = z.object({
   is_required: z.boolean(),
 });
 
+const itemsSchema = z.array(templateItemSchema).max(50);
+
 const createTemplateSchema = z.object({
-  role: z.enum(ROLE_VALUES),
-  items: z.array(templateItemSchema).max(50),
+  role: roleNameSchema,
+  items: itemsSchema,
 });
 
 const updateTemplateSchema = z.object({
-  items: z.array(templateItemSchema).max(50),
+  items: itemsSchema,
 });
+
+/** Map a PostgREST RPC error to friendly copy. The RPCs raise P0001 with
+ * stable human-readable messages (057 error contract); 23505 is the
+ * case-insensitive duplicate-role index. Anything unrecognized falls back to
+ * the generic message and is captured by the caller. */
+function mapRpcError(error: { code?: string | null; message?: string | null } | null): string | null {
+  if (!error) return null;
+  if (error.code === "23505") {
+    return "A role with this name already exists in your clinic.";
+  }
+  if (error.code === "23514") {
+    // Pattern violation of role_templates_role_check — the RPCs pre-check
+    // length only, so 23514 means the character pattern (re-review note).
+    return "Invalid role name.";
+  }
+  if (error.code === "P0001") {
+    const message = error.message ?? "";
+    if (message.includes("already exists")) return "A role with this name already exists in your clinic.";
+    if (message.includes("credential types are not available")) {
+      return "One or more credential types are not available to this clinic.";
+    }
+    if (message.includes("Template not found")) return "Template not found.";
+    // In-use delete guard and name-format messages are already friendly.
+    return message || "Failed to save role template.";
+  }
+  return null;
+}
 
 async function requireOwnerOrManager(userId: string) {
   const supabase = await createClient();
@@ -48,7 +77,10 @@ export async function getRoleTemplates() {
     .select("id, clinic_id, role, is_active, updated_at")
     .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`)
     .is("is_active", true)
-    .order("role");
+    .order("role")
+    // Deterministic global-before-clinic order within a role (057): consumers
+    // that resolve clinic-wins must not depend on unspecified row order.
+    .order("clinic_id", { ascending: false });
 
   if (!templates || templates.length === 0) return { data: [] };
 
@@ -82,13 +114,16 @@ export async function getRoleTemplates() {
   return { data };
 }
 
+/** Create a template. Same-name-as-global is the explicit override flow
+ * (allowed); the RPC rejects case-insensitive duplicates against the clinic's
+ * OWN templates and validates every item's credential-type scope. Atomic. */
 export async function createRoleTemplate(input: {
   role: string;
   items: { credential_type_id: string; is_required: boolean }[];
 }) {
   const clinicData = await getClinicIdAndPlan();
   if (!clinicData) return { error: "Unauthorized" };
-  const { clinicId, userId } = clinicData;
+  const { userId } = clinicData;
 
   const permError = await requireOwnerOrManager(userId);
   if (permError) return { error: permError };
@@ -99,68 +134,37 @@ export async function createRoleTemplate(input: {
   }
 
   const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_role_template", {
+    p_role: parsed.data.role,
+    p_items: parsed.data.items.map((item) => ({
+      credential_type_id: item.credential_type_id,
+      is_required: item.is_required,
+    })),
+  });
 
-  const { data: typeRows } = await supabase
-    .from("credential_types")
-    .select("id")
-    .in("id", parsed.data.items.map((i) => i.credential_type_id))
-    .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
-  const validIds = new Set((typeRows ?? []).map((t) => t.id));
-  if (parsed.data.items.some((i) => !validIds.has(i.credential_type_id))) {
-    return { error: "One or more credential types are not available to this clinic." };
-  }
-
-  const { data: template, error: tErr } = await supabase
-    .from("role_templates")
-    .insert({ clinic_id: clinicId, role: parsed.data.role, is_active: true })
-    .select("id")
-    .single();
-
-  if (tErr || !template) {
-    Sentry.captureException(tErr);
-    return { error: "Failed to create role template." };
-  }
-
-  const rows = parsed.data.items.map((item, idx) => ({
-    template_id: template.id,
-    credential_type_id: item.credential_type_id,
-    is_required: item.is_required,
-    sort_order: idx,
-  }));
-
-  const { error: iErr } = await supabase.from("role_template_items").insert(rows);
-  if (iErr) {
-    Sentry.captureException(iErr);
-    await supabase.from("role_templates").delete().eq("id", template.id);
-    return { error: "Failed to save template items." };
+  if (error) {
+    const friendly = mapRpcError(error);
+    if (!friendly) {
+      Sentry.captureException(error);
+      return { error: "Failed to create role template." };
+    }
+    return { error: friendly };
   }
 
   revalidatePath("/dashboard/settings/role-templates");
   revalidatePath("/dashboard/staff");
-  return { success: true, id: template.id };
+  return { success: true, id: data as string };
 }
 
-async function restoreTemplateItems(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  templateId: string,
-  oldItems: { credential_type_id: string; is_required: boolean; sort_order: number }[],
-) {
-  if (oldItems.length === 0) return;
-  const { error } = await supabase.from("role_template_items").insert(
-    oldItems.map((item) => ({ ...item, template_id: templateId })),
-  );
-  if (error) {
-    Sentry.captureException(error);
-  }
-}
-
+/** Replace a template's items atomically (single transaction — no empty-reader
+ * window, no best-effort restore). Template must belong to the caller's clinic. */
 export async function updateRoleTemplate(
   templateId: string,
   input: { items: { credential_type_id: string; is_required: boolean }[] },
 ) {
   const clinicData = await getClinicIdAndPlan();
   if (!clinicData) return { error: "Unauthorized" };
-  const { clinicId, userId } = clinicData;
+  const { userId } = clinicData;
 
   const permError = await requireOwnerOrManager(userId);
   if (permError) return { error: permError };
@@ -171,53 +175,21 @@ export async function updateRoleTemplate(
   }
 
   const supabase = await createClient();
+  const { error } = await supabase.rpc("replace_role_template_items", {
+    p_template_id: templateId,
+    p_items: parsed.data.items.map((item) => ({
+      credential_type_id: item.credential_type_id,
+      is_required: item.is_required,
+    })),
+  });
 
-  const { data: template } = await supabase
-    .from("role_templates")
-    .select("id, clinic_id")
-    .eq("id", templateId)
-    .single();
-  if (!template) return { error: "Template not found" };
-  if (template.clinic_id !== clinicId) return { error: "Insufficient permissions" };
-
-  const { data: typeRows } = await supabase
-    .from("credential_types")
-    .select("id")
-    .in("id", parsed.data.items.map((i) => i.credential_type_id))
-    .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
-  const validIds = new Set((typeRows ?? []).map((t) => t.id));
-  if (parsed.data.items.some((i) => !validIds.has(i.credential_type_id))) {
-    return { error: "One or more credential types are not available to this clinic." };
-  }
-
-  const { data: oldItems } = await supabase
-    .from("role_template_items")
-    .select("credential_type_id, is_required, sort_order")
-    .eq("template_id", templateId);
-
-  const { error: delErr } = await supabase
-    .from("role_template_items")
-    .delete()
-    .eq("template_id", templateId);
-  if (delErr) {
-    Sentry.captureException(delErr);
-    return { error: "Failed to update template items." };
-  }
-
-  const rows = parsed.data.items.map((item, idx) => ({
-    template_id: templateId,
-    credential_type_id: item.credential_type_id,
-    is_required: item.is_required,
-    sort_order: idx,
-  }));
-
-  if (rows.length > 0) {
-    const { error: insErr } = await supabase.from("role_template_items").insert(rows);
-    if (insErr) {
-      Sentry.captureException(insErr);
-      await restoreTemplateItems(supabase, templateId, oldItems ?? []);
-      return { error: "Failed to update template items. Previous template restored." };
+  if (error) {
+    const friendly = mapRpcError(error);
+    if (!friendly) {
+      Sentry.captureException(error);
+      return { error: "Failed to update template items." };
     }
+    return { error: friendly };
   }
 
   revalidatePath("/dashboard/settings/role-templates");
@@ -225,28 +197,68 @@ export async function updateRoleTemplate(
   return { success: true };
 }
 
+/** Rename a custom role. The RPC moves the template AND every staff row
+ * holding the old role in one transaction (their requirements are untouched),
+ * with collision guards against every global and own-clinic role name. Returns
+ * the number of staff moved. */
+export async function renameRoleTemplate(templateId: string, newRole: string) {
+  const clinicData = await getClinicIdAndPlan();
+  if (!clinicData) return { error: "Unauthorized" };
+  const { userId } = clinicData;
+
+  const permError = await requireOwnerOrManager(userId);
+  if (permError) return { error: permError };
+
+  const parsed = roleNameSchema.safeParse(newRole);
+  if (!parsed.success) {
+    return { error: "Validation failed", fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("rename_role_template", {
+    p_template_id: templateId,
+    p_new_role: parsed.data,
+  });
+
+  if (error) {
+    const friendly = mapRpcError(error);
+    if (!friendly) {
+      // Flow-attributed (plan §10): rename failures are queryable in Sentry by
+      // feature=staff-onboarding + flow=role-rename.
+      captureFlowError(error, "role-rename");
+      return { error: "Failed to rename role." };
+    }
+    return { error: friendly };
+  }
+
+  revalidatePath("/dashboard/settings/role-templates");
+  revalidatePath("/dashboard/staff");
+  return { success: true, moved: data as number };
+}
+
+/** Delete a clinic template. Custom roles held by active staff are blocked by
+ * the RPC (the message includes the staff count); overrides delete freely —
+ * that is the deterministic "reset to global default" path. */
 export async function deleteRoleTemplate(templateId: string) {
   const clinicData = await getClinicIdAndPlan();
   if (!clinicData) return { error: "Unauthorized" };
-  const { clinicId, userId } = clinicData;
+  const { userId } = clinicData;
 
   const permError = await requireOwnerOrManager(userId);
   if (permError) return { error: permError };
 
   const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_role_template", {
+    p_template_id: templateId,
+  });
 
-  const { data: template } = await supabase
-    .from("role_templates")
-    .select("id, clinic_id")
-    .eq("id", templateId)
-    .single();
-  if (!template) return { error: "Template not found" };
-  if (template.clinic_id !== clinicId) return { error: "Insufficient permissions" };
-
-  const { error } = await supabase.from("role_templates").delete().eq("id", templateId);
   if (error) {
-    Sentry.captureException(error);
-    return { error: "Failed to delete role template." };
+    const friendly = mapRpcError(error);
+    if (!friendly) {
+      Sentry.captureException(error);
+      return { error: "Failed to delete role template." };
+    }
+    return { error: friendly };
   }
 
   revalidatePath("/dashboard/settings/role-templates");
@@ -262,25 +274,37 @@ export async function getTemplateSyncPreview(role: string) {
   const permError = await requireOwnerOrManager(userId);
   if (permError) return { error: permError };
 
+  const parsedRole = roleNameSchema.safeParse(role);
+  if (!parsedRole.success) return { error: "Invalid role name." };
+
   const supabase = await createClient();
 
   let template;
   try {
-    template = await getResolvedTemplate(clinicId, role);
+    template = await getResolvedTemplate(clinicId, parsedRole.data);
   } catch (err) {
     Sentry.captureException(err);
     return { error: "Failed to load role template." };
   }
-  if (!template) return { data: { staff: [], count: 0 } };
+  // Honest preview: a role with no template must not render as "no staff need
+  // syncing" — the sync action itself would then fail.
+  if (!template) return { error: "Role template not found." };
 
-  const requiredIds = template.required.map((r) => r.credentialTypeId);
-  if (requiredIds.length === 0) return { data: { staff: [], count: 0 } };
+  // The engine adds BOTH required and optional items (planOnboardingReconciliation
+  // inserts every template type), so the preview must count staff missing any
+  // of them — a required-only filter would disable sync for all-optional
+  // templates and undercount everywhere else (review finding SF6).
+  const allTypeIds = [
+    ...template.required.map((r) => r.credentialTypeId),
+    ...template.optional.map((o) => o.credentialTypeId),
+  ];
+  if (allTypeIds.length === 0) return { data: { staff: [], count: 0 } };
 
   const { data: staff } = await supabase
     .from("staff_members")
     .select("id, name")
     .eq("clinic_id", clinicId)
-    .eq("role", role)
+    .eq("role", parsedRole.data)
     .is("deleted_at", null)
     .is("suspended_at", null);
 
@@ -292,7 +316,7 @@ export async function getTemplateSyncPreview(role: string) {
     .from("onboarding_items")
     .select("staff_member_id, credential_type_id")
     .in("staff_member_id", staffIds)
-    .in("credential_type_id", requiredIds);
+    .in("credential_type_id", allTypeIds);
 
   const existingByStaff: Record<string, Set<string>> = {};
   for (const item of items ?? []) {
@@ -304,7 +328,7 @@ export async function getTemplateSyncPreview(role: string) {
     .from("credentials")
     .select("staff_member_id, credential_type_id")
     .in("staff_member_id", staffIds)
-    .in("credential_type_id", requiredIds)
+    .in("credential_type_id", allTypeIds)
     .is("deleted_at", null)
     .is("suspended_at", null);
 
@@ -317,7 +341,7 @@ export async function getTemplateSyncPreview(role: string) {
   const affected = staff.filter((s) => {
     const existing = existingByStaff[s.id] ?? new Set<string>();
     const heldCreds = credsByStaff[s.id] ?? new Set<string>();
-    return requiredIds.some((id) => !existing.has(id) && !heldCreds.has(id));
+    return allTypeIds.some((id) => !existing.has(id) && !heldCreds.has(id));
   });
 
   return {
@@ -339,11 +363,10 @@ export async function getRoleChangePreview(
   if (!clinicData) return { error: "Unauthorized" };
   const { clinicId, userId } = clinicData;
 
-  // Validate the role against the known set before any data access — a
-  // malformed value must not silently render "Nothing is reset" (review
-  // 2026-08-03).
-  const parsedRole = z.enum(ROLE_VALUES).safeParse(newRole);
-  if (!parsedRole.success) return { error: "Invalid role." };
+  // Validate the role name format before any data access — a malformed value
+  // must not silently render "Nothing is reset" (review 2026-08-03).
+  const parsedRole = roleNameSchema.safeParse(newRole);
+  if (!parsedRole.success) return { error: "Invalid role name." };
 
   const permError = await requireOwnerOrManager(userId);
   if (permError) return { error: permError };
@@ -442,15 +465,26 @@ export async function syncStaffToRoleTemplate(role: string) {
   if (!clinicData) return { error: "Unauthorized" };
   const { clinicId, userId } = clinicData;
 
-  // Validate the role against the known set before any data access (parity
-  // with the other template actions, review 2026-08-03).
-  const parsedRole = z.enum(ROLE_VALUES).safeParse(role);
-  if (!parsedRole.success) return { error: "Invalid role." };
+  // Validate the role name format before any data access (parity with the
+  // other template actions, review 2026-08-03).
+  const parsedRole = roleNameSchema.safeParse(role);
+  if (!parsedRole.success) return { error: "Invalid role name." };
 
   const permError = await requireOwnerOrManager(userId);
   if (permError) return { error: permError };
 
   const supabase = await createClient();
+
+  // Template-existence check (parity with getRoleChangePreview): syncing a
+  // role with no template must fail honestly, not report "synced 0".
+  let template;
+  try {
+    template = await getResolvedTemplate(clinicId, parsedRole.data);
+  } catch (err) {
+    Sentry.captureException(err);
+    return { error: "Failed to load role template." };
+  }
+  if (!template) return { error: "Role template not found." };
 
   const { data: staff } = await supabase
     .from("staff_members")
@@ -460,23 +494,26 @@ export async function syncStaffToRoleTemplate(role: string) {
     .is("deleted_at", null)
     .is("suspended_at", null);
 
-  if (!staff || staff.length === 0) return { success: true, synced: 0 };
+  if (!staff || staff.length === 0) return { success: true, synced: 0, added: 0 };
 
   // Span measures the acknowledged N×M backfill-loop trade-off (N staff × M
   // template items, sequential updates): a latency spike here is visible in
   // Sentry Performance before it becomes a user complaint, and is the signal
   // for batching the backfill (see plan Review Findings, accepted note).
   return Sentry.startSpan({ name: "staff.sync.role-wide", op: "db" }, async () => {
-    let synced = 0;
+    let added = 0;
     for (const s of staff) {
       const result = await createOnboardingItems(s.id, clinicId, parsedRole.data, { requireTemplate: true, flow: "sync-role" });
       if (result.error) return { error: result.error };
-      synced += result.added ?? 0;
+      added += result.added ?? 0;
     }
 
     revalidatePath("/dashboard/onboarding");
     revalidatePath("/dashboard/staff");
     revalidatePath("/dashboard/settings/role-templates");
-    return { success: true, synced };
+    // Distinct units (review finding SF5): `synced` = staff processed,
+    // `added` = onboarding items actually created — the toast must not blur
+    // them ("6 staff members synced" for 2 staff × 3 items).
+    return { success: true, synced: staff.length, added };
   });
 }

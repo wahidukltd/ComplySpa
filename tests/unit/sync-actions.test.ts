@@ -28,7 +28,12 @@ vi.mock("@/lib/staff/onboarding", async (importOriginal) => {
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createOnboardingItems } from "@/lib/staff/onboarding";
-import { getRoleChangePreview, syncStaffToTemplate, syncStaffToRoleTemplate } from "@/lib/actions/role-templates";
+import {
+  getRoleChangePreview,
+  getTemplateSyncPreview,
+  syncStaffToTemplate,
+  syncStaffToRoleTemplate,
+} from "@/lib/actions/role-templates";
 
 const mockedCreateClient = vi.mocked(createClient);
 const mockedCreateOnboardingItems = vi.mocked(createOnboardingItems);
@@ -135,9 +140,22 @@ describe("syncStaffToTemplate — delegation to the shared engine", () => {
 });
 
 describe("syncStaffToRoleTemplate — role-wide delegation", () => {
-  it("rejects an invalid role before any data access", async () => {
-    const result = await syncStaffToRoleTemplate("not-a-role");
-    expect(result.error).toBe("Invalid role.");
+  it("rejects a malformed role name before any data access", async () => {
+    const result = await syncStaffToRoleTemplate("Bad@Role!");
+    expect(result.error).toBe("Invalid role name.");
+  });
+
+  it("errors honestly when the role has no template (057 template-exists contract)", async () => {
+    const { supabase } = makeSupabase([
+      () => ({ data: { role: "owner" }, error: null }),
+      // getResolvedTemplate finds no role_templates row for the role
+      () => ({ data: [], error: null }),
+    ]);
+    mockedCreateClient.mockResolvedValue(supabase as never);
+
+    const result = await syncStaffToRoleTemplate("Laser Technician");
+    expect(result.error).toBe("Role template not found.");
+    expect(mockedCreateOnboardingItems).not.toHaveBeenCalled();
   });
 
   it("syncs every staff member of the role through the shared engine", async () => {
@@ -145,13 +163,18 @@ describe("syncStaffToRoleTemplate — role-wide delegation", () => {
 
     const { supabase, calls } = makeSupabase([
       () => ({ data: { role: "owner" }, error: null }),
+      // getResolvedTemplate: role_templates row (global) + its items
+      () => ({ data: [{ id: "tpl", clinic_id: null, role: "RN", is_active: true }], error: null }),
+      () => ({ data: [], error: null }),
       () => ({ data: [{ id: "s1" }, { id: "s2" }], error: null }),
     ]);
     mockedCreateClient.mockResolvedValue(supabase as never);
 
     const result = await syncStaffToRoleTemplate("RN");
 
-    expect(result).toEqual({ success: true, synced: 2 });
+    // Distinct units (review finding SF5): synced = staff processed,
+    // added = onboarding items created.
+    expect(result).toEqual({ success: true, synced: 2, added: 2 });
     expect(mockedCreateOnboardingItems).toHaveBeenCalledTimes(2);
     expect(mockedCreateOnboardingItems).toHaveBeenCalledWith("s1", "c1", "RN", { requireTemplate: true, flow: "sync-role" });
     expect(mockedCreateOnboardingItems).toHaveBeenCalledWith("s2", "c1", "RN", { requireTemplate: true, flow: "sync-role" });
@@ -165,6 +188,8 @@ describe("syncStaffToRoleTemplate — role-wide delegation", () => {
 
     const { supabase } = makeSupabase([
       () => ({ data: { role: "owner" }, error: null }),
+      () => ({ data: [{ id: "tpl", clinic_id: null, role: "RN", is_active: true }], error: null }),
+      () => ({ data: [], error: null }),
       () => ({ data: [{ id: "s1" }, { id: "s2" }], error: null }),
     ]);
     mockedCreateClient.mockResolvedValue(supabase as never);
@@ -174,10 +199,77 @@ describe("syncStaffToRoleTemplate — role-wide delegation", () => {
   });
 });
 
+describe("getTemplateSyncPreview — SF6 preview-vs-engine parity", () => {
+  it("counts staff missing OPTIONAL items too (the engine adds required + optional)", async () => {
+    const { supabase } = makeSupabase([
+      () => ({ data: { role: "owner" }, error: null }),
+      // getResolvedTemplate: an ALL-OPTIONAL template (the case that used to
+      // report 0 affected and disable sync forever)
+      () => ({ data: [{ id: "tpl", clinic_id: null, role: "RN", is_active: true }], error: null }),
+      () => ({
+        data: [
+          { template_id: "tpl", is_required: false, sort_order: 0, credential_type_id: "t-acls", credential_type: { name: "ACLS Certification" } },
+        ],
+        error: null,
+      }),
+      // staff in the role
+      () => ({ data: [{ id: "s1", name: "Nurse One" }], error: null }),
+      // onboarding_items read — none exist
+      () => ({ data: [], error: null }),
+      // credentials read — none held
+      () => ({ data: [], error: null }),
+    ]);
+    mockedCreateClient.mockResolvedValue(supabase as never);
+
+    const result = await getTemplateSyncPreview("RN");
+
+    expect(result.error).toBeUndefined();
+    // The all-optional template must NOT report "no staff need syncing".
+    expect(result.data?.count).toBe(1);
+    expect(result.data?.staff).toEqual([{ id: "s1", name: "Nurse One" }]);
+  });
+
+  it("excludes staff who already hold every required AND optional item", async () => {
+    const { supabase } = makeSupabase([
+      () => ({ data: { role: "owner" }, error: null }),
+      () => ({ data: [{ id: "tpl", clinic_id: null, role: "RN", is_active: true }], error: null }),
+      () => ({
+        data: [
+          { template_id: "tpl", is_required: true, sort_order: 0, credential_type_id: "t-rn", credential_type: { name: "Registered Nurse License" } },
+          { template_id: "tpl", is_required: false, sort_order: 1, credential_type_id: "t-acls", credential_type: { name: "ACLS Certification" } },
+        ],
+        error: null,
+      }),
+      () => ({ data: [{ id: "s1", name: "Nurse One" }], error: null }),
+      // has the required item in the checklist
+      () => ({ data: [{ staff_member_id: "s1", credential_type_id: "t-rn" }], error: null }),
+      // holds the optional credential
+      () => ({ data: [{ staff_member_id: "s1", credential_type_id: "t-acls" }], error: null }),
+    ]);
+    mockedCreateClient.mockResolvedValue(supabase as never);
+
+    const result = await getTemplateSyncPreview("RN");
+
+    expect(result.error).toBeUndefined();
+    expect(result.data?.count).toBe(0);
+  });
+
+  it("errors honestly when the role has no template", async () => {
+    const { supabase } = makeSupabase([
+      () => ({ data: { role: "owner" }, error: null }),
+      () => ({ data: [], error: null }),
+    ]);
+    mockedCreateClient.mockResolvedValue(supabase as never);
+
+    const result = await getTemplateSyncPreview("Ghost Role");
+    expect(result.error).toBe("Role template not found.");
+  });
+});
+
 describe("getRoleChangePreview — D12 preview action", () => {
-  it("rejects an invalid role", async () => {
-    const result = await getRoleChangePreview("s1", "not-a-role");
-    expect(result.error).toBe("Invalid role.");
+  it("rejects a malformed role name before any data access", async () => {
+    const result = await getRoleChangePreview("s1", "Bad@Role!");
+    expect(result.error).toBe("Invalid role name.");
   });
 
   it("rejects viewers before any data access", async () => {

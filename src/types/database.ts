@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -648,12 +648,15 @@ export type Database = {
         Args: { p_jobname: string; p_max_stale_hours?: number }
         Returns: boolean
       }
-      count_preserved_clinic_data: {
-        Args: never
-        Returns: { staff_count: number; credential_count: number }[]
-      }
       check_trial_expiry: { Args: never; Returns: undefined }
       cleanup_inactive_clinics: { Args: never; Returns: undefined }
+      count_preserved_clinic_data: {
+        Args: never
+        Returns: {
+          credential_count: number
+          staff_count: number
+        }[]
+      }
       create_clinic_for_user: {
         Args: {
           p_address?: string
@@ -665,6 +668,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_role_template: {
+        Args: { p_items: Json; p_role: string }
+        Returns: string
+      }
       delete_credential_with_checklist_revert: {
         Args: {
           p_clinic_id: string
@@ -672,6 +679,10 @@ export type Database = {
           p_staff_member_id: string
         }
         Returns: Json
+      }
+      delete_role_template: {
+        Args: { p_template_id: string }
+        Returns: undefined
       }
       get_alert_windows: {
         Args: { p_clinic_id: string }
@@ -685,6 +696,14 @@ export type Database = {
         Returns: undefined
       }
       reconcile_stale_pending_alerts: { Args: never; Returns: undefined }
+      rename_role_template: {
+        Args: { p_new_role: string; p_template_id: string }
+        Returns: number
+      }
+      replace_role_template_items: {
+        Args: { p_items: Json; p_template_id: string }
+        Returns: undefined
+      }
       scan_escalation_alerts: { Args: never; Returns: undefined }
       scan_expiring_credentials: { Args: never; Returns: undefined }
       soft_delete_staff_member: {
@@ -693,22 +712,30 @@ export type Database = {
       }
       update_clinic_subscription: {
         Args: {
-          p_cancel_at_period_end?: boolean | null
+          p_cancel_at_period_end?: boolean
           p_clinic_id: string
+          p_current_period_end?: string
+          p_current_period_start?: string
           p_plan: string
-          p_polar_customer_id?: string | null
-          p_polar_subscription_id?: string | null
-          p_subscription_amount?: number | null
-          p_subscription_currency?: string | null
-          p_subscription_interval?: string | null
-          p_subscription_product_id?: string | null
-          p_subscription_status?: string | null
-          p_current_period_end?: string | null
-          p_current_period_start?: string | null
+          p_polar_customer_id?: string
+          p_polar_subscription_id?: string
+          p_subscription_amount?: number
+          p_subscription_currency?: string
+          p_subscription_interval?: string
+          p_subscription_product_id?: string
+          p_subscription_status?: string
         }
         Returns: boolean
       }
       update_credential_statuses: { Args: never; Returns: undefined }
+      validate_role_template_items: {
+        Args: { p_clinic_id: string; p_items: Json }
+        Returns: {
+          credential_type_id: string
+          is_required: boolean
+          sort_order: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

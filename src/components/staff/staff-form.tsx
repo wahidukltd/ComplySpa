@@ -18,14 +18,17 @@ import {
   staffMemberSchema,
   type StaffMemberInput,
 } from "@/lib/validations/staff";
-import { ROLE_DISPLAY_LABELS, ROLE_VALUES } from "@/lib/staff/role-credential-defaults";
+import { formatRoleLabel, BUILT_IN_ROLES } from "@/lib/utils/roles";
 import { getRoleChangePreview } from "@/lib/actions/role-templates";
 import { Loader2 } from "lucide-react";
 import type { Tables } from "@/types/database";
 
 type StaffMember = Tables<"staff_members">;
 
-const ROLE_KEYS = ROLE_VALUES;
+interface RoleOption {
+  value: string;
+  label: string;
+}
 
 interface RoleChangePreview {
   kept: number;
@@ -39,9 +42,12 @@ interface StaffFormProps {
   submitLabel?: string;
   /** Present on the edit form — enables the role-change preview (D12). */
   staffMemberId?: string;
+  /** Selectable roles (resolved templates: built-ins + clinic custom roles,
+   * labels via formatRoleLabel). Falls back to the built-ins. */
+  roleOptions?: RoleOption[];
 }
 
-export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save", staffMemberId }: StaffFormProps) {
+export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save", staffMemberId, roleOptions }: StaffFormProps) {
   const {
     register,
     handleSubmit,
@@ -93,8 +99,11 @@ export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save", staff
     preview && preview.role === currentRole && currentRole !== originalRole ? preview.data : null;
 
   const roleSelectItems = useMemo(
-    () => ROLE_KEYS.map((key) => ({ value: key, label: ROLE_DISPLAY_LABELS[key] ?? key })),
-    [],
+    () =>
+      (roleOptions ?? BUILT_IN_ROLES.map((key) => ({ value: key, label: formatRoleLabel(key) }))).map(
+        (opt) => ({ value: opt.value, label: opt.label }),
+      ),
+    [roleOptions],
   );
 
   async function onFormSubmit(data: StaffMemberInput) {
@@ -127,16 +136,16 @@ export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save", staff
         <Label htmlFor="role">Role</Label>
         <Select
           defaultValue={originalRole}
-          onValueChange={(value) => setValue("role", value as StaffMemberInput["role"])}
+          onValueChange={(value) => value && setValue("role", value)}
           items={roleSelectItems}
         >
           <SelectTrigger id="role">
             <SelectValue placeholder="Select a role" />
           </SelectTrigger>
           <SelectContent>
-            {ROLE_KEYS.map((key) => (
-              <SelectItem key={key} value={key}>
-                {ROLE_DISPLAY_LABELS[key] ?? key}
+            {(roleOptions ?? BUILT_IN_ROLES.map((key) => ({ value: key, label: formatRoleLabel(key) }))).map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -152,7 +161,7 @@ export function StaffForm({ defaultValues, onSubmit, submitLabel = "Save", staff
           className="rounded-lg border border-muted-foreground/20 bg-muted/20 px-4 py-3 text-sm"
         >
           <p className="font-medium">
-            Changing role to {ROLE_DISPLAY_LABELS[currentRole] ?? currentRole}
+            Changing role to {formatRoleLabel(currentRole)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Requirements will update when you save:</p>
           <ul className="mt-1.5 space-y-1 text-xs">

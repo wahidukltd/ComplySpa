@@ -21,13 +21,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Pencil, Trash2, Search, CheckCircle2, AlertTriangle, ClipboardCheck } from "lucide-react";
 import { formatDate } from "@/lib/utils/date";
-import { ROLE_DISPLAY_LABELS, ROLE_VALUES } from "@/lib/staff/role-credential-defaults";
+import { formatRoleLabel, BUILT_IN_ROLES } from "@/lib/utils/roles";
 import { deriveWorkStatus, hasPendingOnboardingItems, WORK_STATUS_META, WORK_STATUS_FILTER, type WorkStatus } from "@/lib/utils/work-status";
 import type { OnboardingStaffState } from "@/lib/staff/onboarding";
 import type { Tables } from "@/types/database";
 import type { ReadinessResult } from "@/lib/staff/readiness";
 
 type StaffMember = Tables<"staff_members">;
+
+interface RoleOption {
+  value: string;
+  label: string;
+}
 
 const EMPTY_ONBOARDING_STATE: OnboardingStaffState = {
   requiredTotal: 0,
@@ -46,8 +51,6 @@ const EMPTY_READINESS: ReadinessResult = {
   expiringCredentials: [],
 };
 
-const ROLE_KEYS = ["", ...ROLE_VALUES] as const;
-
 interface StaffTableProps {
   staff: StaffMember[];
   onDelete: (id: string) => void;
@@ -55,6 +58,9 @@ interface StaffTableProps {
   onboardingState?: Record<string, OnboardingStaffState>;
   dataUnavailable?: boolean;
   canEdit?: boolean;
+  /** Role filter options (resolved templates: built-ins + clinic custom roles,
+   * labels via formatRoleLabel). Falls back to the built-ins. */
+  roleOptions?: RoleOption[];
 }
 
 function StatusIcon({ type }: { type: "check" | "alert" | "warning" }) {
@@ -86,11 +92,16 @@ function formatReadinessDetails(r: ReadinessResult): string {
   return parts.join(" · ");
 }
 
-export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState = {}, dataUnavailable = false, canEdit = true }: StaffTableProps) {
+export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState = {}, dataUnavailable = false, canEdit = true, roleOptions }: StaffTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<WorkStatus | "">("");
+
+  const roleFilterOptions = useMemo(
+    () => roleOptions ?? BUILT_IN_ROLES.map((key) => ({ value: key, label: formatRoleLabel(key) })),
+    [roleOptions],
+  );
 
   const filteredStaff = useMemo(() => {
     return staff.filter((member) => {
@@ -145,20 +156,26 @@ export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Role:</span>
-          {ROLE_KEYS.map((key) => {
-            const label = key === "" ? "All" : (ROLE_DISPLAY_LABELS[key] ?? key);
-            return (
-              <Button
-                key={key || "all"}
-                variant={roleFilter === key ? "default" : "outline"}
-                size="sm"
-                onClick={() => setRoleFilter(key)}
-                className="h-7 text-xs"
-              >
-                {label}
-              </Button>
-            );
-          })}
+          <Button
+            key="all"
+            variant={roleFilter === "" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setRoleFilter("")}
+            className="h-7 text-xs"
+          >
+            All
+          </Button>
+          {roleFilterOptions.map((opt) => (
+            <Button
+              key={opt.value}
+              variant={roleFilter === opt.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => setRoleFilter(opt.value)}
+              className="h-7 text-xs"
+            >
+              {opt.label}
+            </Button>
+          ))}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
@@ -230,7 +247,7 @@ export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState
                   <TableCell>
                     {member.role ? (
                       <Badge variant="secondary">
-                        {ROLE_DISPLAY_LABELS[member.role] ?? member.role}
+                        {formatRoleLabel(member.role)}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">—</span>

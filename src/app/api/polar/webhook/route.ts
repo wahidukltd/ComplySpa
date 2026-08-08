@@ -186,17 +186,20 @@ export async function POST(req: NextRequest) {
     const transition = resolveWebhookTransition(event.type, data, clinic.plan, clinic.polar_subscription_id);
 
     // Shared projection args; each event branch decides the plan + cancel flag.
+    // Nullable fields pass `undefined` (param omitted) rather than explicit
+    // nulls — the RPC COALESCEs both to "keep stored value", so behavior is
+    // identical, and the generated RPC arg types reject null.
     const projection = {
       p_clinic_id: clinic.id,
       p_polar_subscription_id: data.id,
-      p_polar_customer_id: data.customerId || null,
+      p_polar_customer_id: data.customerId || undefined,
       p_subscription_status: data.status,
-      p_current_period_start: toIso(data.currentPeriodStart),
-      p_current_period_end: toIso(data.currentPeriodEnd),
+      p_current_period_start: toIso(data.currentPeriodStart) ?? undefined,
+      p_current_period_end: toIso(data.currentPeriodEnd) ?? undefined,
       p_subscription_amount: data.amount,
       p_subscription_product_id: data.productId,
-      p_subscription_currency: data.currency || null,
-      p_subscription_interval: transition.interval,
+      p_subscription_currency: data.currency || undefined,
+      p_subscription_interval: transition.interval ?? undefined,
     };
 
     // Finding 2 (code review 2026-08-08): the stale-event prediction is NOT a

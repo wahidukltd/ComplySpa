@@ -42,6 +42,13 @@ const EXPECTED_FUNCTIONS = [
   "auth_user_role",
   "create_clinic_for_user",
   "get_alert_windows",
+  // 057 role-template RPCs + trigger function
+  "create_role_template",
+  "replace_role_template_items",
+  "rename_role_template",
+  "delete_role_template",
+  "validate_role_template_items",
+  "enforce_staff_role_template",
 ] as const;
 
 const EXPECTED_CRON_JOBS = [
@@ -290,6 +297,79 @@ describe("Migration integrity", () => {
       "SELECT has_function_privilege('anon', 'create_clinic_for_user(text,text,text,text,text,text)', 'EXECUTE')",
     );
     expect(anon).toBe("f");
+  });
+
+  it("057: staff_members.role CHECK is the open format constraint (not the 9-value enum)", () => {
+    const def = execSql(
+      "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'staff_members_role_check'",
+    );
+    expect(def).toContain("char_length(role)");
+    expect(def).toContain("[:alpha:]");
+    expect(def).not.toContain("'RN'");
+  });
+
+  it("057: role_templates.role format CHECK exists (additive)", () => {
+    const def = execSql(
+      "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'role_templates_role_check'",
+    );
+    expect(def).toContain("char_length(role)");
+    expect(def).toContain("[:alpha:]");
+  });
+
+  it("057: case-insensitive role indexes exist in both scopes", () => {
+    const clinicIndex = execSql(
+      "SELECT count(*) FROM pg_indexes WHERE indexname = 'idx_role_templates_clinic_role_ci' AND indexdef LIKE '%(clinic_id, lower(role))%'",
+    );
+    expect(parseInt(clinicIndex, 10)).toBe(1);
+    const globalIndex = execSql(
+      "SELECT count(*) FROM pg_indexes WHERE indexname = 'idx_role_templates_global_role_ci' AND indexdef LIKE '%lower(role)%'",
+    );
+    expect(parseInt(globalIndex, 10)).toBe(1);
+  });
+
+  it("057: enforce_staff_role_template trigger is armed on staff_members", () => {
+    const result = execSql(
+      "SELECT count(*) FROM pg_trigger WHERE tgname = 'trigger_staff_members_role_template' AND tgrelid = 'staff_members'::regclass AND NOT tgisinternal",
+    );
+    expect(parseInt(result, 10)).toBe(1);
+  });
+
+  it("057: updated_at touch trigger is armed on role_templates (raw-API path, N1)", () => {
+    const result = execSql(
+      "SELECT count(*) FROM pg_trigger WHERE tgname = 'trigger_role_templates_touch_updated_at' AND tgrelid = 'role_templates'::regclass AND NOT tgisinternal",
+    );
+    expect(parseInt(result, 10)).toBe(1);
+  });
+
+  it("057: role_template_items_manage WITH CHECK scopes credential_type_id (cross-tenant boundary)", () => {
+    // pg_policies.qual is text; pg_get_expr needs the pg_policy catalog's
+    // node-tree columns.
+    const def = execSql(
+      "SELECT pg_get_expr(p.polqual, c.oid) || ' / ' || pg_get_expr(p.polwithcheck, c.oid) FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relname = 'role_template_items' AND p.polname = 'role_template_items_manage'",
+    );
+    expect(def).toContain("credential_types");
+  });
+
+  it("057: mutation RPCs are executable by authenticated only (047 pin)", () => {
+    const rpcs = [
+      "create_role_template(text,jsonb)",
+      "replace_role_template_items(uuid,jsonb)",
+      "rename_role_template(uuid,text)",
+      "delete_role_template(uuid)",
+      "validate_role_template_items(jsonb)",
+    ];
+    for (const fn of rpcs) {
+      const authed = execSql(
+        `SELECT has_function_privilege('authenticated', '${fn}', 'EXECUTE')`,
+      );
+      expect(authed, `${fn} authenticated`).toBe("t");
+      for (const role of ["anon", "service_role"]) {
+        const denied = execSql(
+          `SELECT has_function_privilege('${role}', '${fn}', 'EXECUTE')`,
+        );
+        expect(denied, `${fn} ${role}`).toBe("f");
+      }
+    }
   });
 });
 

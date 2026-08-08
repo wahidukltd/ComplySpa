@@ -8,6 +8,8 @@ import { StaffTableWrapper } from "./staff-table-wrapper";
 import { cn } from "@/lib/utils";
 import { getStaffReadinessBulk } from "@/lib/staff/readiness";
 import { getOnboardingStateByStaff, type OnboardingStaffState } from "@/lib/staff/onboarding";
+import { getRoleTemplates } from "@/lib/actions/role-templates";
+import { formatRoleLabel } from "@/lib/utils/roles";
 import * as Sentry from "@sentry/nextjs";
 import type { Tables } from "@/types/database";
 
@@ -58,6 +60,14 @@ export default async function StaffListPage() {
   const readinessFailed = staffIds.length > 0 && Object.keys(readinessMap).length === 0;
   const dataUnavailable = onboardingFailed || readinessFailed;
 
+  // Role filter chips follow the resolved template set (built-ins + custom
+  // roles, clinic-wins) so every chip maps to a real template.
+  const roleTemplatesResult = await getRoleTemplates();
+  const templateRoles = new Set((roleTemplatesResult.data ?? []).map((t) => t.role));
+  const roleOptions = [...templateRoles]
+    .sort()
+    .map((role) => ({ value: role, label: formatRoleLabel(role) }));
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -76,6 +86,7 @@ export default async function StaffListPage() {
         onboardingState={onboardingState}
         dataUnavailable={dataUnavailable}
         canEdit={userRecord.role !== "viewer"}
+        roleOptions={roleOptions}
       />
     </div>
   );

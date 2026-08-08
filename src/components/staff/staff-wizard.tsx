@@ -75,6 +75,8 @@ export function StaffWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [step2Error, setStep2Error] = useState<string | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
+  // Clinic-created roles (no global twin), appended after the built-in cards.
+  const [customRoles, setCustomRoles] = useState<string[]>([]);
 
   const {
     register,
@@ -118,6 +120,29 @@ export function StaffWizard() {
         setCredentialTypes(data ?? []);
       }
       setTypesLoading(false);
+
+      // Role cards are template-driven (057): the built-ins keep their order,
+      // clinic-created custom roles (no global twin) are appended. A role with
+      // no template never renders — the staff actions and the DB trigger
+      // reject template-less roles anyway.
+      const { data: templates, error: templatesError } = await supabase
+        .from("role_templates")
+        .select("role, clinic_id")
+        .eq("is_active", true)
+        .or(`clinic_id.is.null,clinic_id.eq.${userRecord.clinic_id}`);
+      if (templatesError) {
+        toast.error("Failed to load custom roles.");
+        return;
+      }
+      const globalRoles = new Set(
+        (templates ?? []).filter((t) => t.clinic_id === null).map((t) => t.role),
+      );
+      setCustomRoles(
+        (templates ?? [])
+          .filter((t) => t.clinic_id !== null && !globalRoles.has(t.role))
+          .map((t) => t.role)
+          .sort(),
+      );
     }
     loadTypes();
   }, []);
@@ -285,7 +310,7 @@ export function StaffWizard() {
       department: values.department || "",
       hire_date: values.hire_date || "",
       manager: values.manager || "",
-      role: (selectedRole ?? undefined) as "RN" | "NP" | "PA" | "MD" | "DO" | "esthetician" | "MA" | "front_desk" | "other" | undefined,
+      role: selectedRole ?? undefined,
       procedures_performed: [],
       credentials: checkedCredentials,
     });
@@ -453,6 +478,25 @@ export function StaffWizard() {
                 {roleKey === "MD" && (
                   <span className="text-xs text-muted-foreground">Covers MD & DO</span>
                 )}
+              </button>
+            );
+          })}
+          {customRoles.map((roleKey) => {
+            const isSelected = selectedRole === roleKey;
+            return (
+              <button
+                key={roleKey}
+                type="button"
+                onClick={() => handleRoleSelect(roleKey)}
+                className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-all hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  isSelected
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border hover:border-muted-foreground/30"
+                }`}
+              >
+                <CircleDot className={`size-8 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                <span className={`text-sm font-medium ${isSelected ? "text-primary" : ""}`}>{roleKey}</span>
+                <span className="text-xs text-muted-foreground">Custom role</span>
               </button>
             );
           })}

@@ -37,7 +37,7 @@ export default async function RoleTemplatesPage() {
 
       <PageHeader
         title="Role Templates"
-        description="Define what each staff role must hold to be compliant. Future hires inherit these requirements automatically."
+        description="ComplySpa provides global defaults for the standard roles. Customize any default or create your own role — requirements apply to future hires and sync to existing staff when you choose."
       />
 
       <TemplateEditor

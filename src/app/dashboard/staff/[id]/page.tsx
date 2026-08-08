@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
-import { ROLE_DISPLAY_LABELS } from "@/lib/staff/role-credential-defaults";
+import { formatRoleLabel } from "@/lib/utils/roles";
 import { getStaffOnboarding } from "@/lib/actions/onboarding";
 import { OnboardingChecklist } from "@/components/staff/staff-onboarding-checklist";
 import { getStaffReadiness } from "@/lib/staff/readiness";
@@ -63,7 +63,7 @@ export default async function StaffDetailPage({
     .is("suspended_at", null)
     .order("expiration_date", { ascending: true, nullsFirst: false });
 
-  const roleLabel = staff.role ? (ROLE_DISPLAY_LABELS[staff.role] ?? staff.role) : null;
+  const roleLabel = staff.role ? formatRoleLabel(staff.role) : null;
 
   const { items: onboardingItems = [], progress: onboardingProgress = {
     total: 0, completed: 0, skipped: 0, pending: 0,

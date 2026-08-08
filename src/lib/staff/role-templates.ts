@@ -7,35 +7,51 @@ export interface ResolvedTemplate {
   optional: { credentialTypeId: string; name: string }[];
 }
 
-interface TemplateItemRow {
-  template_id: string;
+interface TemplateRow {
+  id: string;
   clinic_id: string | null;
   role: string;
+}
+
+interface TemplateItemRow {
+  template_id: string;
   is_required: boolean;
   sort_order: number;
   credential_type_id: string;
   credential_type_name: string;
 }
 
-async function fetchTemplateRows(clinicId: string, roles: string[]): Promise<TemplateItemRow[]> {
+/** Resolve templates for the given roles: the clinic's override row wins per
+ * role, else the global row (clinic-wins — the verified product rule). The
+ * resolution is TEMPLATE-row-driven (057): a template with zero items still
+ * resolves to an empty requirement set (e.g. the seeded `other` role) instead
+ * of vanishing — `getResolvedTemplate` must never conflate "no template" with
+ * "empty template". */
+async function fetchResolvedTemplates(
+  clinicId: string,
+  roles: string[],
+): Promise<Map<string, ResolvedTemplate>> {
   const supabase = await createClient();
 
   const { data: templates } = await supabase
     .from("role_templates")
-    .select("id, clinic_id, role, is_active")
+    .select("id, clinic_id, role")
     .in("role", roles)
     .is("is_active", true)
     .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
 
-  if (!templates || templates.length === 0) return [];
+  if (!templates || templates.length === 0) return new Map();
 
-  const visibleTemplates = templates.filter(
-    (t) => t.clinic_id === clinicId || t.clinic_id === null,
-  );
-  if (visibleTemplates.length === 0) return [];
+  const byRole = new Map<string, TemplateRow>();
+  for (const t of templates) {
+    if (t.clinic_id !== clinicId && t.clinic_id !== null) continue;
+    const existing = byRole.get(t.role);
+    if (!existing || (t.clinic_id !== null && existing.clinic_id === null)) {
+      byRole.set(t.role, t);
+    }
+  }
 
-  const templateIds = visibleTemplates.map((t) => t.id);
-  const templateMeta = new Map(visibleTemplates.map((t) => [t.id, t]));
+  const templateIds = [...byRole.values()].map((t) => t.id);
 
   const { data: items } = await supabase
     .from("role_template_items")
@@ -48,82 +64,52 @@ async function fetchTemplateRows(clinicId: string, roles: string[]): Promise<Tem
     `)
     .in("template_id", templateIds);
 
-  return (items ?? [])
-    .filter((d) => templateMeta.has(d.template_id))
-    .map((d) => {
-      const meta = templateMeta.get(d.template_id)!;
-      return {
-        template_id: d.template_id,
-        clinic_id: meta.clinic_id,
-        role: meta.role,
-        is_required: d.is_required,
-        sort_order: d.sort_order,
-        credential_type_id: d.credential_type_id,
-        credential_type_name: d.credential_type?.name ?? "Unknown",
-      };
+  const itemsByTemplate = new Map<string, TemplateItemRow[]>();
+  for (const item of items ?? []) {
+    const bucket = itemsByTemplate.get(item.template_id) ?? [];
+    bucket.push({
+      template_id: item.template_id,
+      is_required: item.is_required,
+      sort_order: item.sort_order,
+      credential_type_id: item.credential_type_id,
+      credential_type_name: item.credential_type?.name ?? "Unknown",
     });
+    itemsByTemplate.set(item.template_id, bucket);
+  }
+
+  const result = new Map<string, ResolvedTemplate>();
+  for (const [role, template] of byRole) {
+    const roleItems = (itemsByTemplate.get(template.id) ?? []).sort(
+      (a, b) => a.sort_order - b.sort_order,
+    );
+    result.set(role, {
+      templateId: template.id,
+      clinicId: template.clinic_id,
+      required: roleItems
+        .filter((r) => r.is_required)
+        .map((r) => ({ credentialTypeId: r.credential_type_id, name: r.credential_type_name })),
+      optional: roleItems
+        .filter((r) => !r.is_required)
+        .map((r) => ({ credentialTypeId: r.credential_type_id, name: r.credential_type_name })),
+    });
+  }
+
+  return result;
 }
 
-export async function getResolvedTemplate(clinicId: string, role: string): Promise<ResolvedTemplate | null> {
-  const rows = await fetchTemplateRows(clinicId, [role]);
-  const roleRows = rows.filter((r) => r.role === role);
-
-  const clinicRows = roleRows.filter((r) => r.clinic_id === clinicId);
-  const globalRows = roleRows.filter((r) => r.clinic_id === null);
-
-  const source = clinicRows.length > 0 ? clinicRows : globalRows;
-  if (source.length === 0) return null;
-
-  source.sort((a, b) => a.sort_order - b.sort_order);
-
-  const first = source[0];
-  if (!first) return null;
-
-  return {
-    templateId: first.template_id,
-    clinicId: first.clinic_id,
-    required: source
-      .filter((r) => r.is_required)
-      .map((r) => ({ credentialTypeId: r.credential_type_id, name: r.credential_type_name })),
-    optional: source
-      .filter((r) => !r.is_required)
-      .map((r) => ({ credentialTypeId: r.credential_type_id, name: r.credential_type_name })),
-  };
+export async function getResolvedTemplate(
+  clinicId: string,
+  role: string,
+): Promise<ResolvedTemplate | null> {
+  const resolved = await fetchResolvedTemplates(clinicId, [role]);
+  return resolved.get(role) ?? null;
 }
 
 export async function getResolvedTemplatesBulk(
   clinicId: string,
   roles: string[],
 ): Promise<Record<string, ResolvedTemplate>> {
-  const result: Record<string, ResolvedTemplate> = {};
-  if (roles.length === 0) return result;
-
-  const rows = await fetchTemplateRows(clinicId, roles);
-
-  for (const role of roles) {
-    const roleRows = rows.filter((r) => r.role === role);
-    const clinicRows = roleRows.filter((r) => r.clinic_id === clinicId);
-    const globalRows = roleRows.filter((r) => r.clinic_id === null);
-
-    const source = clinicRows.length > 0 ? clinicRows : globalRows;
-    if (source.length === 0) continue;
-
-    source.sort((a, b) => a.sort_order - b.sort_order);
-
-    const first = source[0];
-    if (!first) continue;
-
-    result[role] = {
-      templateId: first.template_id,
-      clinicId: first.clinic_id,
-      required: source
-        .filter((r) => r.is_required)
-        .map((r) => ({ credentialTypeId: r.credential_type_id, name: r.credential_type_name })),
-      optional: source
-        .filter((r) => !r.is_required)
-        .map((r) => ({ credentialTypeId: r.credential_type_id, name: r.credential_type_name })),
-    };
-  }
-
-  return result;
+  if (roles.length === 0) return {};
+  const resolved = await fetchResolvedTemplates(clinicId, roles);
+  return Object.fromEntries(resolved);
 }

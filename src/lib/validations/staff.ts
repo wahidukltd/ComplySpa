@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { roleNameSchema } from "@/lib/utils/roles";
 
 export const staffMemberSchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
-  role: z
-    .enum(["RN", "NP", "PA", "MD", "DO", "esthetician", "MA", "front_desk", "other"])
-    .optional(),
+  // Open role values (057): custom clinic roles are legal. Format is
+  // validated here; template existence is enforced by the staff actions
+  // (requireTemplate) and the enforce_staff_role_template DB trigger.
+  role: roleNameSchema.optional(),
   hire_date: z.string().date("Use YYYY-MM-DD format").optional().or(z.literal("")),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().max(30).optional().or(z.literal("")),

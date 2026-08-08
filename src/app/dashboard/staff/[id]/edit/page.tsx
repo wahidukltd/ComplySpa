@@ -2,6 +2,8 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { EditStaffFormWrapper } from "./edit-staff-form-wrapper";
+import { getRoleTemplates } from "@/lib/actions/role-templates";
+import { formatRoleLabel } from "@/lib/utils/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -39,11 +41,18 @@ export default async function EditStaffPage({
 
   if (!staff) notFound();
 
+  // Role select follows the resolved template set (built-ins + custom roles).
+  const roleTemplatesResult = await getRoleTemplates();
+  const templateRoles = new Set((roleTemplatesResult.data ?? []).map((t) => t.role));
+  const roleOptions = [...templateRoles]
+    .sort()
+    .map((role) => ({ value: role, label: formatRoleLabel(role) }));
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Edit Staff Member" description="Update the staff member's information." />
       <div className="max-w-lg">
-        <EditStaffFormWrapper staff={staff} />
+        <EditStaffFormWrapper staff={staff} roleOptions={roleOptions} />
       </div>
     </div>
   );

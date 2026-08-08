@@ -9,7 +9,13 @@ import type { Tables } from "@/types/database";
 
 type StaffMember = Tables<"staff_members">;
 
-export function EditStaffFormWrapper({ staff }: { staff: StaffMember }) {
+export function EditStaffFormWrapper({
+  staff,
+  roleOptions,
+}: {
+  staff: StaffMember;
+  roleOptions?: { value: string; label: string }[];
+}) {
   const router = useRouter();
 
   async function handleSubmit(data: StaffMemberInput) {
@@ -45,6 +51,7 @@ export function EditStaffFormWrapper({ staff }: { staff: StaffMember }) {
       onSubmit={handleSubmit}
       submitLabel="Save changes"
       staffMemberId={staff.id}
+      roleOptions={roleOptions}
     />
   );
 }
