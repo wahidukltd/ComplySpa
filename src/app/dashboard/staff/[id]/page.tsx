@@ -357,7 +357,7 @@ export default async function StaffDetailPage({
                     </div>
                   </Link>
                   <div className="flex items-center gap-2">
-                    {(cred.status === "expiring" || cred.status === "expired") && (
+                    {canEdit && (cred.status === "expiring" || cred.status === "expired") && (
                       <Link
                         href={`/dashboard/credentials/${cred.id}/renew`}
                         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
