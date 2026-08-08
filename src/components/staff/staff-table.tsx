@@ -63,6 +63,20 @@ interface StaffTableProps {
   roleOptions?: RoleOption[];
 }
 
+function UnavailableNotice() {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-muted-foreground/20 bg-muted/20 px-4 py-3">
+      <AlertTriangle className="size-5 shrink-0 text-muted-foreground" />
+      <div>
+        <p className="text-sm font-medium">Compliance data unavailable</p>
+        <p className="text-xs text-muted-foreground">
+          Work readiness could not be computed. Try refreshing to see staff statuses.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function StatusIcon({ type }: { type: "check" | "alert" | "warning" }) {
   const labels: Record<string, string> = {
     check: "Work ready",
@@ -121,18 +135,10 @@ export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState
     });
   }, [staff, search, roleFilter, statusFilter, readinessMap, onboardingState]);
 
-  if (dataUnavailable) {
-    return (
-      <div className="flex items-center gap-3 rounded-lg border border-muted-foreground/20 bg-muted/20 px-4 py-3">
-        <AlertTriangle className="size-5 shrink-0 text-muted-foreground" />
-        <div>
-          <p className="text-sm font-medium">Compliance data unavailable</p>
-          <p className="text-xs text-muted-foreground">
-            Work readiness could not be computed. Try refreshing to see staff statuses.
-          </p>
-        </div>
-      </div>
-    );
+  // Query-failed case: no roster exists at all — the notice alone must
+  // render, never a false "No staff members yet" empty state.
+  if (staff.length === 0 && dataUnavailable) {
+    return <UnavailableNotice />;
   }
 
   if (staff.length === 0) {
@@ -147,6 +153,9 @@ export function StaffTable({ staff, onDelete, readinessMap = {}, onboardingState
 
   return (
     <div className="space-y-4">
+      {/* Partial failure: the roster is valid, the notice sits above it —
+          search, filters, and rows all stay usable. */}
+      {dataUnavailable && <UnavailableNotice />}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />

@@ -165,13 +165,21 @@ export async function getStaffReadinessBulk(
     // from the authenticated user's own `users` row). RLS backstops this —
     // an explicit clinic filter keeps the function safe even if a future
     // caller switches to a service-role client.
-    const { data: staffRows } = await supabase
+    const { data: staffRows, error: staffQueryErr } = await supabase
       .from("staff_members")
       .select("id, role, clinic_id")
       .eq("clinic_id", clinicId)
       .in("id", staffMemberIds)
       .is("deleted_at", null)
       .is("suspended_at", null);
+
+    if (staffQueryErr) {
+      // Mirror the single variant: a failed bulk query must be visible to
+      // monitoring. Return {} — the list page reads empty-with-staff as
+      // failed (dataUnavailable) and renders the honest notice.
+      Sentry.captureException(staffQueryErr);
+      return result;
+    }
 
     if (!staffRows || staffRows.length === 0) return result;
 

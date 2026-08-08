@@ -56,3 +56,11 @@ REVOKE EXECUTE ON FUNCTION soft_delete_staff_member(uuid, uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION soft_delete_staff_member(uuid, uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION soft_delete_staff_member(uuid, uuid) FROM service_role;
 GRANT EXECUTE ON FUNCTION soft_delete_staff_member(uuid, uuid) TO authenticated;
+
+-- One-time sweep: heal pre-058 orphans — checklist rows of staff already
+-- soft-deleted before this migration shipped. Idempotent; safe to re-run.
+DELETE FROM onboarding_items oi
+WHERE EXISTS (
+  SELECT 1 FROM staff_members s
+  WHERE s.id = oi.staff_member_id AND s.deleted_at IS NOT NULL
+);
