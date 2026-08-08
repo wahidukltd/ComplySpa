@@ -86,17 +86,24 @@ function computeReadinessFromMaps(
   return { status: finalStatus, missingCredentials, expiredCredentials, expiringCredentials };
 }
 
-export async function getStaffReadiness(staffMemberId: string): Promise<ReadinessResult> {
+export async function getStaffReadiness(staffMemberId: string): Promise<ReadinessResult | null> {
   try {
     const supabase = await createClient();
 
-    const { data: staff } = await supabase
+    const { data: staff, error: staffError } = await supabase
       .from("staff_members")
       .select("role, clinic_id")
       .eq("id", staffMemberId)
       .is("deleted_at", null)
       .is("suspended_at", null)
       .single();
+
+    if (staffError) {
+      // Contract: null = engine/DB failure — the caller renders an honest
+      // "unavailable" notice, never a false status (plan 2026-08-09).
+      Sentry.captureException(staffError);
+      return null;
+    }
 
     if (!staff || !staff.role) {
       return { status: "ready", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
@@ -111,12 +118,19 @@ export async function getStaffReadiness(staffMemberId: string): Promise<Readines
     const typeNameToId: Record<string, string> = {};
     for (const r of template.required) typeNameToId[r.name] = r.credentialTypeId;
 
-    const { data: credentials } = await supabase
+    const { data: credentials, error: credsError } = await supabase
       .from("credentials")
       .select("id, credential_type_id, status, credential_type:credential_types!credentials_credential_type_id_fkey(name)")
       .eq("staff_member_id", staffMemberId)
       .is("suspended_at", null)
       .is("deleted_at", null);
+
+    if (credsError) {
+      // Contract: null = engine/DB failure — never a false "pending"
+      // ("no credentials tracked yet") when the query itself failed.
+      Sentry.captureException(credsError);
+      return null;
+    }
 
     if (!credentials || credentials.length === 0) {
       return { status: "pending", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
@@ -125,8 +139,11 @@ export async function getStaffReadiness(staffMemberId: string): Promise<Readines
     const credsByType = groupCredentialsByType(credentials);
     return computeReadinessFromMaps(requiredNames, typeNameToId, credsByType);
   } catch (err) {
+    // Contract: null = engine/DB failure — the caller renders an honest
+    // "unavailable" notice, never a false "no credentials tracked yet"
+    // (plan 2026-08-09). Sentry capture stays.
     Sentry.captureException(err);
-    return { status: "pending", missingCredentials: [], expiredCredentials: [], expiringCredentials: [] };
+    return null;
   }
 }
 

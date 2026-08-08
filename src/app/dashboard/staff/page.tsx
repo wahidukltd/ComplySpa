@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { buttonVariants } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { StaffTableWrapper } from "./staff-table-wrapper";
 import { cn } from "@/lib/utils";
@@ -28,13 +28,17 @@ export default async function StaffListPage() {
 
   if (userErr || !userRecord) redirect("/onboarding");
 
-  const { data: staff } = await supabase
+  const { data: staff, error: staffQueryError } = await supabase
     .from("staff_members")
     .select("id, clinic_id, name, role, hire_date, email, phone, procedures_performed, deleted_at, created_at, updated_at")
     .eq("clinic_id", userRecord.clinic_id)
     .is("deleted_at", null)
     .is("suspended_at", null)
     .order("name");
+
+  if (staffQueryError) {
+    Sentry.captureException(staffQueryError);
+  }
 
   const staffIds = (staff ?? []).map((s) => s.id);
 
@@ -58,7 +62,7 @@ export default async function StaffListPage() {
   // catches per-staff errors internally) — an empty map for a clinic with
   // staff means the readiness engine itself is down.
   const readinessFailed = staffIds.length > 0 && Object.keys(readinessMap).length === 0;
-  const dataUnavailable = onboardingFailed || readinessFailed;
+  const dataUnavailable = onboardingFailed || readinessFailed || !!staffQueryError;
 
   // Role filter chips follow the resolved template set (built-ins + custom
   // roles, clinic-wins) so every chip maps to a real template.
@@ -81,6 +85,18 @@ export default async function StaffListPage() {
           </Link>
         )}
       </PageHeader>
+
+      {staffQueryError && (
+        <div className="flex items-center gap-3 rounded-lg border border-muted-foreground/20 bg-muted/20 px-4 py-3">
+          <AlertTriangle className="size-5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">Compliance data unavailable</p>
+            <p className="text-xs text-muted-foreground">
+              Staff records could not be loaded. Try refreshing to see staff statuses.
+            </p>
+          </div>
+        </div>
+      )}
 
       <StaffTableWrapper
         staff={(staff ?? []) as Tables<"staff_members">[]}

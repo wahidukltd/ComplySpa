@@ -46,7 +46,7 @@ export default async function StaffDetailPage({
 
   if (!staff) notFound();
 
-  const { data: credentials } = await supabase
+  const { data: credentials, error: credsError } = await supabase
     .from("credentials")
     .select(`
       id,
@@ -65,29 +65,22 @@ export default async function StaffDetailPage({
 
   const roleLabel = staff.role ? formatRoleLabel(staff.role) : null;
 
-  const { items: onboardingItems = [], progress: onboardingProgress = {
+  const onboardingRes = await getStaffOnboarding(id);
+  const onboardingFailed = "error" in onboardingRes;
+  const onboardingItems = ("items" in onboardingRes ? onboardingRes.items : []) ?? [];
+  const onboardingProgress = ("progress" in onboardingRes ? onboardingRes.progress : undefined) ?? {
     total: 0, completed: 0, skipped: 0, pending: 0,
     requiredTotal: 0, requiredCompleted: 0,
     optionalTotal: 0, optionalCompleted: 0,
     blocked: false,
-  } } =
-    await getStaffOnboarding(id).then((r) => ("items" in r ? r : { items: [], progress: {
-      total: 0, completed: 0, skipped: 0, pending: 0,
-      requiredTotal: 0, requiredCompleted: 0,
-      optionalTotal: 0, optionalCompleted: 0,
-      blocked: false,
-    } }));
+  };
 
   const validCount = credentials?.filter((c) => c.status === "valid").length ?? 0;
   const expiringCount = credentials?.filter((c) => c.status === "expiring").length ?? 0;
   const expiredCount = credentials?.filter((c) => c.status === "expired").length ?? 0;
 
-  const readiness: ReadinessResult = await getStaffReadiness(id).catch(() => ({
-    status: "pending" as const,
-    missingCredentials: [],
-    expiredCredentials: [],
-    expiringCredentials: [],
-  }));
+  const readiness: ReadinessResult | null = await getStaffReadiness(id).catch(() => null);
+  const readinessUnavailable = readiness === null;
 
   const canEdit = userRecord.role === "owner" || userRecord.role === "manager";
 
@@ -152,7 +145,18 @@ export default async function StaffDetailPage({
         </CardContent>
       </Card>
 
-      {readiness.status === "non_compliant" && (
+      {readinessUnavailable && (
+        <Card className="border-muted-foreground/20 bg-muted/20">
+          <CardContent className="pt-4">
+            <p className="font-medium text-muted-foreground">Compliance data unavailable</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Work readiness could not be computed. Try refreshing to see the status.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {readiness && readiness.status === "non_compliant" && (
         <Card className="border-destructive/30 bg-destructive/5">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
@@ -201,7 +205,7 @@ export default async function StaffDetailPage({
         </Card>
       )}
 
-      {readiness.status === "at_risk" && (
+      {readiness && readiness.status === "at_risk" && (
         <Card className="border-[#C2853A]/30 bg-[#C2853A]/5">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
@@ -231,7 +235,7 @@ export default async function StaffDetailPage({
         </Card>
       )}
 
-      {readiness.status === "ready" && (
+      {readiness && readiness.status === "ready" && (
         <Card className="border-[#4A8C5C]/30 bg-[#4A8C5C]/5">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
@@ -244,7 +248,7 @@ export default async function StaffDetailPage({
         </Card>
       )}
 
-      {readiness.status === "pending" && (
+      {readiness && readiness.status === "pending" && (
         <Card className="border-muted-foreground/20 bg-muted/20">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
@@ -265,7 +269,16 @@ export default async function StaffDetailPage({
         </Card>
       )}
 
-      {onboardingItems.length === 0 ? (
+      {onboardingFailed ? (
+        <Card id="onboarding">
+          <CardContent className="pt-4">
+            <h3 className="text-sm font-semibold">Getting Work Ready</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Couldn&apos;t load the checklist. Try refreshing to see onboarding progress.
+            </p>
+          </CardContent>
+        </Card>
+      ) : onboardingItems.length === 0 ? (
         <Card id="onboarding">
           <CardContent className="pt-4">
             <h3 className="text-sm font-semibold">Getting Work Ready</h3>
@@ -315,7 +328,16 @@ export default async function StaffDetailPage({
         )}
       </div>
 
-      {!credentials || credentials.length === 0 ? (
+      {credsError ? (
+        <Card className="border-muted-foreground/20 bg-muted/20">
+          <CardContent className="pt-4">
+            <p className="font-medium text-muted-foreground">Compliance data unavailable</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Credential records could not be loaded. Try refreshing to see them.
+            </p>
+          </CardContent>
+        </Card>
+      ) : !credentials || credentials.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
             <p className="text-sm text-muted-foreground">
