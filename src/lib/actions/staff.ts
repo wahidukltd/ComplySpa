@@ -105,10 +105,10 @@ export async function addStaffMember(input: StaffMemberInput) {
     const onboardingResult = await createOnboardingItems(staff.id, clinicId, staffRole, { requireTemplate: true, flow: "add-staff" });
     if (onboardingResult.error) {
       // Roll back the staff row — a hire whose requirements failed to
-      // generate must not linger as a half-created record. Clean up any items
-      // created before the failure so no orphan rows accumulate.
+      // generate must not linger as a half-created record. The RPC cleans up
+      // the checklist rows in the same transaction (migration 058), so no
+      // orphan items accumulate.
       await supabase.rpc("soft_delete_staff_member", { p_staff_id: staff.id, p_clinic_id: clinicId });
-      await supabase.from("onboarding_items").delete().eq("staff_member_id", staff.id).eq("clinic_id", clinicId);
       return { success: false, error: onboardingResult.error };
     }
   }
@@ -376,7 +376,6 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
     const onboardingResult = await createOnboardingItems(staff.id, clinicId, role, { requireTemplate: true, flow: "add-staff-wizard" });
     if (onboardingResult.error) {
       await supabase.rpc("soft_delete_staff_member", { p_staff_id: staff.id, p_clinic_id: clinicId });
-      await supabase.from("onboarding_items").delete().eq("staff_member_id", staff.id).eq("clinic_id", clinicId);
       return { success: false, error: onboardingResult.error };
     }
   }
@@ -402,7 +401,6 @@ export async function addStaffMemberWithCredentials(input: AddStaffWithCredentia
     if (credError) {
       Sentry.captureException(credError);
       await supabase.rpc("soft_delete_staff_member", { p_staff_id: staff.id, p_clinic_id: clinicId });
-      await supabase.from("onboarding_items").delete().eq("staff_member_id", staff.id).eq("clinic_id", clinicId);
       const limitError = planLimitErrorMessage(credError);
       if (limitError) return { success: false, error: "Your plan has reached its credential limit. Upgrade to add more." };
       return { success: false, error: "Failed to add credentials. Staff member was not created." };

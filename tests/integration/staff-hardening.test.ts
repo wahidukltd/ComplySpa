@@ -426,4 +426,44 @@ describe("staff hardening — RLS + constraint invariants (integration)", () => 
       .single();
     expect(credAfter!.deleted_at).toBeNull();
   });
+
+  describe("staff soft-delete onboarding_items cleanup (058)", () => {
+    it("soft-deleting a staff member removes their onboarding_items in the same transaction", async () => {
+      const { clinicId, staffId, typeId, ownerAuthId } = await setupClinic();
+      // seed one item as owner via PostgREST (pattern from the 044 test above)
+      const res = await fetchAsUser(ownerAuthId, "onboarding_items", {
+        method: "POST",
+        body: { staff_member_id: staffId, clinic_id: clinicId, credential_type_id: typeId, is_required: true },
+      });
+      expect(res.status).toBe(201);
+      // soft-delete via the RPC (existing file pattern, line 208)
+      const del = await fetchAsUser(ownerAuthId, "rpc/soft_delete_staff_member", {
+        method: "POST",
+        body: { p_staff_id: staffId, p_clinic_id: clinicId },
+      });
+      expect(del.status).toBe(200);
+      // items are gone
+      const admin = createAdminClient();
+      const { data: items } = await admin.from("onboarding_items").select("id").eq("staff_member_id", staffId);
+      expect(items ?? []).toHaveLength(0);
+    });
+
+    it("viewer RPC call returns false and leaves the staff member and items untouched", async () => {
+      const { clinicId, staffId, typeId, ownerAuthId, viewerAuthId } = await setupClinic();
+      await fetchAsUser(ownerAuthId, "onboarding_items", {
+        method: "POST",
+        body: { staff_member_id: staffId, clinic_id: clinicId, credential_type_id: typeId, is_required: true },
+      });
+      const res = await fetchAsUser(viewerAuthId, "rpc/soft_delete_staff_member", {
+        method: "POST",
+        body: { p_staff_id: staffId, p_clinic_id: clinicId },
+      });
+      expect(res.status).toBe(200);
+      const admin = createAdminClient();
+      const { data: staff } = await admin.from("staff_members").select("deleted_at").eq("id", staffId).single();
+      expect(staff?.deleted_at).toBeNull();
+      const { data: items } = await admin.from("onboarding_items").select("id").eq("staff_member_id", staffId);
+      expect(items ?? []).toHaveLength(1);
+    });
+  });
 });
