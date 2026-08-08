@@ -2,21 +2,27 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ClipboardList, History, CreditCard } from "lucide-react";
+import { ClipboardList, History } from "lucide-react";
 import { ClinicProfileForm } from "@/components/settings/clinic-profile-form";
 import { AlertRecipients } from "@/components/settings/alert-recipients";
 import { CustomCredentialTypes } from "@/components/settings/custom-credential-types";
 import { UserInviteForm } from "@/components/settings/user-invite-form";
 import { UserList } from "@/components/settings/user-list";
+import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { getAlertRecipients, getCredentialTypes, getClinicUsers } from "@/lib/actions/settings";
 import { getEntitlements } from "@/lib/utils/entitlements";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id;
@@ -51,7 +57,7 @@ export default async function SettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Settings"
-        description="Manage your clinic profile, alert recipients, credential types, and team."
+        description="Clinic identity, alert routing, credential configuration, and team access."
       >
         <Link
           href="/dashboard/settings/role-templates"
@@ -59,13 +65,6 @@ export default async function SettingsPage() {
         >
           <ClipboardList className="size-4" />
           Role Templates
-        </Link>
-        <Link
-          href="/dashboard/settings/billing"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
-        >
-          <CreditCard className="size-4" />
-          Billing
         </Link>
         <Link
           href="/dashboard/settings/notifications"
@@ -76,7 +75,7 @@ export default async function SettingsPage() {
         </Link>
       </PageHeader>
 
-      <Tabs defaultValue="profile" className="w-full">
+      <SettingsTabs defaultTab={tab ?? "profile"}>
         <TabsList>
           <TabsTrigger value="profile">Clinic Profile</TabsTrigger>
           {canManageAlertRecipients && <TabsTrigger value="recipients">Alert Recipients</TabsTrigger>}
@@ -89,6 +88,7 @@ export default async function SettingsPage() {
             name={clinic.name}
             address={clinic.address}
             state={clinic.state}
+            role={userRecord.role}
           />
         </TabsContent>
 
@@ -120,8 +120,7 @@ export default async function SettingsPage() {
             />
           </TabsContent>
         )}
-      </Tabs>
+      </SettingsTabs>
     </div>
   );
 }
-

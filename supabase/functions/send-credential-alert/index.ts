@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as Sentry from "npm:@sentry/deno@^8";
+import { canonicalRecipientList } from "./dedup.ts";
 
 const SENTRY_DSN = Deno.env.get("SENTRY_DSN");
 if (SENTRY_DSN) {
@@ -81,7 +82,7 @@ function isAuthorizedCaller(req: Request): boolean {
   const header = req.headers.get("x-cron-secret");
   if (!header) return false;
   // ponytail: crypto.subtle.timingSafeEqual is Node-only and absent in the
-  // Edge Runtime — XOR-accumulate is the standard WebCrypto-safe constant-time
+  // Edge Runtime ï¿½ XOR-accumulate is the standard WebCrypto-safe constant-time
   // string compare. Length is leaked (as before); contents are not.
   const enc = new TextEncoder();
   const a = enc.encode(header);
@@ -349,7 +350,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq("clinic_id", clinic_id)
       .eq("is_active", true);
 
-    const allRecipients = [...new Set([ownerEmail, ...(alertRecipients?.map((r) => r.email) ?? [])])].filter(Boolean);
+    // Case-insensitive canonicalization at delivery (plan Â§4.6): the same
+    // address in different casings must never produce duplicate emails,
+    // regardless of when or how the rows entered the table. The DB enforces
+    // case-insensitive uniqueness going forward (migration 056); this is the
+    // defensive layer for anything that predates it.
+    const allRecipients = canonicalRecipientList(ownerEmail, alertRecipients);
 
     const { data: clinic } = await supabase
       .from("clinics")

@@ -2,6 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 import * as Sentry from "@sentry/nextjs";
+import { buildInvitationEmail, buildInvitationSubject } from "./templates/invitation";
 
 function getResend(): Resend {
   const key = process.env.RESEND_API_KEY;
@@ -164,4 +165,25 @@ export async function sendEmailWithAttachment(
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Invitation email (plan §4.3). Reuses sendEmail's retry logic and reports
+ * provider ACCEPTANCE only — nothing here implies the recipient received or
+ * will receive the message. The sign-up URL is the public pricing/sign-up
+ * entry; the invitee's account links to the clinic by email match through
+ * completeInvitationSignup.
+ */
+export async function sendInvitationEmail(params: {
+  to: string;
+  clinicName: string;
+  signUpUrl?: string;
+}): Promise<SendEmailResult> {
+  const signUpUrl = params.signUpUrl ?? "https://complyspa.com/sign-up";
+  return sendEmail({
+    to: params.to,
+    subject: buildInvitationSubject(),
+    html: buildInvitationEmail({ clinicName: params.clinicName, signUpUrl }),
+    from: HELLO_FROM,
+  });
 }

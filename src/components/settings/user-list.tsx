@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { removeUser, updateUserRole } from "@/lib/actions/settings";
+import { useRouter } from "next/navigation";
+import { removeUser, resendInvitation, updateUserRole } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Trash2, UserCog } from "lucide-react";
+import { Loader2, MailWarning, Trash2, UserCog } from "lucide-react";
 import { formatDateTime } from "@/lib/utils/date";
 import { toast } from "sonner";
 
@@ -15,6 +16,7 @@ interface ClinicUser {
   email: string;
   role: string;
   created_at: string;
+  auth_user_id: string | null;
 }
 
 interface UserListProps {
@@ -30,19 +32,22 @@ const ROLE_STYLES: Record<string, { bg: string; text: string }> = {
 };
 
 export function UserList({ users, currentUserId, currentUserRole }: UserListProps) {
+  const router = useRouter();
   const [removing, setRemoving] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   async function handleRemove(id: string) {
     setRemoving(id);
     const result = await removeUser(id);
+    setRemoving(null);
+    setConfirmId(null);
     if (result.error) {
       toast.error(result.error);
     } else {
       toast.success("User removed");
+      router.refresh();
     }
-    setRemoving(null);
-    setConfirmId(null);
   }
 
   async function handleRoleChange(id: string, newRole: string) {
@@ -52,9 +57,25 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
         toast.error(result.error);
       } else {
         toast.success("Role updated");
+        router.refresh();
       }
     } catch {
       toast.error("Failed to update role");
+    }
+  }
+
+  async function handleResend(id: string) {
+    setResendingId(id);
+    const result = await resendInvitation(id);
+    setResendingId(null);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    if (result.emailAccepted) {
+      toast.success("Invitation email was accepted for delivery again.");
+    } else {
+      toast.warning("The invitation email could not be sent. Try again shortly.");
     }
   }
 
@@ -70,6 +91,7 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
           <div className="space-y-2">
             {users.map((u) => {
               const isSelf = u.id === currentUserId;
+              const isPending = u.auth_user_id === null;
               const roleStyle = ROLE_STYLES[u.role] ?? { bg: "#F2EFED", text: "#5A504C" };
 
               return (
@@ -86,9 +108,14 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
                       <p className="text-sm font-medium" style={{ color: "#000000" }}>
                         {u.email}
                         {isSelf && <span className="ml-1 text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>(you)</span>}
+                        {isPending && (
+                          <span className="ml-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium" style={{ backgroundColor: "#FBF0E0", color: "#7A4E1F" }}>
+                            Pending invite
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs" style={{ color: "rgba(0,0,0,0.55)" }}>
-                        Joined {formatDateTime(u.created_at)}
+                        {isPending ? "Invited — hasn't signed up yet" : `Joined ${formatDateTime(u.created_at)}`}
                       </p>
                     </div>
                   </div>
@@ -100,6 +127,21 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
                     >
                       {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
                     </Badge>
+
+                    {currentUserRole === "owner" && isPending && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        disabled={resendingId === u.id}
+                        onClick={() => handleResend(u.id)}
+                        aria-label={`Resend invitation to ${u.email}`}
+                      >
+                        {resendingId === u.id ? <Loader2 className="size-3.5 animate-spin" /> : <MailWarning className="size-3.5" />}
+                        Resend invite
+                      </Button>
+                    )}
 
                     {currentUserRole === "owner" && !isSelf && u.role !== "owner" && (
                       <>

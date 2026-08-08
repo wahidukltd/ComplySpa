@@ -187,14 +187,33 @@ describe("WITH CHECK enforcement (C1 fix)", () => {
 });
 
 describe("Billing bypass prevention (C2 fix)", () => {
-  it("authenticated user cannot UPDATE clinics", async () => {
+  // 055 (plan 2026-08-08): clinics UPDATE is owner-only via policy. The
+  // 006-era state revoked the grant entirely, which broke the Clinic Profile
+  // save at the DB layer; the corrected invariant is "owner can, others
+  // cannot". PostgREST returns 200 with zero affected rows for an
+  // RLS-invisible UPDATE.
+  it("non-owner cannot UPDATE clinics", async () => {
     const res = await patchAsUser(
-      clerkUserA,
+      clerkViewerA,
       "clinics",
       `id=eq.${clinicAId}`,
       { name: "Hacked Clinic" },
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toEqual([]);
+  });
+
+  it("owner can UPDATE clinics (Clinic Profile save path)", async () => {
+    const res = await patchAsUser(
+      clerkUserA,
+      "clinics",
+      `id=eq.${clinicAId}`,
+      { name: "RLS Test Clinic A" },
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toHaveLength(1);
   });
 });
 

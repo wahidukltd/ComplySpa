@@ -6,18 +6,38 @@ export const clinicProfileSchema = z.object({
   state: z.string().max(100, "Must be 100 characters or fewer").optional().or(z.literal("")),
 });
 
+// Emails are canonicalized (trim + lowercase) at the boundary so the DB
+// unique indexes (case-insensitive on alert_recipients, normalized-pending on
+// users) and the delivery pipeline see one canonical form.
 export const alertRecipientSchema = z.object({
-  email: z.string().email("Valid email required").max(255, "Email must be 255 characters or fewer"),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Valid email required")
+    .max(255, "Email must be 255 characters or fewer"),
 });
 
+// Single custom credential type schema — used by both the Settings add form
+// and the credential form's inline custom-type dialog (plan §4.7).
 export const customCredentialTypeSchema = z.object({
-  name: z.string().min(1, "Name is required").max(255, "Name must be 255 characters or fewer"),
+  name: z.string().trim().min(1, "Name is required").max(255, "Name must be 255 characters or fewer"),
   category: z.enum(["license", "training", "insurance", "agreement"]),
-  default_renewal_cycle_days: z.number().int().min(1, "Must be at least 1 day").max(3650, "Must be 3650 days or fewer").optional(),
+  renewal_days: z
+    .number()
+    .int("Must be a whole number of days")
+    .min(1, "Must be at least 1 day")
+    .max(3650, "Must be 3650 days or fewer")
+    .optional(),
 });
 
 export const inviteUserSchema = z.object({
-  email: z.string().email("Valid email required").max(255, "Email must be 255 characters or fewer"),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Valid email required")
+    .max(255, "Email must be 255 characters or fewer"),
   role: z.enum(["manager", "viewer"]),
 });
 

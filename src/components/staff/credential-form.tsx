@@ -29,7 +29,8 @@ import {
 } from "@/lib/validations/staff";
 import { uploadDocument } from "@/lib/utils/upload";
 import { addCustomCredentialType } from "@/lib/actions/credential-types";
-import { Loader2, Upload } from "lucide-react";
+import { findSimilarCredentialTypeName } from "@/lib/utils/credential-types";
+import { Loader2, Upload, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import * as Sentry from "@sentry/nextjs";
 import type { Tables } from "@/types/database";
@@ -66,6 +67,10 @@ export function CredentialForm({
   const [customName, setCustomName] = useState("");
   const [customCategory, setCustomCategory] = useState("training");
   const [customRenewal, setCustomRenewal] = useState("");
+  const customSimilarName = useMemo(
+    () => findSimilarCredentialTypeName(customName, credentialTypes),
+    [customName, credentialTypes],
+  );
   const [customSaving, setCustomSaving] = useState(false);
   const [typeSearch, setTypeSearch] = useState("");
   const [expirationEdited, setExpirationEdited] = useState(false);
@@ -445,6 +450,20 @@ export function CredentialForm({
                 onChange={(e) => setCustomName(e.target.value)}
                 placeholder="e.g. Radiofrequency Microneedling Cert"
               />
+              {customSimilarName && (
+                <p
+                  role="note"
+                  className="flex items-start gap-2 rounded-md border px-3 py-2 text-xs"
+                  style={{ borderColor: "#C2853A", color: "#7A4E1F", backgroundColor: "#FBF0E0" }}
+                >
+                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                  <span>
+                    A credential with a similar name already exists. If this is the credential you need, select the
+                    existing type. If it represents a different credential or requirement, you can continue creating
+                    your custom type.
+                  </span>
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="custom-category">Category</Label>

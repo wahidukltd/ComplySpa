@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -83,6 +84,8 @@ export function TemplateEditor({
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [credentialTypes, setCredentialTypes] = useState<CredentialTypeOption[]>([]);
   const [typesLoading, setTypesLoading] = useState(true);
+
+  const router = useRouter();
 
   const isOwnerOrManager = role === "owner" || role === "manager";
 
@@ -180,7 +183,7 @@ export function TemplateEditor({
     );
     setEditing(false);
     setDraftItems([]);
-    window.location.reload();
+    router.refresh();
   }
 
   async function handleReset() {
@@ -192,7 +195,7 @@ export function TemplateEditor({
       return;
     }
     toast.success("Reset to global default. Future hires will use the global template.");
-    window.location.reload();
+    router.refresh();
   }
 
   async function handleOpenSync() {
@@ -215,7 +218,7 @@ export function TemplateEditor({
       return;
     }
     toast.success(`${result.synced ?? 0} staff member${(result.synced ?? 0) === 1 ? "" : "s"} synced.`);
-    window.location.reload();
+    router.refresh();
   }
 
   const requiredItems = (editing ? draftItems : currentTemplate?.items ?? []).filter((i) => i.is_required);

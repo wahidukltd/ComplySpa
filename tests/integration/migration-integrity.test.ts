@@ -178,11 +178,22 @@ describe("Migration integrity", () => {
     expect(parseInt(result, 10)).toBe(0);
   });
 
-  it("clinics UPDATE is revoked from anon and authenticated (C2 regression guard)", () => {
-    const result = execSql(
-      "SELECT count(*) FROM information_schema.role_table_grants WHERE table_name = 'clinics' AND grantee IN ('anon', 'authenticated') AND privilege_type = 'UPDATE'",
+  it("clinics UPDATE is granted to authenticated and gated owner-only by policy (055 restores the app profile save)", () => {
+    const granted = execSql(
+      "SELECT count(*) FROM information_schema.role_table_grants WHERE table_name = 'clinics' AND grantee = 'authenticated' AND privilege_type = 'UPDATE'",
     );
-    expect(parseInt(result, 10)).toBe(0);
+    expect(parseInt(granted, 10)).toBe(1);
+    const anonGranted = execSql(
+      "SELECT count(*) FROM information_schema.role_table_grants WHERE table_name = 'clinics' AND grantee = 'anon' AND privilege_type = 'UPDATE'",
+    );
+    expect(parseInt(anonGranted, 10)).toBe(0);
+    // The 006-era state revoked the grant entirely, silently breaking
+    // updateClinicProfile at the DB layer (plan 2026-08-08 §4.1 finding).
+    // 055 restores the grant with an owner-only UPDATE policy as the gate.
+    const policy = execSql(
+      `SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='clinics' AND policyname='clinics_update_owner' AND cmd='UPDATE' AND qual LIKE '%owner%' AND with_check LIKE '%owner%'`,
+    );
+    expect(parseInt(policy, 10)).toBe(1);
   });
 
   it("cron functions are not callable by anon (C4 regression guard)", () => {

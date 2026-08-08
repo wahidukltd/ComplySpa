@@ -112,7 +112,7 @@ export default async function NotificationHistoryPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Notification History"
-        description="Every reminder generated for your clinic, with delivery status. Reminders are sent automatically as credentials near expiration."
+        description="A read-only record of every reminder generated for your clinic and its delivery status. Reminders are sent automatically as credentials near expiration — there is nothing to manage here."
       />
       <NotificationHistoryList rows={rows} summary={summary} />
     </div>
