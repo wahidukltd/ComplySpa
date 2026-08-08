@@ -7,7 +7,7 @@ vi.mock("@/lib/staff/role-templates", () => ({
 }));
 
 import { createClient } from "@/lib/supabase/server";
-import { getResolvedTemplate } from "@/lib/staff/role-templates";
+import { getResolvedTemplate, getResolvedTemplatesBulk } from "@/lib/staff/role-templates";
 import { getStaffReadiness, getStaffReadinessBulk } from "@/lib/staff/readiness";
 
 describe("getStaffReadiness error contract", () => {
@@ -71,6 +71,37 @@ describe("getStaffReadiness error contract", () => {
     });
     const result = await getStaffReadiness("staff-1");
     expect(result).toBeNull();
+  });
+});
+
+describe("getStaffReadinessBulk error contract", () => {
+  it("returns {} when the credentials query fails (never false statuses for the roster)", async () => {
+    (createClient as ReturnType<typeof vi.fn>).mockResolvedValue({
+      from: (table: string) => ({
+        select: () => ({
+          eq: () => ({
+            in: () => ({
+              is: () => ({
+                is: () =>
+                  table === "staff_members"
+                    ? { data: [{ id: "staff-1", role: "RN", clinic_id: "clinic-1" }], error: null }
+                    : { data: null, error: { message: "creds boom" } },
+              }),
+            }),
+          }),
+        }),
+      }),
+    });
+    (getResolvedTemplatesBulk as ReturnType<typeof vi.fn>).mockResolvedValue({
+      RN: {
+        templateId: "tpl-1",
+        clinicId: "clinic-1",
+        required: [{ credentialTypeId: "type-1", name: "RN License" }],
+        optional: [],
+      },
+    });
+    const result = await getStaffReadinessBulk(["staff-1"], "clinic-1");
+    expect(result).toEqual({});
   });
 });
 

@@ -203,13 +203,20 @@ export async function getStaffReadinessBulk(
       };
     }
 
-    const { data: allCredentials } = await supabase
+    const { data: allCredentials, error: credsErr } = await supabase
       .from("credentials")
       .select("staff_member_id, credential_type_id, status, id, credential_type:credential_types!credentials_credential_type_id_fkey(name)")
       .eq("clinic_id", clinicId)
       .in("staff_member_id", staffMemberIds)
       .is("suspended_at", null)
       .is("deleted_at", null);
+
+    if (credsErr) {
+      // A failed credentials query must not silently render false statuses for
+      // the whole roster — fail the bulk honestly (empty map = readinessFailed).
+      Sentry.captureException(credsErr);
+      return result;
+    }
 
     const credsByStaff: Record<string, { staff_member_id: string; credential_type_id: string | null; status: string; id: string; credential_type: { name: string } | null }[]> = {};
     for (const c of allCredentials ?? []) {
