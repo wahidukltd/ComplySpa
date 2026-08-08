@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { StaffFormWrapper } from "./staff-form-wrapper";
@@ -12,11 +12,15 @@ export default async function NewStaffPage() {
   if (!userId) redirect("/sign-in");
   const { data: userRecord, error: userErr } = await supabase
     .from("users")
-    .select("clinic_id")
+    .select("clinic_id, role")
     .eq("auth_user_id", userId)
     .maybeSingle();
 
   if (userErr || !userRecord) redirect("/onboarding");
+
+  // Viewers cannot create staff; the action layer also gates, but the page
+  // must not render a form that can never save (staff-edit pattern).
+  if (userRecord.role === "viewer") notFound();
 
   return (
     <div className="flex flex-col gap-6">

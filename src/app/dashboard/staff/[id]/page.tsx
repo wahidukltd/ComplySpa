@@ -245,12 +245,14 @@ export default async function StaffDetailPage({
               <AlertTriangle className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
               <div>
                 <p className="font-medium text-muted-foreground">Pending — no credentials tracked yet</p>
-                <Link
-                  href={`/dashboard/staff/${id}/credentials/new`}
-                  className="mt-1 inline-block text-xs text-primary hover:underline"
-                >
-                  Add credentials
-                </Link>
+                {canEdit && (
+                  <Link
+                    href={`/dashboard/staff/${id}/credentials/new`}
+                    className="mt-1 inline-block text-xs text-primary hover:underline"
+                  >
+                    Add credentials
+                  </Link>
+                )}
               </div>
             </div>
           </CardContent>
@@ -299,10 +301,12 @@ export default async function StaffDetailPage({
             </div>
           )}
         </div>
-        <Link href={`/dashboard/staff/${id}/credentials/new`} className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-1.5")}>
-          <Plus className="size-4" />
-          Add credential
-        </Link>
+        {canEdit && (
+          <Link href={`/dashboard/staff/${id}/credentials/new`} className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-1.5")}>
+            <Plus className="size-4" />
+            Add credential
+          </Link>
+        )}
       </div>
 
       {!credentials || credentials.length === 0 ? (
@@ -311,10 +315,12 @@ export default async function StaffDetailPage({
             <p className="text-sm text-muted-foreground">
               No credentials yet. Add a license, certification, or training record.
             </p>
-            <Link href={`/dashboard/staff/${id}/credentials/new`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>
-              <Plus className="size-4" />
-              Add first credential
-            </Link>
+            {canEdit && (
+              <Link href={`/dashboard/staff/${id}/credentials/new`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>
+                <Plus className="size-4" />
+                Add first credential
+              </Link>
+            )}
           </CardContent>
         </Card>
       ) : (

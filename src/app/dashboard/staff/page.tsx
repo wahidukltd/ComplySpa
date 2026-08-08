@@ -74,10 +74,12 @@ export default async function StaffListPage() {
         title="Staff"
         description="Manage your clinic's staff members."
       >
-        <Link href="/dashboard/staff/new" className={cn(buttonVariants({ variant: "default" }), "gap-1.5")}>
-          <Plus className="size-4" />
-          Add staff
-        </Link>
+        {userRecord.role !== "viewer" && (
+          <Link href="/dashboard/staff/new" className={cn(buttonVariants({ variant: "default" }), "gap-1.5")}>
+            <Plus className="size-4" />
+            Add staff
+          </Link>
+        )}
       </PageHeader>
 
       <StaffTableWrapper
