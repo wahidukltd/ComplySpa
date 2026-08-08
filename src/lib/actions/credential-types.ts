@@ -3,7 +3,7 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getClinicIdAndPlan } from "@/lib/utils/clinic";
+import { getClinicIdAndUser } from "@/lib/utils/clinic";
 import { customCredentialTypeSchema } from "@/lib/validations/settings";
 import * as Sentry from "@sentry/nextjs";
 
@@ -18,7 +18,7 @@ export async function addCustomCredentialType(input: {
   category: string;
   renewal_days?: number;
 }) {
-  const clinicData = await getClinicIdAndPlan();
+  const clinicData = await getClinicIdAndUser();
   if (!clinicData) return { error: "Unauthorized" };
 
   const { clinicId, userId } = clinicData;
@@ -36,7 +36,7 @@ export async function addCustomCredentialType(input: {
     .eq("auth_user_id", userId)
     .maybeSingle();
   if (!user) return { error: "Unauthorized" };
-  if (user.role === "viewer") return { error: "Insufficient permissions" };
+  if (!["owner", "manager"].includes(user.role)) return { error: "Insufficient permissions" };
 
   const { data: newType, error } = await supabase
     .from("credential_types")

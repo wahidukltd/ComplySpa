@@ -16,7 +16,7 @@ interface ClinicUser {
   email: string;
   role: string;
   created_at: string;
-  auth_user_id: string | null;
+  is_pending: boolean;
 }
 
 interface UserListProps {
@@ -39,14 +39,19 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
 
   async function handleRemove(id: string) {
     setRemoving(id);
-    const result = await removeUser(id);
-    setRemoving(null);
-    setConfirmId(null);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success("User removed");
-      router.refresh();
+    try {
+      const result = await removeUser(id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("User removed");
+        router.refresh();
+      }
+    } catch {
+      toast.error("Failed to remove user");
+    } finally {
+      setRemoving(null);
+      setConfirmId(null);
     }
   }
 
@@ -66,16 +71,21 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
 
   async function handleResend(id: string) {
     setResendingId(id);
-    const result = await resendInvitation(id);
-    setResendingId(null);
-    if (result.error) {
-      toast.error(result.error);
-      return;
-    }
-    if (result.emailAccepted) {
-      toast.success("Invitation email was accepted for delivery again.");
-    } else {
-      toast.warning("The invitation email could not be sent. Try again shortly.");
+    try {
+      const result = await resendInvitation(id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      if (result.emailAccepted) {
+        toast.success("Invitation email was accepted for delivery again.");
+      } else {
+        toast.warning("The invitation email could not be sent. Try again shortly.");
+      }
+    } catch {
+      toast.error("Failed to resend invitation");
+    } finally {
+      setResendingId(null);
     }
   }
 
@@ -91,7 +101,7 @@ export function UserList({ users, currentUserId, currentUserRole }: UserListProp
           <div className="space-y-2">
             {users.map((u) => {
               const isSelf = u.id === currentUserId;
-              const isPending = u.auth_user_id === null;
+              const isPending = u.is_pending;
               const roleStyle = ROLE_STYLES[u.role] ?? { bg: "#F2EFED", text: "#5A504C" };
 
               return (

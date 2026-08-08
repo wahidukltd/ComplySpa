@@ -45,7 +45,6 @@ interface ConfirmState {
   id: string;
   name: string;
   templates: number;
-  onboardingItems: number;
 }
 
 const SIMILAR_NAME_COPY =
@@ -102,7 +101,6 @@ export function CustomCredentialTypes({ custom, builtin, role }: CustomCredentia
         id,
         name: type?.name ?? "This credential type",
         templates: result.inUse.templates,
-        onboardingItems: result.inUse.onboardingItems,
       });
       return;
     }
@@ -256,10 +254,9 @@ export function CustomCredentialTypes({ custom, builtin, role }: CustomCredentia
           <DialogHeader>
             <DialogTitle>Remove {confirmState?.name}?</DialogTitle>
             <DialogDescription>
-              This type is referenced in {confirmState?.onboardingItems ?? 0} staff onboarding checklist
-              {confirmState?.onboardingItems === 1 ? "" : "s"} and {confirmState?.templates ?? 0} role template
-              {confirmState?.templates === 1 ? "" : "s"}. Removing it will also remove those references. Existing
-              credentials are not affected.
+              This type is part of {confirmState?.templates ?? 0} role template
+              {confirmState?.templates === 1 ? "" : "s"}. Removing it will also remove it from those templates.
+              Existing credentials and onboarding requirements are not affected.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

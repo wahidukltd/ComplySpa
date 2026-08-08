@@ -94,6 +94,12 @@ export async function completeInvitationSignup(authUserId: string): Promise<{ er
   const { data: { user: authUser } } = await (await createClient()).auth.getUser();
   if (!authUser?.email) return { error: "No email found for user" };
   if (!authUser.email_confirmed_at) return { error: "Please verify your email before claiming the invitation." };
+  // The id being linked MUST be the caller's own session id (review-team
+  // finding 2026-08-08): auth_user_id is immutable once set, so a
+  // client-supplied id here would bind an arbitrary (victim) account into
+  // the clinic. The admin client bypasses RLS — the session check is the
+  // only guard.
+  if (!authUser.id || authUserId !== authUser.id) return { error: "Unauthorized" };
 
   const admin = createAdminClient();
   const { data: pending } = await admin
@@ -122,6 +128,9 @@ export async function restoreExistingAccount(authUserId: string): Promise<{ redi
   const supabase = await createClient();
   const { data: { user: authUser } } = await supabase.auth.getUser();
   if (!authUser?.email) return { redirectTo: null, error: "No email found" };
+  // Session-binding guard (review-team finding 2026-08-08) — see
+  // completeInvitationSignup; the admin client bypasses RLS.
+  if (!authUser.id || authUserId !== authUser.id) return { redirectTo: null, error: "Unauthorized" };
 
   const supabaseAdmin = createAdminClient();
 

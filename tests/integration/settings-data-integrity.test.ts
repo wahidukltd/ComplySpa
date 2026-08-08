@@ -42,6 +42,68 @@ describe("Settings data integrity — migration 056 (plan §4.2)", () => {
     expect(parseInt(index, 10)).toBe(1);
   });
 
+  it("056 consolidation (seeded duplicate fixture, plan §7 step 2 DoD): case-variant duplicates collapse deterministically — earliest kept, active state preserved, email normalized", () => {
+    // Replays the reordered 056 consolidation against a seeded case-variant
+    // group INSIDE a transaction (review-team fix: the normalization must
+    // run after dedupe — a normalize-first order aborts with 23505 on this
+    // exact dataset). The CI index is dropped inside the transaction so the
+    // seed can exist at all; ROLLBACK restores the index and discards rows.
+    const result = execSql(
+      `BEGIN;
+DROP INDEX idx_alert_recipients_clinic_email_ci;
+INSERT INTO alert_recipients (clinic_id, email, is_active, created_at) VALUES
+  ('${clinicCId}', 'Owner@x.com', false, NOW() - interval '3 days'),
+  ('${clinicCId}', 'owner@x.com', true, NOW() - interval '2 days'),
+  ('${clinicCId}', 'OWNER@x.com', false, NOW() - interval '1 day');
+-- step 3: activate the earliest row when a later duplicate is active
+UPDATE alert_recipients a SET is_active = true
+WHERE a.is_active = false
+  AND EXISTS (
+    SELECT 1 FROM alert_recipients b
+    WHERE b.id <> a.id AND b.clinic_id = a.clinic_id
+      AND lower(b.email) = lower(a.email) AND b.is_active = true
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM alert_recipients c
+    WHERE c.clinic_id = a.clinic_id AND lower(c.email) = lower(a.email)
+      AND (c.created_at, c.id) < (a.created_at, a.id)
+  );
+-- step 4: keep earliest (created_at, id)
+DELETE FROM alert_recipients a
+WHERE a.id IN (
+  SELECT id FROM (
+    SELECT id, row_number() OVER (PARTITION BY clinic_id, lower(email) ORDER BY created_at ASC, id ASC) AS rn
+    FROM alert_recipients
+  ) ranked WHERE rn > 1
+);
+-- step 5: normalize (index-free at this point)
+UPDATE alert_recipients SET email = lower(btrim(email))
+WHERE email IS DISTINCT FROM lower(btrim(email));
+SELECT email || '|' || is_active::text FROM alert_recipients WHERE clinic_id = '${clinicCId}';
+ROLLBACK;`,
+    );
+    expect(result).toBe("owner@x.com|true");
+  });
+
+  it("056 CI index rejects a raw case-variant insert at the DB level (bypassing the action's normalization)", async () => {
+    const { data: seeded, error: seedError } = await serviceClient
+      .from("alert_recipients")
+      .insert({ clinic_id: clinicCId, email: "CaseVariant@test.com" })
+      .select("id")
+      .single();
+    expect(seedError).toBeNull();
+    expect(seeded).not.toBeNull();
+
+    const { error: dupError } = await serviceClient
+      .from("alert_recipients")
+      .insert({ clinic_id: clinicCId, email: "casevariant@test.com" })
+      .select("id")
+      .single();
+    expect(dupError?.code).toBe("23505");
+
+    await serviceClient.from("alert_recipients").delete().eq("id", seeded!.id);
+  });
+
   it("recipient uniqueness: Owner@x.com then owner@x.com collapses to one row (case-insensitive)", async () => {
     const first = await fetchAsUser(ownerC, "alert_recipients", {
       method: "POST",
@@ -145,10 +207,13 @@ describe("Settings data integrity — migration 056 (plan §4.2)", () => {
     expect(indexDef).toContain("deleted_at IS NULL");
   });
 
-  it("056: service_role gains the alert_recipients grants the edge function needs (036/038 lesson)", () => {
+  it("056: scoped grants — edge function (service_role) can read recipients; 028 F5 posture preserved (anon never gets DML)", () => {
     for (const priv of ["SELECT", "INSERT", "UPDATE", "DELETE"]) {
-      const granted = execSql(`SELECT has_table_privilege('service_role', 'alert_recipients', '${priv}')`);
-      expect(granted).toBe("t");
+      expect(execSql(`SELECT has_table_privilege('authenticated', 'alert_recipients', '${priv}')`)).toBe("t");
+      expect(execSql(`SELECT has_table_privilege('service_role', 'alert_recipients', '${priv}')`)).toBe("t");
+    }
+    for (const priv of ["INSERT", "UPDATE", "DELETE"]) {
+      expect(execSql(`SELECT has_table_privilege('anon', 'alert_recipients', '${priv}')`)).toBe("f");
     }
   });
 

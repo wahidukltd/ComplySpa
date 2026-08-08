@@ -53,6 +53,18 @@ export default async function SettingsPage({
   const { canManageUsers, canManageAlertRecipients } = getEntitlements(clinic.plan, clinic.trial_plan);
   const ownerEmail = usersResult.users.find((u) => u.role === "owner")?.email ?? null;
 
+  // Sanitize the deep-link tab against the tabs actually rendered for this
+  // session (review-team finding 2026-08-08): an entitlement-gated tab value
+  // (e.g. ?tab=users on a solo plan) must fall back to profile instead of
+  // rendering a dead tab state.
+  const allowedTabs = [
+    "profile",
+    "credential-types",
+    ...(canManageAlertRecipients ? ["recipients"] : []),
+    ...(canManageUsers ? ["users"] : []),
+  ];
+  const defaultTab = tab && allowedTabs.includes(tab) ? tab : "profile";
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -75,7 +87,7 @@ export default async function SettingsPage({
         </Link>
       </PageHeader>
 
-      <SettingsTabs defaultTab={tab ?? "profile"}>
+      <SettingsTabs defaultTab={defaultTab}>
         <TabsList>
           <TabsTrigger value="profile">Clinic Profile</TabsTrigger>
           {canManageAlertRecipients && <TabsTrigger value="recipients">Alert Recipients</TabsTrigger>}

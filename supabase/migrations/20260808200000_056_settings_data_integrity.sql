@@ -41,22 +41,35 @@ END $$;
 
 -- ============================================================================
 -- (a) Alert recipients — canonical case-insensitive identity
+--
+-- ORDER MATTERS (review-team finding, 2026-08-08): the old 018-era unique
+-- index (clinic_id, email) is CASE-SENSITIVE, so the only duplicate shape
+-- pre-056 data can contain is case-variant (e.g. 'Owner@x.com' +
+-- 'owner@x.com'). Normalizing before dropping that index would collide the
+-- new lowercase value with the other row's still-present old value (23505)
+-- and abort the migration on exactly the dataset this dedupe exists to fix.
+-- The index is therefore dropped FIRST, then consolidation runs against the
+-- raw values keyed on lower(email), then normalization (index-free) runs,
+-- then the case-insensitive index is created last.
 -- ============================================================================
 
--- 1. Normalize existing rows (idempotent; prod today: no-op).
-UPDATE alert_recipients SET email = lower(btrim(email))
-WHERE email IS DISTINCT FROM lower(btrim(email));
+-- 1. GRANT fix (036/038 lesson, found by the 056 integration suite): the
+--    018-era table grant covered `authenticated` only — the service_role
+--    edge function (send-credential-alert) could never read recipients.
+--    Production was masked by supabase_admin default privileges; a
+--    service-role read fails with 42501. Grants are scoped: anon keeps the
+--    028 F5 posture (SELECT only — DML stays revoked); authenticated and
+--    service_role carry full DML per the repo's table convention.
+GRANT SELECT ON alert_recipients TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON alert_recipients TO authenticated, service_role;
 
--- 1b. GRANT fix (036/038 lesson, found by the 056 integration suite): the
---     018-era table grant covered `authenticated` only — the service_role
---     edge function (send-credential-alert) could never read recipients.
---     Production was masked by supabase_admin default privileges; a
---     service-role read fails with 42501. Pin the full grant set here.
-GRANT SELECT, INSERT, UPDATE, DELETE ON alert_recipients TO anon, authenticated, service_role;
+-- 2. Drop the case-sensitive index before any row mutation (see header).
+DROP INDEX IF EXISTS idx_alert_recipients_clinic_email;
 
--- 2a. Deterministic consolidation: if the earliest row of a duplicate group
---     is inactive but any later duplicate is active, activate the earliest —
---     delivery must never be lost to consolidation.
+-- 3. Deterministic consolidation: if the earliest row of a duplicate group
+--    is inactive but any later duplicate is active, activate the earliest —
+--    delivery must never be lost to consolidation. Keyed on lower(email)
+--    against the RAW values.
 UPDATE alert_recipients a SET is_active = true
 WHERE a.is_active = false
   AND EXISTS (
@@ -73,9 +86,9 @@ WHERE a.is_active = false
       AND (c.created_at, c.id) < (a.created_at, a.id)
   );
 
--- 2b. Delete the newer duplicates — keep the earliest (created_at, id).
---     Same clinic + same normalized email = the same recipient by
---     definition; clinic-scoped only; never touches other clinics' rows.
+-- 4. Delete the newer duplicates — keep the earliest (created_at, id).
+--    Same clinic + same normalized email = the same recipient by
+--    definition; clinic-scoped only; never touches other clinics' rows.
 DELETE FROM alert_recipients a
 WHERE a.id IN (
   SELECT id FROM (
@@ -89,9 +102,13 @@ WHERE a.id IN (
   WHERE rn > 1
 );
 
--- 3. Rebuild the unique index case-insensitively (replaces the 018-era
+-- 5. Normalize existing rows (idempotent; index-free at this point so a
+--    case-variant group can never collide).
+UPDATE alert_recipients SET email = lower(btrim(email))
+WHERE email IS DISTINCT FROM lower(btrim(email));
+
+-- 6. Rebuild the unique index case-insensitively (replaces the 018-era
 --    case-sensitive unique index; enforced even if the app is bypassed).
-DROP INDEX IF EXISTS idx_alert_recipients_clinic_email;
 CREATE UNIQUE INDEX idx_alert_recipients_clinic_email_ci
   ON alert_recipients (clinic_id, lower(email));
 

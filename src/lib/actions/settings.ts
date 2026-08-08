@@ -7,6 +7,7 @@ import { getClinicIdAndUser } from "@/lib/utils/clinic";
 import { getPlanLimits } from "@/lib/utils/plan";
 import { getEntitlements } from "@/lib/utils/entitlements";
 import { sendInvitationEmail } from "@/lib/email/send";
+import { resolveInviteEmailOutcome } from "@/lib/email/invite-outcome";
 import {
   clinicProfileSchema,
   alertRecipientSchema,
@@ -214,12 +215,23 @@ export async function removeCustomCredentialType(id: string, confirmed = false) 
     };
   }
 
-  if (!confirmed && (templates > 0 || onboardingItems > 0)) {
+  // onboarding_items.credential_type_id is ON DELETE RESTRICT (migration
+  // 044 — onboarding completion history must not cascade away), so
+  // onboarding references BLOCK the delete, exactly like credentials.
+  // Only role-template references can be confirmed away (041 CASCADE).
+  if (onboardingItems > 0) {
+    return {
+      success: false,
+      error: `This type is used by ${onboardingItems} onboarding checklist item${onboardingItems === 1 ? "" : "s"}. Complete or remove those requirements first.`,
+    };
+  }
+
+  if (!confirmed && templates > 0) {
     return {
       success: false,
       error: null,
       requiresConfirmation: true,
-      inUse: { templates, onboardingItems },
+      inUse: { templates },
     };
   }
 
@@ -231,6 +243,16 @@ export async function removeCustomCredentialType(id: string, confirmed = false) 
     .eq("is_custom", true);
 
   if (error) {
+    if (error.code === "23503") {
+      // The RLS-filtered credential count can under-report (credentials of
+      // soft-deleted/suspended staff are invisible), but the RESTRICT FK
+      // (migration 001) sees every row — map the constraint to the friendly
+      // in-use message instead of a generic failure.
+      return {
+        success: false,
+        error: "This type is in use by credentials that are not visible here (for example, suspended staff). Delete or reassign them first.",
+      };
+    }
     Sentry.captureException(error);
     return { success: false, error: "Failed to remove credential type" };
   }
@@ -254,7 +276,28 @@ export async function getClinicUsers() {
     .is("deleted_at", null)
     .order("created_at");
 
-  return { users: data ?? [], error: null };
+  // Never ship raw auth UUIDs to the client (review-team finding 2026-08-08):
+  // the only consumer need is the pending-vs-member distinction, which is
+  // computed server-side here.
+  const users = (data ?? []).map((u) => ({
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    created_at: u.created_at,
+    is_pending: u.auth_user_id === null,
+  }));
+
+  return { users, error: null };
+}
+
+async function rollbackPendingInvite(clinicId: string, pendingUserId: string): Promise<void> {
+  // Soft-delete — the authenticated client has no DELETE policy on users.
+  const supabase = await createClient();
+  await supabase
+    .from("users")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", pendingUserId)
+    .eq("clinic_id", clinicId);
 }
 
 async function sendInviteEmail(
@@ -263,46 +306,46 @@ async function sendInviteEmail(
   pendingUserId: string,
 ): Promise<{ ok: boolean; emailAccepted: boolean; error?: string }> {
   const isProduction = process.env.NODE_ENV === "production";
+  const hasKey = Boolean(process.env.RESEND_API_KEY);
   const clinicName = await getClinicName(clinicId);
 
-  // Production fail-closed (plan §4.3): a missing/misconfigured email service
-  // must never leave a silently-unmailed pending row. In dev/test the row is
-  // kept and the UI degrades honestly (emailAccepted: false).
-  if (isProduction && !process.env.RESEND_API_KEY) {
-    Sentry.captureMessage("RESEND_API_KEY missing in production — invitation email not sent", {
-      level: "error",
-      extra: { feature: "settings", flow: "user-invite" },
-    });
-    return { ok: false, emailAccepted: false, error: "Email service is misconfigured — invitation not created" };
+  const sendResult = hasKey ? await sendInvitationEmail({ to: email, clinicName }) : null;
+  const outcome = resolveInviteEmailOutcome({
+    isProduction,
+    hasResendKey: hasKey,
+    sendSuccess: sendResult?.success ?? null,
+  });
+
+  if (!outcome.ok) {
+    // Production fail-closed (plan §4.3, review-team fix 2026-08-08): BOTH
+    // failure exits (missing key, send failure) roll the pending row back —
+    // the error "invitation not created" is never paired with a surviving
+    // unmailed row that holds a seat.
+    Sentry.captureMessage(
+      isProduction
+        ? "Invitation email could not be sent in production — invitation rolled back"
+        : "RESEND_API_KEY missing — invitation email not attempted",
+      {
+        level: "error",
+        tags: { feature: "settings", flow: "user-invite" },
+        extra: { error: sendResult?.error ?? "RESEND_API_KEY not set" },
+      },
+    );
+    if (outcome.rollback) {
+      await rollbackPendingInvite(clinicId, pendingUserId);
+    }
+    return { ok: false, emailAccepted: false, error: outcome.error };
   }
 
-  const result = await sendInvitationEmail({ to: email, clinicName });
-
-  if (!result.success) {
-    if (isProduction) {
-      // Fail closed: remove the just-created pending row so no invite exists
-      // without its email (soft-delete — the authenticated client has no
-      // DELETE policy on users).
-      const supabase = await createClient();
-      await supabase
-        .from("users")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", pendingUserId)
-        .eq("clinic_id", clinicId);
-      Sentry.captureMessage("Invitation email send failed in production — invitation rolled back", {
-        level: "error",
-        extra: { feature: "settings", flow: "user-invite", error: result.error },
-      });
-      return { ok: false, emailAccepted: false, error: "Email service is misconfigured — invitation not created" };
-    }
+  if (!outcome.emailAccepted) {
     Sentry.captureMessage("Invitation email send failed (dev/test) — invitation kept, no email", {
       level: "warning",
-      extra: { feature: "settings", flow: "user-invite", error: result.error },
+      tags: { feature: "settings", flow: "user-invite" },
+      extra: { error: sendResult?.error },
     });
-    return { ok: true, emailAccepted: false };
   }
 
-  return { ok: true, emailAccepted: true };
+  return { ok: true, emailAccepted: outcome.emailAccepted };
 }
 
 export async function inviteUser(input: InviteUserInput) {
@@ -346,12 +389,14 @@ export async function inviteUser(input: InviteUserInput) {
   // the invariant that closes the race is the partial unique index
   // (clinic_id, lower(email)) WHERE auth_user_id IS NULL AND deleted_at IS NULL
   // from migration 056 — concurrent inserts collapse to one row and the loser
-  // hits 23505 below.
+  // hits 23505 below. Lookups are case-insensitive (ilike = exact match, no
+  // wildcards) so a member/pending row stored with different casing
+  // (pre-normalization data) is still caught (review-team finding 2026-08-08).
   const { data: pending } = await supabase
     .from("users")
     .select("id")
     .eq("clinic_id", user.clinic_id)
-    .eq("email", parsed.data.email)
+    .ilike("email", parsed.data.email)
     .is("auth_user_id", null)
     .is("deleted_at", null)
     .maybeSingle();
@@ -363,7 +408,7 @@ export async function inviteUser(input: InviteUserInput) {
     .from("users")
     .select("id")
     .eq("clinic_id", user.clinic_id)
-    .eq("email", parsed.data.email)
+    .ilike("email", parsed.data.email)
     .is("deleted_at", null)
     .not("auth_user_id", "is", null)
     .maybeSingle();
@@ -384,13 +429,14 @@ export async function inviteUser(input: InviteUserInput) {
   if (inviteErr) {
     if (inviteErr.code === "23505") {
       // Race loser (migration 056 index / users_email_unique): the other
-      // request won. Re-read the surviving row so the UI can offer resend
-      // instead of an opaque error.
+      // request won. Re-read the surviving row (case-insensitive — the
+      // 056 index keys on lower(email)) so the UI can offer resend instead
+      // of an opaque error.
       const { data: survivor } = await supabase
         .from("users")
         .select("id")
         .eq("clinic_id", user.clinic_id)
-        .eq("email", parsed.data.email)
+        .ilike("email", parsed.data.email)
         .is("auth_user_id", null)
         .is("deleted_at", null)
         .maybeSingle();
@@ -406,7 +452,7 @@ export async function inviteUser(input: InviteUserInput) {
         .from("users")
         .select("id")
         .eq("clinic_id", user.clinic_id)
-        .eq("email", parsed.data.email)
+        .ilike("email", parsed.data.email)
         .is("auth_user_id", null)
         .not("deleted_at", "is", null)
         .maybeSingle();
