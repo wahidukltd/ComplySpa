@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,7 @@ export function StaffWizard() {
 
   const {
     register,
+    control,
     formState: { errors },
     getValues,
     setError,
@@ -94,6 +95,14 @@ export function StaffWizard() {
       manager: "",
     },
   });
+
+  // Debug log 2026-08-09: the Step-1 Next button was bound to
+  // `!getValues("name")?.trim()` — getValues does not subscribe to re-renders,
+  // so typing never re-evaluated the disabled prop and Next stayed permanently
+  // disabled (staff creation was blocked at step 1). useWatch is reactive and
+  // re-renders on field changes; called at the component top level (rules of
+  // hooks — renderStep1 is a nested render function).
+  const watchedName = useWatch({ control, name: "name" });
 
   useEffect(() => {
     async function loadTypes() {
@@ -438,7 +447,7 @@ export function StaffWizard() {
           <Button variant="outline" onClick={() => router.push("/dashboard/staff")}>
             Cancel
           </Button>
-          <Button onClick={() => setStep(2)} disabled={!getValues("name")?.trim()}>
+          <Button onClick={() => setStep(2)} disabled={!watchedName?.trim()}>
             Next
             <ChevronRight className="ml-1 size-4" />
           </Button>
