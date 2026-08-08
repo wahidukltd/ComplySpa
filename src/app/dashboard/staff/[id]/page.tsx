@@ -166,12 +166,14 @@ export default async function StaffDetailPage({
                         <Link href={`/dashboard/credentials/${ec.credentialId}`} className="text-destructive hover:underline">
                           {ec.name} — expired
                         </Link>
-                        <Link
-                          href={`/dashboard/credentials/${ec.credentialId}/renew`}
-                          className="ml-2 text-xs text-primary hover:underline"
-                        >
-                          Renew
-                        </Link>
+                        {canEdit && (
+                          <Link
+                            href={`/dashboard/credentials/${ec.credentialId}/renew`}
+                            className="ml-2 text-xs text-primary hover:underline"
+                          >
+                            Renew
+                          </Link>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -181,12 +183,14 @@ export default async function StaffDetailPage({
                     {readiness.missingCredentials.map((mc) => (
                       <li key={mc.name}>
                         <span className="text-destructive">{mc.name} — missing</span>
-                        <Link
-                          href={`/dashboard/staff/${id}/credentials/new`}
-                          className="ml-2 text-xs text-primary hover:underline"
-                        >
-                          Add now
-                        </Link>
+                        {canEdit && (
+                          <Link
+                            href={`/dashboard/staff/${id}/credentials/new`}
+                            className="ml-2 text-xs text-primary hover:underline"
+                          >
+                            Add now
+                          </Link>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -210,12 +214,14 @@ export default async function StaffDetailPage({
                       <Link href={`/dashboard/credentials/${ec.credentialId}`} className="hover:underline">
                         {ec.name}
                       </Link>
-                      <Link
-                        href={`/dashboard/credentials/${ec.credentialId}/renew`}
-                        className="ml-2 text-xs text-primary hover:underline"
-                      >
-                        Renew
-                      </Link>
+                      {canEdit && (
+                        <Link
+                          href={`/dashboard/credentials/${ec.credentialId}/renew`}
+                          className="ml-2 text-xs text-primary hover:underline"
+                        >
+                          Renew
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>
