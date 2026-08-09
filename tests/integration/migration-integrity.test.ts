@@ -17,7 +17,7 @@ const EXPECTED_TABLES = [
   "users",
 ] as const;
 
-const SEED_CREDENTIAL_TYPE_COUNT = 24;
+const SEED_CREDENTIAL_TYPE_COUNT = 26;
 
 const EXPECTED_IMMUTABILITY_TRIGGERS = [
   "trigger_users_clinic_id_immutable",
@@ -370,6 +370,41 @@ describe("Migration integrity", () => {
         expect(denied, `${fn} ${role}`).toBe("f");
       }
     }
+  });
+
+  it("059: LPN/LVN and Massage Therapy license types are seeded as global", () => {
+    const result = execSql(
+      "SELECT count(*) FROM credential_types WHERE is_custom = false AND name IN ('LPN/LVN License', 'Massage Therapy License')",
+    );
+    expect(parseInt(result, 10)).toBe(2);
+  });
+
+  it("059: six new global roles are seeded with >= 1 required item", () => {
+    for (const role of ["lpn", "laser_tech", "cosmetologist", "phlebotomist", "massage_therapist", "practice_manager"]) {
+      const required = execSql(
+        `SELECT count(*) FROM role_template_items i
+         JOIN role_templates t ON t.id = i.template_id
+         WHERE t.clinic_id IS NULL AND t.role = '${role}' AND i.is_required`,
+      );
+      expect(parseInt(required, 10)).toBeGreaterThan(0);
+    }
+  });
+
+  it("059: NP/PA agreement types are attached to their templates", () => {
+    const np = execSql(
+      `SELECT count(*) FROM role_template_items i
+       JOIN role_templates t ON t.id = i.template_id
+       JOIN credential_types c ON c.id = i.credential_type_id
+       WHERE t.clinic_id IS NULL AND t.role = 'NP' AND c.name = 'Collaborative Practice Agreement'`,
+    );
+    expect(parseInt(np, 10)).toBe(1);
+    const pa = execSql(
+      `SELECT count(*) FROM role_template_items i
+       JOIN role_templates t ON t.id = i.template_id
+       JOIN credential_types c ON c.id = i.credential_type_id
+       WHERE t.clinic_id IS NULL AND t.role = 'PA' AND c.name = 'Supervising Physician Agreement'`,
+    );
+    expect(parseInt(pa, 10)).toBe(1);
   });
 });
 
