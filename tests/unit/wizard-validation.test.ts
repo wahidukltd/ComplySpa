@@ -4,6 +4,7 @@ import {
   buildSuggestedRows,
   autoExpirationDate,
   rowDateError,
+  wizardRoleNameError,
 } from "@/lib/staff/wizard";
 
 const CPR_ID = "11111111-1111-1111-8111-111111111111";
@@ -120,5 +121,40 @@ describe("staffStep1Schema — the step-1 client gate mirrors the server constra
 
   it("rejects an over-length name", () => {
     expect(staffStep1Schema.safeParse({ name: "x".repeat(256) }).success).toBe(false);
+  });
+});
+
+describe("wizardRoleNameError — Step-2 custom role creation guard", () => {
+  it("rejects empty, over-length, and pattern-violating names", () => {
+    expect(wizardRoleNameError("", [])).not.toBeNull();
+    expect(wizardRoleNameError("   ", [])).not.toBeNull();
+    expect(wizardRoleNameError("Bad@Role", [])).not.toBeNull();
+    expect(wizardRoleNameError("A".repeat(81), [])).not.toBeNull();
+  });
+
+  it("rejects built-in role names (case-insensitive) with the Settings pointer", () => {
+    expect(wizardRoleNameError("RN", [])).toBe(
+      "This name matches a built-in role. Customize it in Settings → Role Templates instead.",
+    );
+    expect(wizardRoleNameError("rn", [])).toBe(
+      "This name matches a built-in role. Customize it in Settings → Role Templates instead.",
+    );
+    expect(wizardRoleNameError("front_desk", [])).toBe(
+      "This name matches a built-in role. Customize it in Settings → Role Templates instead.",
+    );
+  });
+
+  it("rejects own-clinic duplicate custom role names (case-insensitive)", () => {
+    expect(wizardRoleNameError("Laser Tech II", ["Laser Tech II"])).toBe(
+      "A role with this name already exists in your clinic.",
+    );
+    expect(wizardRoleNameError("laser tech ii", ["Laser Tech II"])).toBe(
+      "A role with this name already exists in your clinic.",
+    );
+  });
+
+  it("accepts valid custom names that collide with nothing", () => {
+    expect(wizardRoleNameError("Laser Tech II", ["Injectables Nurse"])).toBeNull();
+    expect(wizardRoleNameError("  Dermal Specialist  ", [])).toBeNull();
   });
 });

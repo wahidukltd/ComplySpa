@@ -1,5 +1,7 @@
 /** Shared staff-wizard types (no server/client imports — safe everywhere). */
 
+import { roleNameSchema, BUILT_IN_ROLES } from "@/lib/utils/roles";
+
 export interface WizardCredentialType {
   id: string;
   name: string;
@@ -70,6 +72,38 @@ export function autoExpirationDate(days: number, now: Date = new Date()): string
 export function rowDateError(issueDate: string, expirationDate: string): string | null {
   if (issueDate && expirationDate && expirationDate < issueDate) {
     return "Expiration must be on or after the issue date.";
+  }
+  return null;
+}
+
+/** Step-2 custom-role name guard. Mirrors the settings editor's
+ * validateCreateName (roleNameSchema + own-clinic case-insensitive duplicate)
+ * and adds the wizard-specific built-in guard: a custom role named like a
+ * built-in would silently become an override (getStaffWizardData excludes
+ * same-name-as-global clinic rows from customRoles) and never render as a
+ * card — a dead end. Built-in customization belongs in Settings. */
+export function wizardRoleNameError(
+  name: string,
+  existingCustomRoles: string[],
+): string | null {
+  const parsed = roleNameSchema.safeParse(name);
+  if (!parsed.success) {
+    return parsed.error.issues[0]?.message ?? "Invalid role name.";
+  }
+  const trimmed = parsed.data;
+  if (
+    (BUILT_IN_ROLES as readonly string[]).some(
+      (r) => r.toLowerCase() === trimmed.toLowerCase(),
+    )
+  ) {
+    return "This name matches a built-in role. Customize it in Settings → Role Templates instead.";
+  }
+  if (
+    existingCustomRoles.some(
+      (r) => r.toLowerCase() === trimmed.toLowerCase(),
+    )
+  ) {
+    return "A role with this name already exists in your clinic.";
   }
   return null;
 }

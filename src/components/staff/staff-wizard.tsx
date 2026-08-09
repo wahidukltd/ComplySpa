@@ -62,6 +62,7 @@ import {
   type WizardCredentialType,
 } from "@/lib/staff/wizard";
 import { WizardAddCredentialDialog } from "./wizard-add-credential-dialog";
+import { WizardCreateRoleDialog } from "./wizard-create-role-dialog";
 
 // MD and DO merge into one "Physician" card with an explicit MD/DO sub-choice
 // (distinct role values — medical director = first MD/DO — with identical 041
@@ -117,7 +118,6 @@ export function StaffWizard() {
   const [wizardCredentials, setWizardCredentials] = useState<WizardCredentialRow[]>([]);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the value is consumed by the create-custom-role dialog (wizard Task 6); Task 5 wires only the state + card button
   const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -206,6 +206,20 @@ export function StaffWizard() {
     } finally {
       setRoleLoading(false);
     }
+  }
+
+  /** Non-blinking refetch after a custom role is created: keeps the current
+   * data visible while swapping in the fresh customRoles list (the initial
+   * load's skeleton flash is fine; a post-create flash is not). */
+  async function refreshWizardData() {
+    const { data, error } = await getStaffWizardData(null);
+    if (!error && data) {
+      setWizardData({ types: data.types, customRoles: data.customRoles });
+    }
+  }
+
+  function handleCreatedRole(role: string) {
+    void refreshWizardData().then(() => handleRoleSelect(role));
   }
 
   function handleRoleSelect(role: string) {
@@ -1113,6 +1127,15 @@ export function StaffWizard() {
         onOpenChange={setAddDialogOpen}
         types={availableTypes()}
         onAdd={handleAddCredential}
+      />
+
+      <WizardCreateRoleDialog
+        key={String(createRoleOpen)}
+        open={createRoleOpen}
+        onOpenChange={setCreateRoleOpen}
+        types={wizardData?.types ?? []}
+        customRoles={wizardData?.customRoles ?? []}
+        onCreated={handleCreatedRole}
       />
     </div>
   );
