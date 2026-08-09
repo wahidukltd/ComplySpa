@@ -586,7 +586,10 @@ export function TemplateEditor({
   }
 
   const emptyOverrideNote =
-    isOverride && currentTemplate !== null && currentTemplate.items.length === 0;
+    isOverride &&
+    !isCustomRole &&
+    currentTemplate !== null &&
+    currentTemplate.items.length === 0;
 
   const emptyCustomRoleNote =
     isCustomRole && currentTemplate !== null && currentTemplate.items.length === 0;
