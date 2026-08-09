@@ -24,15 +24,21 @@ import {
   HeartPulse,
   Sparkles,
   Bandage,
+  Briefcase,
   Building2,
   CircleDot,
+  Droplet,
+  HeartHandshake,
   Loader2,
+  Palette,
   Plus,
   Trash2,
   ChevronLeft,
   ChevronRight,
   Check,
   RotateCcw,
+  Syringe,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -44,7 +50,7 @@ import {
   type StaffStep1Values,
 } from "@/lib/validations/staff";
 import {
-  ROLE_CARD_ORDER,
+  ROLE_GROUPS,
   ROLE_DISPLAY_LABELS,
 } from "@/lib/staff/role-credential-defaults";
 import { formatRoleLabel } from "@/lib/utils/roles";
@@ -63,12 +69,11 @@ import { WizardAddCredentialDialog } from "./wizard-add-credential-dialog";
 // row has ZERO items (041 seed), so a hire would be instantly green "Work
 // Ready" (readiness.ts:116 — zero-required template) with zero credentials
 // and an empty checklist — a false compliance claim. Clinic custom roles
-// (always a real template row, 057) cover "none of the above".
+// (always a real template row, 057) cover "none of the above"; zero-item
+// custom roles are filtered server-side (getStaffWizardData). Cards render
+// in ROLE_GROUPS order (Clinical / Aesthetic / Operations / Custom).
 const PHYSICIAN_GROUP = "__physician__";
 const PHYSICIAN_CHOICES = ["MD", "DO"] as const;
-const BUILT_IN_CARD_ROLES = ROLE_CARD_ORDER.filter(
-  (role) => role !== "MD" && role !== "DO" && role !== "other",
-);
 
 const STEP1_FIELDS = [
   "name",
@@ -85,8 +90,14 @@ const ROLE_ICONS: Record<string, typeof Stethoscope> = {
   NP: UserCheck,
   PA: HeartPulse,
   RN: Heart,
+  lpn: Syringe,
   esthetician: Sparkles,
+  cosmetologist: Palette,
+  laser_tech: Zap,
+  phlebotomist: Droplet,
+  massage_therapist: HeartHandshake,
   MA: Bandage,
+  practice_manager: Briefcase,
   front_desk: Building2,
 };
 
@@ -106,6 +117,8 @@ export function StaffWizard() {
   const [wizardCredentials, setWizardCredentials] = useState<WizardCredentialRow[]>([]);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the value is consumed by the create-custom-role dialog (wizard Task 6); Task 5 wires only the state + card button
+  const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const {
@@ -579,6 +592,55 @@ export function StaffWizard() {
     const isPhysicianActive =
       selectedRole === "MD" || selectedRole === "DO" || roleGroup === PHYSICIAN_GROUP;
 
+    const physicianCard = (
+      <button
+        type="button"
+        onClick={handlePhysicianCard}
+        disabled={roleLoading}
+        aria-pressed={isPhysicianActive}
+        className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent ${
+          isPhysicianActive
+            ? "border-primary bg-primary/5 ring-1 ring-primary"
+            : "border-border hover:border-muted-foreground/30"
+        }`}
+      >
+        <Stethoscope
+          className={`size-8 ${isPhysicianActive ? "text-primary" : "text-muted-foreground"}`}
+        />
+        <span className={`text-sm font-medium ${isPhysicianActive ? "text-primary" : ""}`}>
+          Physician
+        </span>
+        <span className="text-xs text-muted-foreground">Covers MD &amp; DO</span>
+      </button>
+    );
+
+    const builtInCard = (roleKey: string) => {
+      const Icon = ROLE_ICONS[roleKey] ?? CircleDot;
+      const label = ROLE_DISPLAY_LABELS[roleKey] ?? roleKey;
+      const isSelected = selectedRole === roleKey;
+      return (
+        <button
+          key={roleKey}
+          type="button"
+          onClick={() => handleRoleSelect(roleKey)}
+          disabled={roleLoading}
+          aria-pressed={isSelected}
+          className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent ${
+            isSelected
+              ? "border-primary bg-primary/5 ring-1 ring-primary"
+              : "border-border hover:border-muted-foreground/30"
+          }`}
+        >
+          <Icon
+            className={`size-8 ${isSelected ? "text-primary" : "text-muted-foreground"}`}
+          />
+          <span className={`text-sm font-medium ${isSelected ? "text-primary" : ""}`}>
+            {label}
+          </span>
+        </button>
+      );
+    };
+
     return (
       <div className="space-y-5">
         <div>
@@ -607,62 +669,42 @@ export function StaffWizard() {
             ))}
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <button
-              type="button"
-              onClick={handlePhysicianCard}
-              disabled={roleLoading}
-              aria-pressed={isPhysicianActive}
-              className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent ${
-                isPhysicianActive
-                  ? "border-primary bg-primary/5 ring-1 ring-primary"
-                  : "border-border hover:border-muted-foreground/30"
-              }`}
-            >
-              <Stethoscope
-                className={`size-8 ${isPhysicianActive ? "text-primary" : "text-muted-foreground"}`}
-              />
-              <span className={`text-sm font-medium ${isPhysicianActive ? "text-primary" : ""}`}>
-                Physician
-              </span>
-              <span className="text-xs text-muted-foreground">Covers MD &amp; DO</span>
-            </button>
-
-            {BUILT_IN_CARD_ROLES.map((roleKey) => {
-              const Icon = ROLE_ICONS[roleKey] ?? CircleDot;
-              const label = ROLE_DISPLAY_LABELS[roleKey] ?? roleKey;
-              const isSelected = selectedRole === roleKey;
-              return (
-                <button
-                  key={roleKey}
-                  type="button"
-                  onClick={() => handleRoleSelect(roleKey)}
-                  disabled={roleLoading}
-                  aria-pressed={isSelected}
-                  className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent ${
-                    isSelected
-                      ? "border-primary bg-primary/5 ring-1 ring-primary"
-                      : "border-border hover:border-muted-foreground/30"
-                  }`}
-                >
-                  <Icon
-                    className={`size-8 ${isSelected ? "text-primary" : "text-muted-foreground"}`}
-                  />
-                  <span className={`text-sm font-medium ${isSelected ? "text-primary" : ""}`}>
-                    {label}
-                  </span>
-                </button>
-              );
-            })}
-
-            {wizardData.customRoles.length > 0 && (
-              <>
-                <div className="col-span-full mt-2 flex items-center gap-3">
+          <div className="space-y-6">
+            {ROLE_GROUPS.map((group) => (
+              <div key={group.key} className="space-y-3">
+                <div className="flex items-center gap-3">
                   <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    Custom roles
+                    {group.label}
                   </span>
                   <div className="h-px flex-1 bg-border" />
                 </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.key === "clinical" && physicianCard}
+                  {group.roles.map(builtInCard)}
+                </div>
+              </div>
+            ))}
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Custom roles
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => setCreateRoleOpen(true)}
+                  aria-label="Create a custom role"
+                  className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-all hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <Plus className="size-8 text-muted-foreground" />
+                  <span className="text-sm font-medium">Create custom role</span>
+                  <span className="text-xs text-muted-foreground">
+                    Name it and pick its credentials
+                  </span>
+                </button>
                 {wizardData.customRoles.map((roleKey) => {
                   const isSelected = selectedRole === roleKey;
                   return (
@@ -688,8 +730,8 @@ export function StaffWizard() {
                     </button>
                   );
                 })}
-              </>
-            )}
+              </div>
+            </div>
           </div>
         )}
 
