@@ -219,6 +219,11 @@ export function StaffWizard() {
   }
 
   function toggleCredential(credentialTypeId: string) {
+    // A skipped row carries no saved validation error (pre-merge review M-1):
+    // unchecking clears it — the next Save re-validates. (Reading the current
+    // row here is fine — event-handler time, not an updater purity issue.)
+    const current = wizardCredentials.find((c) => c.credentialTypeId === credentialTypeId);
+    if (current?.checked) clearRowError(credentialTypeId);
     setWizardCredentials((prev) =>
       prev.map((c) => {
         if (c.credentialTypeId !== credentialTypeId) return c;
@@ -376,18 +381,28 @@ export function StaffWizard() {
       }));
 
     setSubmitting(true);
-    const result = await addStaffMemberWithCredentials({
-      name: values.name,
-      email: values.email || "",
-      phone: values.phone || "",
-      location: values.location || "",
-      department: values.department || "",
-      hire_date: values.hire_date || "",
-      manager: values.manager || "",
-      role: selectedRole,
-      procedures_performed: [],
-      credentials: checkedCredentials,
-    });
+    let result;
+    try {
+      result = await addStaffMemberWithCredentials({
+        name: values.name,
+        email: values.email || "",
+        phone: values.phone || "",
+        location: values.location || "",
+        department: values.department || "",
+        hire_date: values.hire_date || "",
+        manager: values.manager || "",
+        role: selectedRole,
+        procedures_performed: [],
+        credentials: checkedCredentials,
+      });
+    } catch {
+      // A rejected save must never wedge the button in "Saving…" (pre-merge
+      // review I-1 — the same failure class the load paths were hardened
+      // for). The wizard state stays intact for a retry.
+      setSubmitting(false);
+      toast.error("Failed to save. Please try again.");
+      return;
+    }
     setSubmitting(false);
 
     if (result.success && result.id) {
@@ -870,7 +885,7 @@ export function StaffWizard() {
         </div>
 
         <div className="flex justify-between pt-2">
-          <Button variant="outline" onClick={() => setStep(2)}>
+          <Button variant="outline" onClick={() => setStep(2)} disabled={submitting}>
             <ChevronLeft className="mr-1 size-4" />
             Back
           </Button>

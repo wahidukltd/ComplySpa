@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { wizardCredentialSchema } from "@/lib/validations/staff";
+import { staffStep1Schema, wizardCredentialSchema } from "@/lib/validations/staff";
 import {
   buildSuggestedRows,
   autoExpirationDate,
@@ -102,5 +102,23 @@ describe("wizardCredentialSchema — server date-order refine (defense-in-depth)
       expiration_date: "2026-01-02",
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("staffStep1Schema — the step-1 client gate mirrors the server constraints (pre-merge review M-4)", () => {
+  it("accepts a valid form", () => {
+    expect(
+      staffStep1Schema.safeParse({ name: "Jane Smith", email: "jane@clinic.com" }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an invalid email", () => {
+    expect(staffStep1Schema.safeParse({ name: "Jane Smith", email: "not-an-email" }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejects an over-length name", () => {
+    expect(staffStep1Schema.safeParse({ name: "x".repeat(256) }).success).toBe(false);
   });
 });
