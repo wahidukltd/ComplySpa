@@ -73,3 +73,26 @@ export const ROLE_VALUES = [
   'laser_tech', 'phlebotomist', 'massage_therapist', 'MA', 'practice_manager',
   'front_desk', 'other',
 ] as const;
+
+/** Wizard Step-2 role card groups (order preserved). MD/DO render as the
+ * merged "Physician" card with an explicit sub-choice (PHYSICIAN_GROUP in
+ * staff-wizard.tsx); `other` is never offered in the add flow (zero-item
+ * template → false "Work Ready"). Every other built-in belongs to exactly
+ * one group — the coverage test enforces it. */
+export const ROLE_GROUPS: { key: string; label: string; roles: string[] }[] = [
+  {
+    key: "clinical",
+    label: "Clinical",
+    roles: ["NP", "PA", "RN", "lpn", "MA", "phlebotomist"],
+  },
+  {
+    key: "aesthetic",
+    label: "Aesthetic",
+    roles: ["esthetician", "cosmetologist", "laser_tech", "massage_therapist"],
+  },
+  {
+    key: "operations",
+    label: "Operations",
+    roles: ["front_desk", "practice_manager"],
+  },
+];
