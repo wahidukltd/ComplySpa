@@ -31,22 +31,18 @@ export function WizardAddCredentialDialog({
 }: WizardAddCredentialDialogProps) {
   const [search, setSearch] = useState("");
 
-  // A fresh picker on every open — the search clears when the dialog closes
-  // (plan amendment 2026-08-09: state reset in the event handler, not an
-  // effect — eslint-config-next's react-hooks/set-state-in-effect rejects the
-  // effect form; the first open starts with the initial "").
-  const handleOpenChange = (next: boolean) => {
-    if (!next) setSearch("");
-    onOpenChange(next);
-  };
-
+  // A fresh picker on every open — the parent renders this dialog with
+  // key={String(addDialogOpen)}, so it remounts on every open/close and the
+  // search always starts empty (plan amendments 2026-08-09/4: no effect, no
+  // close-reset wrapper needed — the remount IS the reset, and it covers the
+  // Cancel and add-close paths that a wrapper cannot reach).
   const query = search.trim().toLowerCase();
   const filtered = query
     ? types.filter((t) => t.name.toLowerCase().includes(query))
     : types;
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a credential</DialogTitle>

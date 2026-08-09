@@ -82,8 +82,6 @@ const STEP1_FIELDS = [
 type Step1Field = (typeof STEP1_FIELDS)[number];
 
 const ROLE_ICONS: Record<string, typeof Stethoscope> = {
-  MD: Stethoscope,
-  DO: Stethoscope,
   NP: UserCheck,
   PA: HeartPulse,
   RN: Heart,
@@ -140,13 +138,19 @@ export function StaffWizard() {
     (async () => {
       setLoadError(null);
       setWizardData(null);
-      const { data, error } = await getStaffWizardData(null);
-      if (cancelled) return;
-      if (error || !data) {
-        setLoadError(error ?? "Failed to load wizard data.");
-        return;
+      try {
+        const { data, error } = await getStaffWizardData(null);
+        if (cancelled) return;
+        if (error || !data) {
+          setLoadError(error ?? "Failed to load wizard data.");
+          return;
+        }
+        setWizardData({ types: data.types, customRoles: data.customRoles });
+      } catch {
+        // A rejected transport must surface like a returned error — never an
+        // infinite skeleton with no Retry (final-review M-1).
+        if (!cancelled) setLoadError("Failed to load wizard data.");
       }
-      setWizardData({ types: data.types, customRoles: data.customRoles });
     })();
     return () => {
       cancelled = true;
@@ -170,16 +174,25 @@ export function StaffWizard() {
   async function loadSuggestions(role: string) {
     setRoleLoading(true);
     setStep2Error(null);
-    const { data, error } = await getStaffWizardData(role);
-    setRoleLoading(false);
-    if (error || !data) {
-      // Honest failure: no stale rows, no silent empty list — Next stays
-      // blocked until the retry succeeds.
+    try {
+      const { data, error } = await getStaffWizardData(role);
+      if (error || !data) {
+        // Honest failure: no stale rows, no silent empty list — Next stays
+        // blocked until the retry succeeds.
+        setWizardCredentials([]);
+        setStep2Error(error ?? "Failed to load credentials for this role.");
+        return;
+      }
+      setWizardCredentials(buildSuggestedRows(data.suggestions));
+    } catch {
+      // A rejected transport must not leave the role controls permanently
+      // disabled (final-review M-1) — the same honest error path as a
+      // returned error, with roleLoading always cleared.
       setWizardCredentials([]);
-      setStep2Error(error ?? "Failed to load credentials for this role.");
-      return;
+      setStep2Error("Failed to load credentials for this role.");
+    } finally {
+      setRoleLoading(false);
     }
-    setWizardCredentials(buildSuggestedRows(data.suggestions));
   }
 
   function handleRoleSelect(role: string) {
@@ -417,11 +430,9 @@ export function StaffWizard() {
           <div key={s.num} className="flex items-center gap-2">
             <div
               className={`flex size-8 items-center justify-center rounded-full text-sm font-medium ${
-                step > s.num
+                step >= s.num
                   ? "bg-primary text-primary-foreground"
-                  : step === s.num
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
+                  : "bg-muted text-muted-foreground"
               }`}
             >
               {step > s.num ? <Check className="size-4" /> : s.num}
@@ -1040,6 +1051,7 @@ export function StaffWizard() {
       {step === 3 && renderStep3()}
 
       <WizardAddCredentialDialog
+        key={String(addDialogOpen)}
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         types={availableTypes()}
