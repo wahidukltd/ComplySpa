@@ -118,14 +118,18 @@ describe("getStaffWizardData — data assembly (role = null)", () => {
       }), // credential_types
       () => ({
         data: [
-          { role: "MD", clinic_id: null },
-          { role: "other", clinic_id: null },
-          { role: "RN", clinic_id: null },
-          { role: "RN", clinic_id: "clinic-1" },
-          { role: "Injectables Nurse", clinic_id: "clinic-1" },
+          { id: "tmpl-md", role: "MD", clinic_id: null },
+          { id: "tmpl-other", role: "other", clinic_id: null },
+          { id: "tmpl-rn", role: "RN", clinic_id: null },
+          { id: "tmpl-rn-override", role: "RN", clinic_id: "clinic-1" },
+          { id: "tmpl-injectables", role: "Injectables Nurse", clinic_id: "clinic-1" },
         ],
         error: null,
       }), // role_templates
+      () => ({
+        data: [{ template_id: "tmpl-injectables" }],
+        error: null,
+      }), // role_template_items (clinic templates only)
     ]);
     mockedCreateClient.mockResolvedValue(supabase as never);
 
@@ -140,7 +144,50 @@ describe("getStaffWizardData — data assembly (role = null)", () => {
     // Clinic row for a global role is an override, not a custom role.
     expect(result.data!.customRoles).toEqual(["Injectables Nurse"]);
     expect(result.data!.suggestions).toEqual([]);
-    expect(calls.map((c) => c.from)).toEqual(["users", "credential_types", "role_templates"]);
+    expect(calls.map((c) => c.from)).toEqual([
+      "users", "credential_types", "role_templates", "role_template_items",
+    ]);
+  });
+
+  it("excludes zero-item custom roles from the wizard card list", async () => {
+    const { supabase, calls } = makeSupabase([
+      () => ({ data: { role: "owner" }, error: null }), // users lookup
+      () => ({ data: [], error: null }), // credential_types
+      () => ({
+        data: [
+          { id: "tmpl-md", role: "MD", clinic_id: null },
+          { id: "tmpl-empty", role: "Vague Role", clinic_id: "clinic-1" },
+          { id: "tmpl-real", role: "Laser Tech II", clinic_id: "clinic-1" },
+        ],
+        error: null,
+      }), // role_templates
+      () => ({
+        data: [{ template_id: "tmpl-real" }],
+        error: null,
+      }), // role_template_items — only tmpl-real has items
+    ]);
+    mockedCreateClient.mockResolvedValue(supabase as never);
+
+    const result = await getStaffWizardData(null);
+
+    expect(result.error).toBeNull();
+    expect(result.data!.customRoles).toEqual(["Laser Tech II"]);
+    expect(calls.map((c) => c.from)).toContain("role_template_items");
+  });
+
+  it("skips the items query when the clinic has no template rows", async () => {
+    const { supabase, calls } = makeSupabase([
+      () => ({ data: { role: "owner" }, error: null }), // users lookup
+      () => ({ data: [], error: null }), // credential_types
+      () => ({ data: [], error: null }), // role_templates (no clinic rows)
+    ]);
+    mockedCreateClient.mockResolvedValue(supabase as never);
+
+    const result = await getStaffWizardData(null);
+
+    expect(result.error).toBeNull();
+    expect(result.data!.customRoles).toEqual([]);
+    expect(calls.map((c) => c.from)).not.toContain("role_template_items");
   });
 });
 
