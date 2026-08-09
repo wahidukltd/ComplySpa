@@ -77,11 +77,18 @@ export function WizardAddCredentialDialog({
       return;
     }
     setCreating(true);
-    const result = await addCustomCredentialType({
-      name: parsed.data.name,
-      category: parsed.data.category,
-      renewal_days: parsed.data.renewal_days,
-    });
+    let result;
+    try {
+      result = await addCustomCredentialType({
+        name: parsed.data.name,
+        category: parsed.data.category,
+        renewal_days: parsed.data.renewal_days,
+      });
+    } catch {
+      setCreating(false);
+      toast.error("Something went wrong. Please try again.");
+      return;
+    }
     setCreating(false);
     if (result.error) {
       setCreateError(result.error);
@@ -167,6 +174,7 @@ export function WizardAddCredentialDialog({
                   if (createError) setCreateError(null);
                 }}
                 aria-invalid={!!createError}
+                aria-describedby={createError ? "wiz-new-type-name-error" : undefined}
               />
             </div>
             <div className="space-y-2">
@@ -203,7 +211,11 @@ export function WizardAddCredentialDialog({
                 Used to auto-fill expiration dates when this type is included.
               </p>
             </div>
-            {createError && <p className="text-sm text-destructive">{createError}</p>}
+            {createError && (
+              <p id="wiz-new-type-name-error" className="text-sm text-destructive">
+                {createError}
+              </p>
+            )}
           </div>
         )}
 
@@ -235,7 +247,7 @@ export function WizardAddCredentialDialog({
         <DialogFooter>
           {mode === "create" ? (
             <>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={creating}>
                 Cancel
               </Button>
               <Button onClick={handleCreateType} disabled={creating}>

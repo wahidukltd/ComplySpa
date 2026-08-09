@@ -219,7 +219,7 @@ export function StaffWizard() {
   }
 
   function handleCreatedRole(role: string) {
-    void refreshWizardData().then(() => handleRoleSelect(role));
+    void refreshWizardData().finally(() => handleRoleSelect(role));
   }
 
   function handleRoleSelect(role: string) {

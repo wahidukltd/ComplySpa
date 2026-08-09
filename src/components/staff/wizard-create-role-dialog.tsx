@@ -84,13 +84,20 @@ export function WizardCreateRoleDialog({
       return;
     }
     setSaving(true);
-    const result = await createRoleTemplate({
-      role: name.trim(),
-      items: items.map((i) => ({
-        credential_type_id: i.credential_type_id,
-        is_required: i.is_required,
-      })),
-    });
+    let result;
+    try {
+      result = await createRoleTemplate({
+        role: name.trim(),
+        items: items.map((i) => ({
+          credential_type_id: i.credential_type_id,
+          is_required: i.is_required,
+        })),
+      });
+    } catch {
+      setSaving(false);
+      toast.error("Something went wrong. Please try again.");
+      return;
+    }
     setSaving(false);
     if (result.error) {
       toast.error(result.error);
@@ -126,8 +133,13 @@ export function WizardCreateRoleDialog({
                 if (nameError) setNameError(null);
               }}
               aria-invalid={!!nameError}
+              aria-describedby={nameError ? "wiz-new-role-name-error" : undefined}
             />
-            {nameError && <p className="text-sm text-destructive">{nameError}</p>}
+            {nameError && (
+              <p id="wiz-new-role-name-error" className="text-sm text-destructive">
+                {nameError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -209,7 +221,7 @@ export function WizardCreateRoleDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
           <Button onClick={handleCreate} disabled={saving}>
