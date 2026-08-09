@@ -77,6 +77,15 @@ describe("formatRoleLabel — display labels", () => {
     expect(formatRoleLabel("other")).toBe("Other");
   });
 
+  it("labels the new med spa roles", () => {
+    expect(formatRoleLabel("lpn")).toBe("LPN / LVN");
+    expect(formatRoleLabel("laser_tech")).toBe("Laser Technician");
+    expect(formatRoleLabel("cosmetologist")).toBe("Cosmetologist");
+    expect(formatRoleLabel("phlebotomist")).toBe("Phlebotomist");
+    expect(formatRoleLabel("massage_therapist")).toBe("Massage Therapist");
+    expect(formatRoleLabel("practice_manager")).toBe("Practice Manager");
+  });
+
   it("passes custom role names through unchanged (the name IS the label)", () => {
     expect(formatRoleLabel("Laser Technician")).toBe("Laser Technician");
     expect(formatRoleLabel("Injectioniste")).toBe("Injectioniste");
@@ -84,8 +93,8 @@ describe("formatRoleLabel — display labels", () => {
 });
 
 describe("isBuiltInRole", () => {
-  it("recognizes the 9 seeded roles", () => {
-    expect(BUILT_IN_ROLES).toHaveLength(9);
+  it("recognizes the 15 seeded roles", () => {
+    expect(BUILT_IN_ROLES).toHaveLength(15);
     for (const role of BUILT_IN_ROLES) {
       expect(isBuiltInRole(role)).toBe(true);
     }

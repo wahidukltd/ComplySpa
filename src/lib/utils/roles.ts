@@ -21,15 +21,22 @@ export const roleNameSchema = z
     "Role name can only contain letters, numbers, spaces, and basic punctuation ( - ' ( ) . & / + ).",
   );
 
-/** The 9 ComplySpa-seeded roles (migration 041). */
+/** The 15 ComplySpa-seeded roles (migrations 041 + 059). Order is
+ * canonical: provider → nursing → aesthetic → support. */
 export const BUILT_IN_ROLES = [
   "MD",
   "DO",
   "NP",
   "PA",
   "RN",
+  "lpn",
   "esthetician",
+  "cosmetologist",
+  "laser_tech",
+  "phlebotomist",
+  "massage_therapist",
   "MA",
+  "practice_manager",
   "front_desk",
   "other",
 ] as const;
