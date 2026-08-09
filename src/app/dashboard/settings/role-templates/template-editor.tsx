@@ -588,6 +588,9 @@ export function TemplateEditor({
   const emptyOverrideNote =
     isOverride && currentTemplate !== null && currentTemplate.items.length === 0;
 
+  const emptyCustomRoleNote =
+    isCustomRole && currentTemplate !== null && currentTemplate.items.length === 0;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -702,6 +705,14 @@ export function TemplateEditor({
               <div className="mb-4 rounded-lg border border-[#C2853A]/40 bg-[#C2853A]/10 px-4 py-3 text-sm">
                 This customized template has no requirements — it fully replaces the global
                 default. Future hires in this role will have an empty checklist.
+              </div>
+            )}
+
+            {emptyCustomRoleNote && (
+              <div className="mb-4 rounded-lg border border-[#C2853A]/40 bg-[#C2853A]/10 px-4 py-3 text-sm">
+                This custom role has no credentials, so it is hidden from the staff wizard —
+                a hire would show as instantly ready with an empty checklist. Add at least
+                one credential to make it selectable.
               </div>
             )}
 
