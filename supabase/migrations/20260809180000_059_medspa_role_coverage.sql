@@ -28,10 +28,12 @@
 -- 1. New global credential types (is_custom = false, clinic_id = NULL)
 -- ============================================================================
 INSERT INTO credential_types (name, category, default_renewal_cycle_days, is_custom)
-VALUES ('LPN/LVN License', 'license', 730, false);
+VALUES ('LPN/LVN License', 'license', 730, false)
+ON CONFLICT DO NOTHING;
 
 INSERT INTO credential_types (name, category, default_renewal_cycle_days, is_custom)
-VALUES ('Massage Therapy License', 'license', 730, false);
+VALUES ('Massage Therapy License', 'license', 730, false)
+ON CONFLICT DO NOTHING;
 
 -- ============================================================================
 -- 2. New global role templates (all with >= 1 required item)

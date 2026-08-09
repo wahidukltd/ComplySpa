@@ -83,6 +83,10 @@ export function WizardCreateRoleDialog({
       toast.error("Add at least one credential to the role.");
       return;
     }
+    if (!items.some((i) => i.is_required)) {
+      toast.error("Add at least one required credential to the role.");
+      return;
+    }
     setSaving(true);
     let result;
     try {
@@ -215,8 +219,8 @@ export function WizardCreateRoleDialog({
           )}
 
           <p className="text-xs text-muted-foreground">
-            At least one credential is required — a role with none would show a
-            new hire as instantly ready with an empty checklist.
+            Include at least one required credential — a role with none would
+            show a new hire as instantly ready with an empty checklist.
           </p>
         </div>
 

@@ -127,7 +127,7 @@ describe("getStaffWizardData — data assembly (role = null)", () => {
         error: null,
       }), // role_templates
       () => ({
-        data: [{ template_id: "tmpl-injectables" }],
+        data: [{ template_id: "tmpl-injectables", is_required: true }],
         error: null,
       }), // role_template_items (clinic templates only)
     ]);
@@ -149,7 +149,7 @@ describe("getStaffWizardData — data assembly (role = null)", () => {
     ]);
   });
 
-  it("excludes zero-item custom roles from the wizard card list", async () => {
+  it("excludes zero-item and all-optional custom roles from the wizard card list", async () => {
     const { supabase, calls } = makeSupabase([
       () => ({ data: { role: "owner" }, error: null }), // users lookup
       () => ({ data: [], error: null }), // credential_types
@@ -157,14 +157,18 @@ describe("getStaffWizardData — data assembly (role = null)", () => {
         data: [
           { id: "tmpl-md", role: "MD", clinic_id: null },
           { id: "tmpl-empty", role: "Vague Role", clinic_id: "clinic-1" },
+          { id: "tmpl-optional-only", role: "Optional Only", clinic_id: "clinic-1" },
           { id: "tmpl-real", role: "Laser Tech II", clinic_id: "clinic-1" },
         ],
         error: null,
       }), // role_templates
       () => ({
-        data: [{ template_id: "tmpl-real" }],
+        data: [
+          { template_id: "tmpl-optional-only", is_required: false },
+          { template_id: "tmpl-real", is_required: true },
+        ],
         error: null,
-      }), // role_template_items — only tmpl-real has items
+      }), // role_template_items — only tmpl-real has a required item
     ]);
     mockedCreateClient.mockResolvedValue(supabase as never);
 

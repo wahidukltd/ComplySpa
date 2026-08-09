@@ -219,7 +219,9 @@ export function StaffWizard() {
   }
 
   function handleCreatedRole(role: string) {
-    void refreshWizardData().finally(() => handleRoleSelect(role));
+    void refreshWizardData()
+      .catch(() => undefined)
+      .then(() => handleRoleSelect(role));
   }
 
   function handleRoleSelect(role: string) {
@@ -737,8 +739,9 @@ export function StaffWizard() {
                 <button
                   type="button"
                   onClick={() => setCreateRoleOpen(true)}
+                  disabled={roleLoading}
                   aria-label="Create a custom role"
-                  className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-all hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-all hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
                 >
                   <Plus className="size-8 text-muted-foreground" />
                   <span className="text-sm font-medium">Create custom role</span>

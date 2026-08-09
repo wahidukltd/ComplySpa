@@ -463,24 +463,29 @@ export async function getStaffWizardData(
     return { data: null, error: "Failed to load role templates." };
   }
 
-  // Zero-item custom roles are the `other` trap: a hire would be instantly
-  // green "Work Ready" with zero credentials (readiness.ts:116 — zero-required
-  // template resolves to ready). The wizard card list must never offer one.
+  // Zero-item and all-optional custom roles are the `other` trap: a hire
+  // would be instantly green "Work Ready" with zero credentials
+  // (readiness.ts:116 — a zero-REQUIRED template resolves to ready). The
+  // wizard card list must never offer one, however the template was created.
   const clinicTemplateIds = (templateRows ?? [])
     .filter((t) => t.clinic_id !== null)
     .map((t) => t.id);
 
-  let templateIdsWithItems = new Set<string>();
+  let templateIdsWithRequired = new Set<string>();
   if (clinicTemplateIds.length > 0) {
     const { data: itemRows, error: itemErr } = await supabase
       .from("role_template_items")
-      .select("template_id")
+      .select("template_id, is_required")
       .in("template_id", clinicTemplateIds);
     if (itemErr) {
       Sentry.captureException(itemErr);
       return { data: null, error: "Failed to load role templates." };
     }
-    templateIdsWithItems = new Set((itemRows ?? []).map((i) => i.template_id));
+    templateIdsWithRequired = new Set(
+      (itemRows ?? [])
+        .filter((i) => i.is_required)
+        .map((i) => i.template_id),
+    );
   }
 
   const globalRoles = new Set(
@@ -491,7 +496,7 @@ export async function getStaffWizardData(
       (t) =>
         t.clinic_id !== null &&
         !globalRoles.has(t.role) &&
-        templateIdsWithItems.has(t.id),
+        templateIdsWithRequired.has(t.id),
     )
     .map((t) => t.role)
     .sort();
