@@ -312,6 +312,33 @@ export function StaffWizard() {
     setAddDialogOpen(false);
   }
 
+  /** Builds the row from the RETURNED type object — typeById is memoized on
+   * wizardData, so it is stale within this same render cycle; reading the
+   * new type from the action result is the only correct source. */
+  function handleAddCredentialType(type: WizardCredentialType) {
+    setWizardData((prev) =>
+      prev ? { ...prev, types: [...prev.types, type] } : prev,
+    );
+    setWizardCredentials((prev) => [
+      ...prev,
+      {
+        credentialTypeId: type.id,
+        name: type.name,
+        category: type.category,
+        isRequired: false,
+        fromTemplate: false,
+        checked: true,
+        licenseNumber: "",
+        state: "",
+        issueDate: "",
+        expirationDate: type.defaultRenewalCycleDays
+          ? autoExpirationDate(type.defaultRenewalCycleDays)
+          : "",
+      },
+    ]);
+    setAddDialogOpen(false);
+  }
+
   function removeCredential(credentialTypeId: string) {
     setWizardCredentials((prev) =>
       prev.filter((c) => c.credentialTypeId !== credentialTypeId),
@@ -1127,6 +1154,7 @@ export function StaffWizard() {
         onOpenChange={setAddDialogOpen}
         types={availableTypes()}
         onAdd={handleAddCredential}
+        onCreatedType={handleAddCredentialType}
       />
 
       <WizardCreateRoleDialog
